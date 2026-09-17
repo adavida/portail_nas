@@ -1,4 +1,4 @@
-use axum::{extract::Path, http::StatusCode, routing::get, routing::put, Json, Router};
+use axum::{Json, Router, extract::Path, http::StatusCode, routing::get, routing::put};
 use serde_json::json;
 
 use crate::{

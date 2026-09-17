@@ -52,7 +52,7 @@ impl Fixture {
         }
     }
 
-    async fn seed(self: &Self) -> (StatusCode, (StatusCode, BodyJson)) {
+    async fn seed(&self) -> (StatusCode, (StatusCode, BodyJson)) {
         let user = send(
             Method::POST,
             "/api/users",
@@ -110,7 +110,7 @@ async fn add_member_makes_uid_visible_in_group() {
 
     assert_eq!(create_status, StatusCode::CREATED);
 
-    let extra = format!("apim2u{}", fixture.uid[5..].to_string());
+    let extra = format!("apim2u{}", &fixture.uid[5..]);
     let (extra_status, _) = send(
         Method::POST,
         "/api/users",
@@ -154,7 +154,7 @@ async fn remove_member_hides_uid_from_group() {
         return;
     }
 
-    let second = format!("apim3x{}", fixture.uid[5..].to_string());
+    let second = format!("apim3x{}", &fixture.uid[5..]);
     let (extra_status, _) = send(
         Method::POST,
         "/api/users",

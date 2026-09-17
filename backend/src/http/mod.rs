@@ -3,7 +3,7 @@ pub mod groups;
 pub mod health;
 pub mod users;
 
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 
 pub fn router() -> Router {
     Router::new()

@@ -18,32 +18,6 @@ pub(crate) fn ldap_base() -> String {
     std::env::var("LDAP_BASE_DN").unwrap_or_else(|_| "dc=dev,dc=example,dc=com".into())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::ldap_url;
-
-    #[ctor::ctor(unsafe)]
-    fn redirect_ldap_to_test() {
-        std::env::set_var(
-            "LDAP_URL",
-            std::env::var("LDAP_TEST_URL").unwrap_or_else(|_| "ldap://127.0.0.1:3891".into()),
-        );
-        std::env::set_var(
-            "LDAP_BASE_DN",
-            std::env::var("LDAP_TEST_BASE_DN")
-                .unwrap_or_else(|_| "dc=test,dc=example,dc=com".into()),
-        );
-    }
-
-    #[test]
-    fn ldap_url_reads_env() {
-        std::env::set_var("LDAP_URL", "ldap://example:1");
-        assert_eq!(ldap_url(), "ldap://example:1");
-        std::env::remove_var("LDAP_URL");
-        assert_eq!(ldap_url(), "ldap://127.0.0.1:3890");
-    }
-}
-
 pub(crate) async fn connect_admin(base: &str) -> Result<ldap3::Ldap, AppError> {
     let (conn, mut ldap) = ldap3::LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
 
@@ -74,5 +48,31 @@ pub(crate) trait MapLdap<T> {
 impl<T> MapLdap<T> for Result<T, ldap3::LdapError> {
     fn map_ldap(self) -> Result<T, AppError> {
         self.map_err(|e| AppError::Ldap(e.to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ldap_url;
+
+    #[ctor::ctor(unsafe)]
+    fn redirect_ldap_to_test() {
+        std::env::set_var(
+            "LDAP_URL",
+            std::env::var("LDAP_TEST_URL").unwrap_or_else(|_| "ldap://127.0.0.1:3891".into()),
+        );
+        std::env::set_var(
+            "LDAP_BASE_DN",
+            std::env::var("LDAP_TEST_BASE_DN")
+                .unwrap_or_else(|_| "dc=test,dc=example,dc=com".into()),
+        );
+    }
+
+    #[test]
+    fn ldap_url_reads_env() {
+        std::env::set_var("LDAP_URL", "ldap://example:1");
+        assert_eq!(ldap_url(), "ldap://example:1");
+        std::env::remove_var("LDAP_URL");
+        assert_eq!(ldap_url(), "ldap://127.0.0.1:3890");
     }
 }
