@@ -5,8 +5,10 @@ pub struct Health {
     pub status: String,
 }
 
-pub fn health_status() -> Health {
-    Health {
-        status: "ok".into(),
+impl Health {
+    pub fn ok() -> Self {
+        Self {
+            status: "ok".into(),
+        }
     }
 }

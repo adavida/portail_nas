@@ -25,5 +25,5 @@
 ## Layout
 
 - Racine: `devenv.nix` / `devenv.yaml` / `devenv.lock` / `.envrc` (`/home/david/projects/rust/nas/202260917_portail`)
-- Code: `backend/src/main.rs`, `frontend/src/` (`App.tsx`, `main.tsx`, `App.test.tsx`, `vite.config.ts`)
+- Code: `backend/src/main.rs`, `backend/src/{domain,http,controllers}/`, `frontend/src/` (`App.tsx`, `main.tsx`, `App.test.tsx`, `vite.config.ts`)
 - Config: `.vscode/{settings,extensions}.json`, `justfile`, `.opencode/rules/01-devenv.md` … `04-workflow.md`

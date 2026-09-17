@@ -3,11 +3,11 @@
 > Skills de référence:
 >
 > - Formatage/lints: `.opencode/skills/backend-format/SKILL.md` (trigger `backend/src`, `Cargo.toml`, `*.rs`)
-> - Structure/serde: `.opencode/skills/backend-structure/SKILL.md` (trigger `backend/src/lib.rs`, `routes/`, `domain/`)
+> - Structure/serde: `.opencode/skills/backend-structure/SKILL.md` (trigger `backend/src/lib.rs`, `http/`, `controllers/`, `domain/`)
 
 ## Backend `portail-backend` (Axum 0.7, Tokio full)
 
-- Workspace `Cargo.toml:2` `members = ["backend"]`, crate `backend/Cargo.toml:2`. Voir skills ci-dessus pour `rustfmt`/`clippy`/`serde`/`domain`/`routes`.
+- Workspace `Cargo.toml:2` `members = ["backend"]`, crate `backend/Cargo.toml:2`. Voir skill ci-dessus pour `rustfmt`/`clippy`/`serde`/`domain`/`http`/`controllers`.
 
 ## Frontend `portail-frontend` (Vite + React 18 + TS)
 
