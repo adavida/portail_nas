@@ -1,11 +1,13 @@
 # 03 — Backend & Frontend
 
+> Skills de référence:
+>
+> - Formatage/lints: `.opencode/skills/backend-format/SKILL.md` (trigger `backend/src`, `Cargo.toml`, `*.rs`)
+> - Structure/serde: `.opencode/skills/backend-structure/SKILL.md` (trigger `backend/src/lib.rs`, `routes/`, `domain/`)
+
 ## Backend `portail-backend` (Axum 0.7, Tokio full)
 
-- Workspace `Cargo.toml:2` `members = ["backend"]`, crate `backend/Cargo.toml:2`.
-- Entrypoint `backend/src/main.rs:15` `Router::new().route("/api/health", get(health))` → `{"status":"ok"}`. Ne pas déplacer sans MAJ `frontend/src/App.tsx:7` et `frontend/vite.config.ts:8` proxy.
-- Tests collocalisés `#[tokio::test]` avec `tower::ServiceExt::oneshot` + `http_body_util::BodyExt` (`backend/src/main.rs:27`).
-- Commandes: `devenv shell -- cargo test` (ou `tasks "portail:backend:test"`), single `devenv shell -- cargo test health_returns_ok -- --nocapture`.
+- Workspace `Cargo.toml:2` `members = ["backend"]`, crate `backend/Cargo.toml:2`. Voir skills ci-dessus pour `rustfmt`/`clippy`/`serde`/`domain`/`routes`.
 
 ## Frontend `portail-frontend` (Vite + React 18 + TS)
 
