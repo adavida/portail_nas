@@ -2,7 +2,7 @@ use ldap3::{LdapConnAsync, Mod, Scope, SearchEntry};
 use std::collections::HashSet;
 
 use crate::{
-    domain::users::{NewUser, UpdatePassword, User},
+    domain::users::{NewUser, Password, Uid, User},
     error::AppError,
 };
 
@@ -39,8 +39,6 @@ pub async fn list_users() -> Result<Vec<User>, AppError> {
 }
 
 pub async fn create_user(new: NewUser) -> Result<User, AppError> {
-    new.validate()
-        .map_err(|e| AppError::Internal(e.to_string()))?;
     let url = ldap_url();
     let base = ldap_base();
     let dn = new.dn(&base);
@@ -66,15 +64,10 @@ pub async fn create_user(new: NewUser) -> Result<User, AppError> {
     })
 }
 
-pub async fn update_user_password(uid: String, req: UpdatePassword) -> Result<(), AppError> {
-    req.validate()
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    if uid.trim().is_empty() {
-        return Err(AppError::Internal("missing uid".into()));
-    }
+pub async fn update_user_password(uid: Uid, password: Password) -> Result<(), AppError> {
     let url = ldap_url();
     let base = ldap_base();
-    let dn = format!("uid={uid},ou=people,{base}");
+    let dn = format!("uid={},ou=people,{base}", uid.as_str());
 
     let (conn, mut ldap) = LdapConnAsync::new(&url)
         .await
@@ -83,7 +76,7 @@ pub async fn update_user_password(uid: String, req: UpdatePassword) -> Result<()
     bind_admin(&mut ldap, &base).await?;
 
     let mut set = HashSet::new();
-    set.insert(req.password);
+    set.insert(password.as_str().to_string());
     ldap.modify(&dn, vec![Mod::Replace("userPassword".to_string(), set)])
         .await
         .map_err(|e| AppError::Ldap(e.to_string()))?
@@ -93,13 +86,10 @@ pub async fn update_user_password(uid: String, req: UpdatePassword) -> Result<()
     Ok(())
 }
 
-pub async fn authenticate_user(uid: String, password: String) -> Result<bool, AppError> {
-    if uid.trim().is_empty() || password.is_empty() {
-        return Err(AppError::Internal("missing uid/password".into()));
-    }
+pub async fn authenticate_user(uid: Uid, password: Password) -> Result<bool, AppError> {
     let url = ldap_url();
     let base = ldap_base();
-    let dn = format!("uid={uid},ou=people,{base}");
+    let dn = format!("uid={},ou=people,{base}", uid.as_str());
 
     let (conn, mut ldap) = LdapConnAsync::new(&url)
         .await
@@ -107,7 +97,7 @@ pub async fn authenticate_user(uid: String, password: String) -> Result<bool, Ap
     ldap3::drive!(conn);
 
     let res = ldap
-        .simple_bind(&dn, &password)
+        .simple_bind(&dn, password.as_str())
         .await
         .map_err(|e| AppError::Ldap(e.to_string()))?;
     let rc = res.rc;
@@ -122,7 +112,7 @@ pub async fn authenticate_user(uid: String, password: String) -> Result<bool, Ap
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::users::NewUser;
+    use crate::domain::users::{Email, Name};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn gen_uid(prefix: &str) -> String {
@@ -153,9 +143,12 @@ mod tests {
     }
 
     async fn assert_auth_ok(uid: &str, password: &str) {
-        let ok = authenticate_user(uid.to_string(), password.to_string())
-            .await
-            .unwrap();
+        let ok = authenticate_user(
+            Uid::try_new(uid.to_string()).unwrap(),
+            Password::try_new(password.to_string()).unwrap(),
+        )
+        .await
+        .unwrap();
 
         assert!(
             ok,
@@ -164,9 +157,12 @@ mod tests {
     }
 
     async fn assert_auth_fail(uid: &str, password: &str) {
-        let ok = authenticate_user(uid.to_string(), password.to_string())
-            .await
-            .unwrap();
+        let ok = authenticate_user(
+            Uid::try_new(uid.to_string()).unwrap(),
+            Password::try_new(password.to_string()).unwrap(),
+        )
+        .await
+        .unwrap();
 
         assert!(
             !ok,
@@ -175,7 +171,13 @@ mod tests {
     }
 
     async fn assert_auth_err(uid: &str, password: &str) {
-        let result = authenticate_user(uid.to_string(), password.to_string()).await;
+        let uid_res = Uid::try_new(uid.to_string());
+        let pw_res = Password::try_new(password.to_string());
+
+        let result = match (uid_res, pw_res) {
+            (Ok(u), Ok(p)) => authenticate_user(u, p).await,
+            _ => Err(AppError::Internal("missing uid/password".into())),
+        };
 
         assert!(
             result.is_err(),
@@ -189,10 +191,10 @@ mod tests {
         ensure_clean(&uid).await;
 
         let new: NewUser = NewUser {
-            uid: uid.clone(),
-            name: "Auth Test".into(),
-            email: "a@ex.com".into(),
-            password: "secret123".into(),
+            uid: Uid::try_new(uid.clone()).unwrap(),
+            name: Name::try_new("Auth Test".into()).unwrap(),
+            email: Email::try_new("a@ex.com".into()).unwrap(),
+            password: Password::try_new("secret123".into()).unwrap(),
         };
 
         let r = create_user(new).await;
@@ -215,10 +217,10 @@ mod tests {
         ensure_clean(&uid).await;
 
         let new = NewUser {
-            uid: uid.clone(),
-            name: "T".into(),
-            email: "".into(),
-            password: "old".into(),
+            uid: Uid::try_new(uid.clone()).unwrap(),
+            name: Name::try_new("T".into()).unwrap(),
+            email: Email::try_new("".into()).unwrap(),
+            password: Password::try_new("old".into()).unwrap(),
         };
 
         let r = create_user(new).await;
@@ -228,18 +230,9 @@ mod tests {
 
         r.unwrap();
 
-        let v = crate::domain::users::UpdatePassword {
-            password: "newpass".into(),
-        }
-        .validate();
-
-        assert!(v.is_ok());
-
         update_user_password(
-            uid.clone(),
-            crate::domain::users::UpdatePassword {
-                password: "newpass".into(),
-            },
+            Uid::try_new(uid.clone()).unwrap(),
+            Password::try_new("newpass".into()).unwrap(),
         )
         .await
         .unwrap();

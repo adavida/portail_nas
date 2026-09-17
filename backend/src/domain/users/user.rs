@@ -1,21 +1,29 @@
 use serde::Serialize;
 
+use super::{Email, Name, Uid};
+
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct User {
-    pub uid: String,
-    pub name: String,
-    pub email: String,
+    pub uid: Uid,
+    pub name: Name,
+    pub email: Email,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UserError {
     MissingUid,
+    InvalidUid,
+    InvalidName,
+    InvalidEmail,
 }
 
 impl std::fmt::Display for UserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::MissingUid => write!(f, "missing uid"),
+            Self::InvalidUid => write!(f, "invalid uid"),
+            Self::InvalidName => write!(f, "invalid name"),
+            Self::InvalidEmail => write!(f, "invalid email"),
         }
     }
 }
@@ -29,16 +37,16 @@ impl User {
         display_name: Option<String>,
         mail: Option<String>,
     ) -> Result<Self, UserError> {
-        let uid = uid.ok_or(UserError::MissingUid)?;
-        let name = display_name
+        let raw_uid = uid.ok_or(UserError::MissingUid)?;
+        let uid = Uid::try_new(raw_uid).map_err(|_| UserError::InvalidUid)?;
+        let raw_name = display_name
             .filter(|s| !s.is_empty())
             .or(cn)
-            .unwrap_or_default();
-        Ok(Self {
-            uid,
-            name,
-            email: mail.unwrap_or_default(),
-        })
+            .unwrap_or_else(|| uid.as_str().to_string());
+        let name = Name::try_new(raw_name).map_err(|_| UserError::InvalidName)?;
+        let email =
+            Email::try_new(mail.unwrap_or_default()).map_err(|_| UserError::InvalidEmail)?;
+        Ok(Self { uid, name, email })
     }
 
     pub fn from_search(entries: Vec<std::collections::HashMap<String, Vec<String>>>) -> Vec<Self> {
@@ -52,7 +60,7 @@ impl User {
                 Self::from_attrs(uid, cn, display_name, mail).ok()
             })
             .collect();
-        users.sort_by(|a, b| a.uid.cmp(&b.uid));
+        users.sort_by(|a, b| a.uid.as_str().cmp(b.uid.as_str()));
         users
     }
 }
@@ -72,7 +80,8 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            u.name, "Alice D",
+            u.name.as_str(),
+            "Alice D",
             "displayName should win over cn for user name"
         );
     }
@@ -82,10 +91,15 @@ mod tests {
         let u = User::from_attrs(Some("bob".into()), Some("Bob C".into()), None, None).unwrap();
 
         assert_eq!(
-            u.name, "Bob C",
+            u.name.as_str(),
+            "Bob C",
             "cn should be fallback when displayName is None"
         );
-        assert_eq!(u.email, "", "email should be empty when mail is None");
+        assert_eq!(
+            u.email.as_str(),
+            "",
+            "email should be empty when mail is None"
+        );
     }
 
     #[test]
@@ -96,6 +110,18 @@ mod tests {
             result,
             UserError::MissingUid,
             "from_attrs without uid should fail with MissingUid"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_uid() {
+        let result =
+            User::from_attrs(Some("BOB".into()), Some("Bob".into()), None, None).unwrap_err();
+
+        assert_eq!(
+            result,
+            UserError::InvalidUid,
+            "uppercase uid should be rejected"
         );
     }
 }

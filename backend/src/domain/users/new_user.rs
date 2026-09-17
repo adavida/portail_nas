@@ -1,76 +1,53 @@
 use serde::Deserialize;
 
+use super::{Email, Name, Password, Uid};
+
 #[derive(Deserialize, Clone, Debug)]
 pub struct NewUser {
-    pub uid: String,
-    pub name: String,
-    pub email: String,
-    pub password: String,
+    pub uid: Uid,
+    pub name: Name,
+    pub email: Email,
+    pub password: Password,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CreateUserError {
-    MissingUid,
-    MissingName,
-    MissingPassword,
-}
-
-impl std::fmt::Display for CreateUserError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::MissingUid => write!(f, "missing uid"),
-            Self::MissingName => write!(f, "missing name"),
-            Self::MissingPassword => write!(f, "missing password"),
-        }
-    }
-}
-
-impl std::error::Error for CreateUserError {}
 
 impl NewUser {
-    pub fn validate(&self) -> Result<(), CreateUserError> {
-        if self.uid.trim().is_empty() {
-            return Err(CreateUserError::MissingUid);
-        }
-        if self.name.trim().is_empty() {
-            return Err(CreateUserError::MissingName);
-        }
-        if self.password.is_empty() {
-            return Err(CreateUserError::MissingPassword);
-        }
-        Ok(())
-    }
-
     pub fn dn(&self, base: &str) -> String {
-        format!("uid={},ou=people,{base}", self.uid)
+        format!("uid={},ou=people,{base}", self.uid.as_str())
     }
 
     pub fn to_attrs(&self) -> Vec<(String, std::collections::HashSet<String>)> {
         let sn = self
             .name
+            .as_str()
             .split_whitespace()
             .last()
-            .unwrap_or(&self.name)
+            .unwrap_or(self.name.as_str())
             .to_string();
         vec![
             (
                 "objectClass".to_string(),
                 ["inetOrgPerson".to_string()].into_iter().collect(),
             ),
-            ("uid".to_string(), [self.uid.clone()].into_iter().collect()),
-            ("cn".to_string(), [self.name.clone()].into_iter().collect()),
+            (
+                "uid".to_string(),
+                [self.uid.as_str().to_string()].into_iter().collect(),
+            ),
+            (
+                "cn".to_string(),
+                [self.name.as_str().to_string()].into_iter().collect(),
+            ),
             ("sn".to_string(), [sn].into_iter().collect()),
             (
                 "displayName".to_string(),
-                [self.name.clone()].into_iter().collect(),
+                [self.name.as_str().to_string()].into_iter().collect(),
             ),
             (
                 "mail".to_string(),
-                [self.email.clone()].into_iter().collect(),
+                [self.email.as_str().to_string()].into_iter().collect(),
             ),
             (
                 "userPassword".to_string(),
-                [self.password.clone()].into_iter().collect(),
+                [self.password.as_str().to_string()].into_iter().collect(),
             ),
         ]
     }
@@ -81,60 +58,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_user_validate() {
-        let err1 = NewUser {
-            uid: "".into(),
-            name: "x".into(),
-            email: "".into(),
-            password: "p".into(),
-        }
-        .validate()
-        .unwrap_err();
-
-        assert_eq!(
-            err1,
-            CreateUserError::MissingUid,
-            "empty uid should be rejected"
-        );
-
-        let err2 = NewUser {
-            uid: "a".into(),
-            name: "".into(),
-            email: "".into(),
-            password: "p".into(),
-        }
-        .validate()
-        .unwrap_err();
-
-        assert_eq!(
-            err2,
-            CreateUserError::MissingName,
-            "empty name should be rejected"
-        );
-
-        let err3 = NewUser {
-            uid: "a".into(),
-            name: "n".into(),
-            email: "".into(),
-            password: "".into(),
-        }
-        .validate()
-        .unwrap_err();
-
-        assert_eq!(
-            err3,
-            CreateUserError::MissingPassword,
-            "empty password should be rejected"
-        );
-    }
-
-    #[test]
     fn new_user_dn_and_attrs() {
         let u = NewUser {
-            uid: "bob".into(),
-            name: "Bob Dupont".into(),
-            email: "bob@example.com".into(),
-            password: "secret".into(),
+            uid: Uid::try_new("bob".into()).unwrap(),
+            name: Name::try_new("Bob Dupont".into()).unwrap(),
+            email: Email::try_new("bob@example.com".into()).unwrap(),
+            password: Password::try_new("secret".into()).unwrap(),
         };
 
         let dn = u.dn("dc=dev,dc=example,dc=com");
@@ -159,6 +88,42 @@ mod tests {
         assert!(
             find("userPassword").contains("secret"),
             "attrs should contain userPassword"
+        );
+    }
+
+    #[test]
+    fn deserialize_validates_uid() {
+        let json = r#"{"uid":"","name":"Bob","email":"","password":"secret"}"#;
+
+        let err = serde_json::from_str::<NewUser>(json).unwrap_err();
+
+        assert!(
+            err.to_string().contains("uid is empty"),
+            "empty uid should be rejected via Deserialize"
+        );
+    }
+
+    #[test]
+    fn deserialize_validates_name() {
+        let json = r#"{"uid":"bob","name":"","email":"","password":"secret"}"#;
+
+        let err = serde_json::from_str::<NewUser>(json).unwrap_err();
+
+        assert!(
+            err.to_string().contains("name is empty"),
+            "empty name should be rejected"
+        );
+    }
+
+    #[test]
+    fn deserialize_validates_password() {
+        let json = r#"{"uid":"bob","name":"Bob","email":"","password":""}"#;
+
+        let err = serde_json::from_str::<NewUser>(json).unwrap_err();
+
+        assert!(
+            err.to_string().contains("password is empty"),
+            "empty password should be rejected"
         );
     }
 }

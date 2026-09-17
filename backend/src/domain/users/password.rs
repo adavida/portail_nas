@@ -1,32 +1,46 @@
 use serde::Deserialize;
 
-#[derive(Deserialize, Clone, Debug)]
-pub struct UpdatePassword {
-    pub password: String,
-}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Password(String);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PasswordError {
-    MissingPassword,
+    Empty,
 }
 
 impl std::fmt::Display for PasswordError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingPassword => write!(f, "missing password"),
+            Self::Empty => write!(f, "password is empty"),
         }
     }
 }
 
 impl std::error::Error for PasswordError {}
 
-impl UpdatePassword {
-    pub fn validate(&self) -> Result<(), PasswordError> {
-        if self.password.is_empty() {
-            return Err(PasswordError::MissingPassword);
+impl Password {
+    pub fn try_new(raw: String) -> Result<Self, PasswordError> {
+        if raw.is_empty() {
+            return Err(PasswordError::Empty);
         }
-        Ok(())
+        Ok(Self(raw))
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Password {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Self::try_new(s).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct UpdatePassword {
+    pub password: Password,
 }
 
 #[cfg(test)]
@@ -34,27 +48,37 @@ mod tests {
     use super::*;
 
     #[test]
-    fn validate_ok() {
-        let result = UpdatePassword {
-            password: "secret".into(),
-        }
-        .validate();
+    fn accepts_valid() {
+        let pw = Password::try_new("secret".into()).unwrap();
 
-        assert!(result.is_ok(), "non-empty password should be valid");
+        assert_eq!(pw.as_str(), "secret");
     }
 
     #[test]
-    fn missing_password() {
-        let err = UpdatePassword {
-            password: "".into(),
-        }
-        .validate()
-        .unwrap_err();
+    fn rejects_empty() {
+        let err = Password::try_new("".into()).unwrap_err();
 
-        assert_eq!(
-            err,
-            PasswordError::MissingPassword,
-            "empty password should be rejected"
+        assert_eq!(err, PasswordError::Empty);
+    }
+
+    #[test]
+    fn update_password_deserialize_validates() {
+        let json = r#"{"password":"secret"}"#;
+
+        let up: UpdatePassword = serde_json::from_str(json).unwrap();
+
+        assert_eq!(up.password.as_str(), "secret");
+    }
+
+    #[test]
+    fn update_password_rejects_empty() {
+        let json = r#"{"password":""}"#;
+
+        let err = serde_json::from_str::<UpdatePassword>(json).unwrap_err();
+
+        assert!(
+            err.to_string().contains("password is empty"),
+            "should propagate PasswordError"
         );
     }
 }
