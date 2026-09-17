@@ -6,7 +6,7 @@ use crate::{
     error::AppError,
 };
 
-use super::{connect_admin, ldap_base, ldap_url, user_dn, MapLdap};
+use super::{MapLdap, connect_admin, ldap_base, ldap_url, user_dn};
 
 fn one_set(v: String) -> HashSet<String> {
     [v].into_iter().collect()
@@ -149,8 +149,7 @@ pub async fn authenticate_user(uid: Uid, password: Password) -> Result<bool, App
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::shared::Name;
-    use crate::domain::users::Email;
+    use crate::domain::users::{Email, Name};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn gen_uid(prefix: &str) -> String {

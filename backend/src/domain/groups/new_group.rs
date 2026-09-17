@@ -1,7 +1,6 @@
 use serde::Deserialize;
 
-use super::{Description, Gid};
-use crate::domain::shared::Name;
+use super::{Description, Gid, Name};
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct NewGroup {

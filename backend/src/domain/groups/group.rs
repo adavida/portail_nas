@@ -1,7 +1,6 @@
 use serde::Serialize;
 
-use super::{Description, Gid};
-use crate::domain::shared::Name;
+use super::{Description, Gid, Name};
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Group {

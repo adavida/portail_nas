@@ -287,8 +287,7 @@ async fn create_duplicate_gid_is_500() {
 }
 
 mod repo {
-    use portail_backend::domain::groups::{Description, Gid, NewGroup, UpdateGroup};
-    use portail_backend::domain::shared::Name;
+    use portail_backend::domain::groups::{Description, Gid, Name, NewGroup, UpdateGroup};
     use portail_backend::error::AppError;
     use portail_backend::repository::ldap::groups::{
         create_group, delete_group, list_groups, update_group,
