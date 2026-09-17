@@ -83,97 +83,12 @@ function GroupRow({
   );
 }
 
-function CreateRow({ onCreated }: { onCreated?: () => void }) {
-  const [gid, setGid] = useState("");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [member, setMember] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = async () => {
-    if (!gid.trim() || !name.trim() || !member.trim()) {
-      setError("gid, nom et au moins un membre requis");
-      return;
-    }
-    setError(null);
-    const res = await fetch("/api/groups", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        gid,
-        name,
-        description,
-        members: [member.trim()],
-      }),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      setError(j.error || `error ${res.status}`);
-      return;
-    }
-    setGid("");
-    setName("");
-    setDescription("");
-    setMember("");
-    onCreated?.();
-  };
-
-  return (
-    <tr data-testid="group-create-row">
-      <td style={td}>
-        <input
-          data-testid="input-gid"
-          placeholder="gid"
-          value={gid}
-          onChange={(e) => setGid(e.target.value)}
-        />
-      </td>
-      <td style={td}>
-        <input
-          data-testid="input-name"
-          placeholder="nom"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </td>
-      <td style={td}>
-        <input
-          data-testid="input-description"
-          placeholder="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </td>
-      <td style={td}>
-        <input
-          data-testid="input-member"
-          placeholder="membre initial (uid)"
-          value={member}
-          onChange={(e) => setMember(e.target.value)}
-        />
-      </td>
-      <td style={td}>
-        <button
-          data-testid="group-create-button"
-          onClick={submit}
-          type="button"
-        >
-          Créer
-        </button>
-        {error && <span data-testid="group-create-error"> {error}</span>}
-      </td>
-    </tr>
-  );
-}
-
 export function GroupsTable({
   groups,
-  onCreated,
   onUpdated,
   onDeleted,
 }: {
   groups: Group[];
-  onCreated?: () => void;
   onUpdated?: () => void;
   onDeleted?: () => void;
 }) {
@@ -187,16 +102,14 @@ export function GroupsTable({
           <th style={{ ...td, textAlign: "left" }}>GID</th>
           <th style={{ ...td, textAlign: "left" }}>Nom</th>
           <th style={{ ...td, textAlign: "left" }}>Description</th>
-          <th style={{ ...td, textAlign: "left" }}>Membre initial</th>
           <th style={{ ...td, textAlign: "left" }}>Action</th>
         </tr>
       </thead>
       <tbody>
-        {onCreated && <CreateRow onCreated={onCreated} />}
         {groups.length === 0 ? (
           <tr>
             <td
-              colSpan={5}
+              colSpan={4}
               style={{ ...td, textAlign: "center" }}
               data-testid="groups-empty"
             >

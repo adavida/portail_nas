@@ -13,15 +13,18 @@ function GroupsCell({
   groups,
   allGroups,
   onSave,
+  onCreateGroup,
 }: {
   uid: string;
   groups: string[];
   allGroups: string[];
   onSave: (next: string[]) => Promise<{ ok: boolean; error?: string }>;
+  onCreateGroup?: (gid: string) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string[]>(groups);
   const [error, setError] = useState<string | null>(null);
+  const [newGid, setNewGid] = useState("");
 
   const toggle = (gid: string) =>
     setDraft((d) =>
@@ -41,6 +44,18 @@ function GroupsCell({
     setDraft(groups);
     setError(null);
     setEditing(false);
+  };
+
+  const createGroup = async () => {
+    const gid = newGid.trim();
+    if (!gid || !onCreateGroup) return;
+    const res = await onCreateGroup(gid);
+    if (res.ok) {
+      setDraft((d) => [...d, gid]);
+      setNewGid("");
+    } else {
+      setError(res.error || `error`);
+    }
   };
 
   if (!editing) {
@@ -72,6 +87,21 @@ function GroupsCell({
           {draft.includes(gid) ? "✓" : "✗"} {gid}
         </button>
       ))}
+      <input
+        data-testid={`groups-new-input-${uid}`}
+        placeholder="nouveau groupe (gid)"
+        value={newGid}
+        onChange={(e) => setNewGid(e.target.value)}
+      />
+      {onCreateGroup && (
+        <button
+          type="button"
+          data-testid={`groups-new-button-${uid}`}
+          onClick={createGroup}
+        >
+          Créer
+        </button>
+      )}
       <button type="button" data-testid={`groups-save-${uid}`} onClick={save}>
         Valider
       </button>
@@ -141,6 +171,33 @@ function UserRow({
       }
     }
 
+    setMsg("ok");
+    setIsError(false);
+    onUpdated?.();
+    return { ok: true };
+  };
+
+  const createGroupWithMember = async (
+    gid: string,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    setMsg(null);
+    const res = await fetch("/api/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        gid,
+        name: gid,
+        description: "",
+        members: [user.uid],
+      }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      const error = j.error || `error ${res.status}`;
+      setMsg(error);
+      setIsError(true);
+      return { ok: false, error };
+    }
     setMsg("ok");
     setIsError(false);
     onUpdated?.();
@@ -228,6 +285,7 @@ function UserRow({
         groups={groups}
         allGroups={allGroups ?? []}
         onSave={saveGroups}
+        onCreateGroup={createGroupWithMember}
       />
       <td style={{ border: "1px solid #ccc", padding: 8 }}>
         <span style={{ display: "flex", gap: 8, alignItems: "center" }}>

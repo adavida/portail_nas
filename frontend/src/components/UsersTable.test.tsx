@@ -220,3 +220,60 @@ test("groups save error keeps editor open with message", async () => {
   expect(error).toHaveTextContent("not found: uid=ghost");
   expect(screen.getByTestId("groups-save-alice")).toBeInTheDocument();
 });
+
+test("create group from groups cell with user as member", async () => {
+  const fetchMock = vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+  );
+  globalThis.fetch = fetchMock;
+
+  const alice = { uid: "alice", name: "Alice", email: "", groups: [] };
+
+  render(<UsersTable users={[alice]} onUpdated={() => {}} />);
+
+  fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
+    target: { value: "devs" },
+  });
+  fireEvent.click(screen.getByTestId("groups-new-button-alice"));
+
+  await vi.waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/groups",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          gid: "devs",
+          name: "devs",
+          description: "",
+          members: ["alice"],
+        }),
+      }),
+    );
+  });
+});
+
+test("create group error keeps input and shows message", async () => {
+  globalThis.fetch = vi.fn(() =>
+    Promise.resolve({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "ldap: boom" }),
+    } as Response),
+  );
+
+  const alice = { uid: "alice", name: "Alice", email: "", groups: [] };
+
+  render(<UsersTable users={[alice]} />);
+
+  fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
+    target: { value: "devs" },
+  });
+  fireEvent.click(screen.getByTestId("groups-new-button-alice"));
+
+  const error = await screen.findByTestId("groups-error-alice");
+
+  expect(error).toHaveTextContent("ldap: boom");
+  expect(screen.getByTestId("groups-new-input-alice")).toBeInTheDocument();
+});
