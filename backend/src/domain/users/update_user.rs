@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
-use super::{Email, Name};
+use super::Email;
+use crate::domain::shared::Name;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct UpdateUser {

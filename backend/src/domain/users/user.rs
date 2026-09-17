@@ -1,7 +1,8 @@
 use serde::Serialize;
 
 use super::user_error::UserError;
-use super::{Email, Name, Uid};
+use super::{Email, Uid};
+use crate::domain::shared::Name;
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct User {

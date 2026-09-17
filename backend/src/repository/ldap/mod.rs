@@ -1,5 +1,7 @@
+pub mod groups;
 pub mod users;
 
+pub use groups::{create_group, delete_group, list_groups};
 pub use users::{
     authenticate_user, create_user, delete_user, list_users, update_user, update_user_password,
 };
@@ -30,6 +32,14 @@ pub(crate) fn ldap_base() -> String {
     }
 }
 
+pub(crate) async fn connect_admin(base: &str) -> Result<ldap3::Ldap, AppError> {
+    let (conn, mut ldap) = ldap3::LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
+
+    ldap3::drive!(conn);
+    bind_admin(&mut ldap, base).await?;
+    Ok(ldap)
+}
+
 pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap, base: &str) -> Result<(), AppError> {
     let bind_dn = format!("cn=admin,{base}");
 
@@ -39,14 +49,6 @@ pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap, base: &str) -> Result<(),
         .success()
         .map_ldap()?;
     Ok(())
-}
-
-pub(crate) async fn connect_admin(base: &str) -> Result<ldap3::Ldap, AppError> {
-    let (conn, mut ldap) = ldap3::LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
-
-    ldap3::drive!(conn);
-    bind_admin(&mut ldap, base).await?;
-    Ok(ldap)
 }
 
 pub(crate) fn user_dn(uid: &crate::domain::users::Uid, base: &str) -> String {

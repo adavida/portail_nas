@@ -1,4 +1,4 @@
-use axum::{extract::Path, http::StatusCode, Json};
+use axum::{extract::Path, http::StatusCode, routing::get, routing::put, Json, Router};
 use serde_json::json;
 
 use crate::{
@@ -6,6 +6,21 @@ use crate::{
     domain::users::{NewUser, Uid, UpdatePassword, UpdateUser, User},
     error::AppError,
 };
+
+pub(crate) fn users_router() -> Router {
+    let r = Router::new()
+        .route("/", get(list_users).post(create_user))
+        .route("/{uid}", put(update_user).delete(delete_user))
+        .route("/{uid}/password", put(update_user_password));
+
+    #[cfg(feature = "test-api")]
+    let r = r.route(
+        "/{uid}/authenticate",
+        axum::routing::post(authenticate_user),
+    );
+
+    r
+}
 
 pub async fn list_users() -> Result<Json<Vec<User>>, AppError> {
     let users = list().await?;

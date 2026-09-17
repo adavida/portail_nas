@@ -149,7 +149,8 @@ pub async fn authenticate_user(uid: Uid, password: Password) -> Result<bool, App
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::users::{Email, Name};
+    use crate::domain::shared::Name;
+    use crate::domain::users::Email;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn gen_uid(prefix: &str) -> String {

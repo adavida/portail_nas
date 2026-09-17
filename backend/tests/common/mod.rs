@@ -1,10 +1,10 @@
 use ldap3::{LdapConnAsync, Scope, SearchEntry};
 
-async fn purge_people() {
+async fn purge_ou(ou: &str) {
     let url = std::env::var("LDAP_TEST_URL").unwrap_or_else(|_| "ldap://127.0.0.1:3891".into());
     let base =
         std::env::var("LDAP_TEST_BASE_DN").unwrap_or_else(|_| "dc=test,dc=example,dc=com".into());
-    let search_base = format!("ou=people,{base}");
+    let search_base = format!("ou={ou},{base}");
 
     let Ok((conn, mut ldap)) = LdapConnAsync::new(&url).await else {
         return;
@@ -21,7 +21,7 @@ async fn purge_people() {
             &search_base,
             Scope::OneLevel,
             "(objectClass=*)",
-            vec!["uid"],
+            vec!["cn", "uid"],
         )
         .await
         .and_then(|r| r.success())
@@ -41,5 +41,21 @@ fn purge_test_ldap() {
         .build()
         .expect("test runtime");
 
-    rt.block_on(purge_people());
+    rt.block_on(async {
+        purge_ou("people").await;
+        purge_ou("groups").await;
+    });
+}
+
+#[ctor::ctor(unsafe)]
+fn purge_test_ldap_after() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("test runtime");
+
+    rt.block_on(async {
+        purge_ou("people").await;
+        purge_ou("groups").await;
+    });
 }

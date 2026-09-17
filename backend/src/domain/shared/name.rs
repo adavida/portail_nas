@@ -49,36 +49,55 @@ mod tests {
 
     #[test]
     fn accepts_valid() {
-        let name = Name::try_new("Alice Dupont".into()).unwrap();
+        let n = Name::try_new("Devs".into()).unwrap();
 
-        assert_eq!(name.as_str(), "Alice Dupont");
+        assert_eq!(n.as_str(), "Devs", "valid name should be kept as is");
     }
 
     #[test]
-    fn trims() {
-        let name = Name::try_new("  Bob  ".into()).unwrap();
+    fn trims_whitespace() {
+        let n = Name::try_new("  Devs  ".into()).unwrap();
 
-        assert_eq!(name.as_str(), "Bob", "name should be trimmed");
+        assert_eq!(n.as_str(), "Devs", "name should be trimmed");
     }
 
     #[test]
     fn rejects_empty() {
         let err = Name::try_new("".into()).unwrap_err();
 
-        assert_eq!(err, NameError::Empty);
+        assert_eq!(err, NameError::Empty, "empty name should be Empty");
     }
 
     #[test]
     fn rejects_blank() {
         let err = Name::try_new("   ".into()).unwrap_err();
 
-        assert_eq!(err, NameError::Empty);
+        assert_eq!(err, NameError::Empty, "blank name should be Empty");
     }
 
     #[test]
     fn rejects_too_long() {
         let err = Name::try_new("a".repeat(101)).unwrap_err();
 
-        assert_eq!(err, NameError::Empty, "name >100 should be rejected");
+        assert_eq!(err, NameError::Empty, "too long name should be rejected");
+    }
+
+    #[test]
+    fn deserialize_validates() {
+        let n: Name = serde_json::from_str("\"Devs\"").unwrap();
+
+        assert_eq!(n.as_str(), "Devs");
+    }
+
+    #[test]
+    fn deserialize_rejects_invalid() {
+        let json = "\"\"";
+
+        let err = serde_json::from_str::<Name>(json).unwrap_err();
+
+        assert!(
+            err.to_string().contains("name is empty"),
+            "deserialize should propagate NameError"
+        );
     }
 }
