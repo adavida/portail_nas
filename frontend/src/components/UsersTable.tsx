@@ -1,54 +1,7 @@
 export type User = { uid: string; name: string; email: string };
 
 import { useState } from "react";
-
-function EditableCell({
-  value,
-  field,
-  uid,
-  onSave,
-}: {
-  value: string;
-  field: "name" | "email";
-  uid: string;
-  onSave: (field: "name" | "email", value: string) => Promise<boolean>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-
-  const save = async () => {
-    const ok = await onSave(field, draft);
-    if (ok) setEditing(false);
-  };
-
-  if (!editing) {
-    return (
-      <td
-        data-testid={`cell-${field}-${uid}`}
-        onDoubleClick={() => setEditing(true)}
-        style={{ border: "1px solid #ccc", padding: 8, cursor: "text" }}
-      >
-        {value}
-      </td>
-    );
-  }
-
-  return (
-    <td style={{ border: "1px solid #ccc", padding: 8 }}>
-      <input
-        data-testid={`edit-input-${field}-${uid}`}
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") save();
-          if (e.key === "Escape") setEditing(false);
-        }}
-      />
-    </td>
-  );
-}
+import EditableCell from "./EditableCell";
 
 function UserRow({
   user,
@@ -103,7 +56,7 @@ function UserRow({
     onDeleted?.();
   };
 
-  const saveField = async (field: "name" | "email", newValue: string) => {
+  const saveField = async (field: string, newValue: string) => {
     setMsg(null);
     const body =
       field === "name"
@@ -130,13 +83,13 @@ function UserRow({
       <EditableCell
         value={user.name}
         field="name"
-        uid={user.uid}
+        rowId={user.uid}
         onSave={saveField}
       />
       <EditableCell
         value={user.email}
         field="email"
-        uid={user.uid}
+        rowId={user.uid}
         onSave={saveField}
       />
       <td style={{ border: "1px solid #ccc", padding: 8 }}>

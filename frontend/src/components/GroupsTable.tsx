@@ -1,14 +1,17 @@
 export type Group = { gid: string; name: string; description: string };
 
 import { useState } from "react";
+import EditableCell from "./EditableCell";
 
 const td = { border: "1px solid #ccc", padding: 8 };
 
 function GroupRow({
   group,
+  onUpdated,
   onDeleted,
 }: {
   group: Group;
+  onUpdated?: () => void;
   onDeleted?: () => void;
 }) {
   const [msg, setMsg] = useState<string | null>(null);
@@ -26,11 +29,41 @@ function GroupRow({
     onDeleted?.();
   };
 
+  const saveField = async (field: string, newValue: string) => {
+    setMsg(null);
+    const res = await fetch(`/api/groups/${encodeURIComponent(group.gid)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        field === "name"
+          ? { name: newValue, description: group.description }
+          : { name: group.name, description: newValue },
+      ),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setMsg(j.error || `error ${res.status}`);
+      return false;
+    }
+    onUpdated?.();
+    return true;
+  };
+
   return (
     <tr data-testid={`group-row-${group.gid}`}>
       <td style={td}>{group.gid}</td>
-      <td style={td}>{group.name}</td>
-      <td style={td}>{group.description}</td>
+      <EditableCell
+        value={group.name}
+        field="name"
+        rowId={group.gid}
+        onSave={saveField}
+      />
+      <EditableCell
+        value={group.description}
+        field="description"
+        rowId={group.gid}
+        onSave={saveField}
+      />
       <td style={td}>
         <button
           data-testid={`group-delete-button-${group.gid}`}
@@ -116,10 +149,12 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
 export function GroupsTable({
   groups,
   onCreated,
+  onUpdated,
   onDeleted,
 }: {
   groups: Group[];
   onCreated?: () => void;
+  onUpdated?: () => void;
   onDeleted?: () => void;
 }) {
   return (
@@ -149,7 +184,12 @@ export function GroupsTable({
           </tr>
         ) : (
           groups.map((g) => (
-            <GroupRow key={g.gid} group={g} onDeleted={onDeleted} />
+            <GroupRow
+              key={g.gid}
+              group={g}
+              onUpdated={onUpdated}
+              onDeleted={onDeleted}
+            />
           ))
         )}
       </tbody>

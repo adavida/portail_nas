@@ -205,6 +205,49 @@ async fn create_empty_description_is_accepted() {
 }
 
 #[tokio::test]
+async fn update_changes_name_and_description() {
+    let group = TestGroup::new("apigrupd");
+    let (status, _) = group.create().await;
+
+    if status == StatusCode::INTERNAL_SERVER_ERROR {
+        return;
+    }
+
+    let (status, _) = send(
+        Method::PUT,
+        &format!("/api/groups/{}", group.gid),
+        Some(json!({ "name": "Renamed", "description": "" })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NO_CONTENT, "PUT /api/groups should 204");
+
+    let (status, groups) = send(Method::GET, "/api/groups", None).await;
+
+    assert_eq!(status, StatusCode::OK);
+
+    let updated = groups
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|g| g["gid"] == group.gid)
+        .cloned();
+
+    assert!(updated.is_some(), "updated group should still be listed");
+
+    let updated = updated.unwrap();
+
+    assert_eq!(
+        updated["name"], "Renamed",
+        "name should be updated after PUT"
+    );
+    assert_eq!(
+        updated["description"], "",
+        "empty description should stay empty"
+    );
+}
+
+#[tokio::test]
 async fn delete_unknown_gid_is_500() {
     let n = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -244,10 +287,12 @@ async fn create_duplicate_gid_is_500() {
 }
 
 mod repo {
-    use portail_backend::domain::groups::{Description, Gid, NewGroup};
+    use portail_backend::domain::groups::{Description, Gid, NewGroup, UpdateGroup};
     use portail_backend::domain::shared::Name;
     use portail_backend::error::AppError;
-    use portail_backend::repository::ldap::groups::{create_group, delete_group, list_groups};
+    use portail_backend::repository::ldap::groups::{
+        create_group, delete_group, list_groups, update_group,
+    };
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn nanos() -> u128 {
@@ -308,5 +353,47 @@ mod repo {
         let result = delete_group(gid).await;
 
         assert!(result.is_err(), "delete of unknown group should fail");
+    }
+
+    #[tokio::test]
+    async fn repository_update_changes_name_and_description() {
+        let mut new = new_group("unigrp2");
+
+        if create_group(new.clone()).await.is_err() {
+            return;
+        }
+
+        new.name = Name::try_new("Repo Renamed".into()).unwrap();
+
+        let result = update_group(
+            new.gid.clone(),
+            UpdateGroup {
+                name: new.name.clone(),
+                description: Description::try_new("".into()),
+            },
+        )
+        .await;
+
+        assert!(result.is_ok(), "update of existing group should succeed");
+
+        let groups = list_groups().await.unwrap();
+        let updated = groups.iter().find(|g| g.gid == new.gid).cloned();
+
+        assert!(updated.is_some(), "group should be listed after update");
+
+        let updated = updated.unwrap();
+
+        assert_eq!(
+            updated.name.as_str(),
+            "Repo Renamed",
+            "name should be persisted after update"
+        );
+        assert_eq!(
+            updated.description.as_str(),
+            "",
+            "empty description should clear the LDAP attr"
+        );
+
+        let _ = delete_group(new.gid).await;
     }
 }

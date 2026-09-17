@@ -1,7 +1,8 @@
-use ldap3::{LdapConnAsync, Scope, SearchEntry};
+use ldap3::{LdapConnAsync, Mod, Scope, SearchEntry};
+use std::collections::HashSet;
 
 use crate::{
-    domain::groups::{Gid, Group, NewGroup},
+    domain::groups::{Gid, Group, NewGroup, UpdateGroup},
     error::AppError,
 };
 
@@ -51,6 +52,37 @@ pub async fn create_group(new: NewGroup) -> Result<Group, AppError> {
         name: new.name,
         description: new.description,
     })
+}
+
+pub async fn update_group(gid: Gid, data: UpdateGroup) -> Result<(), AppError> {
+    let base = ldap_base();
+    let dn = format!("cn={},ou=groups,{base}", gid.as_str());
+    let mut ldap = connect_admin(&base).await?;
+
+    let set_description = if data.description.as_str().is_empty() {
+        HashSet::new()
+    } else {
+        [data.description.as_str().to_string()]
+            .into_iter()
+            .collect()
+    };
+
+    ldap.modify(
+        &dn,
+        vec![
+            Mod::Replace(
+                "o".to_string(),
+                [data.name.as_str().to_string()].into_iter().collect(),
+            ),
+            Mod::Replace("description".to_string(), set_description),
+        ],
+    )
+    .await
+    .map_ldap()?
+    .success()
+    .map_ldap()?;
+    let _ = ldap.unbind().await;
+    Ok(())
 }
 
 pub async fn delete_group(gid: Gid) -> Result<(), AppError> {

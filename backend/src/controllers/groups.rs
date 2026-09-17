@@ -1,5 +1,5 @@
 use crate::{
-    domain::groups::{Gid, Group, NewGroup},
+    domain::groups::{Gid, Group, NewGroup, UpdateGroup},
     error::AppError,
     repository::ldap as ldap_repo,
 };
@@ -14,4 +14,8 @@ pub async fn create(new: NewGroup) -> Result<Group, AppError> {
 
 pub async fn delete(gid: Gid) -> Result<(), AppError> {
     ldap_repo::delete_group(gid).await
+}
+
+pub async fn update(gid: Gid, data: UpdateGroup) -> Result<(), AppError> {
+    ldap_repo::update_group(gid, data).await
 }

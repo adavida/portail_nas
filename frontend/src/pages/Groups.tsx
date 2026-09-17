@@ -30,6 +30,7 @@ export default function Groups() {
         <GroupsTable
           groups={groups}
           onCreated={fetchGroups}
+          onUpdated={fetchGroups}
           onDeleted={fetchGroups}
         />
       )}

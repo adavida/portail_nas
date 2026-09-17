@@ -88,3 +88,61 @@ test("create sends empty description", async () => {
     );
   });
 });
+
+test("edit name sends PUT with name and current description", async () => {
+  const fetchMock = vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+  );
+  globalThis.fetch = fetchMock;
+
+  const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
+
+  render(<GroupsTable groups={groups} onUpdated={() => {}} />);
+
+  fireEvent.doubleClick(screen.getByTestId("cell-name-devs"));
+  fireEvent.change(screen.getByTestId("edit-input-name-devs"), {
+    target: { value: "Renamed" },
+  });
+  fireEvent.keyDown(screen.getByTestId("edit-input-name-devs"), {
+    key: "Enter",
+  });
+
+  await vi.waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/groups/devs",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ name: "Renamed", description: "Devs team" }),
+      }),
+    );
+  });
+});
+
+test("edit description sends PUT with description and current name", async () => {
+  const fetchMock = vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+  );
+  globalThis.fetch = fetchMock;
+
+  const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
+
+  render(<GroupsTable groups={groups} onUpdated={() => {}} />);
+
+  fireEvent.doubleClick(screen.getByTestId("cell-description-devs"));
+  fireEvent.change(screen.getByTestId("edit-input-description-devs"), {
+    target: { value: "" },
+  });
+  fireEvent.keyDown(screen.getByTestId("edit-input-description-devs"), {
+    key: "Enter",
+  });
+
+  await vi.waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/groups/devs",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ name: "Devs", description: "" }),
+      }),
+    );
+  });
+});
