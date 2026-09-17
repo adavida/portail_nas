@@ -1,0 +1,15 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "files.associations": {
+    "devenv.nix": "nix"
+  },
+  "rust-analyzer.check.command": "clippy",
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "eslint.enable": true,
+  "search.exclude": {
+    "**/.devenv": true,
+    "**/target": true,
+    "**/node_modules": true
+  }
+}
