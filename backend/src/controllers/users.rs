@@ -23,3 +23,7 @@ pub async fn delete(uid: Uid) -> Result<(), AppError> {
 pub async fn update(uid: Uid, data: UpdateUser) -> Result<(), AppError> {
     ldap_repo::update_user(uid, data).await
 }
+
+pub async fn authenticate(uid: Uid, password: Password) -> Result<bool, AppError> {
+    ldap_repo::authenticate_user(uid, password).await
+}

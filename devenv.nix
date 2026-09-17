@@ -95,7 +95,7 @@ in
   '';
 
   enterTest = ''
-    echo "== backend =="; cargo test -- --nocapture 2>&1 | tail -n 20
+    echo "== backend =="; cargo test --features test-api -- --nocapture 2>&1 | tail -n 20
     echo "== frontend =="; npm --prefix frontend test -- --run 2>&1 | tail -n 20
   '';
 
@@ -118,7 +118,7 @@ in
 
   processes = {
     backend.exec = "cargo watch -w backend -x 'run -p portail-backend'";
-    "backend-test".exec = "cargo watch -w backend -x test";
+    "backend-test".exec = "cargo watch -w backend -x 'test --features test-api'";
     frontend.exec = "npm --prefix frontend run dev";
     "frontend-test".exec = "npm --prefix frontend run test:watch";
     openldap.exec = mkSlapd {

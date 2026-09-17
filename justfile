@@ -7,7 +7,7 @@ dev:
     echo "  terminal 2: devenv shell -- npm --prefix frontend run dev"
 
 test:
-    cargo test
+    cargo test --features test-api
     npm --prefix frontend test -- --run
 
 backend-run:

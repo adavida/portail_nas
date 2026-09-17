@@ -1,7 +1,8 @@
 use axum::{extract::Path, http::StatusCode, Json};
+use serde_json::json;
 
 use crate::{
-    controllers::users::{create, delete, list, update, update_password},
+    controllers::users::{authenticate, create, delete, list, update, update_password},
     domain::users::{NewUser, Uid, UpdatePassword, UpdateUser, User},
     error::AppError,
 };
@@ -37,4 +38,12 @@ pub async fn update_user(
 ) -> Result<StatusCode, AppError> {
     update(uid, payload).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn authenticate_user(
+    Path(uid): Path<Uid>,
+    Json(payload): Json<UpdatePassword>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let ok = authenticate(uid, payload.password).await?;
+    Ok(Json(json!({ "ok": ok })))
 }
