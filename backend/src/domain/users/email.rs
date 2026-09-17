@@ -37,10 +37,6 @@ impl Email {
     pub fn as_str(&self) -> &str {
         &self.0
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
 }
 
 impl<'de> Deserialize<'de> for Email {
@@ -58,7 +54,7 @@ mod tests {
     fn accepts_empty() {
         let email = Email::try_new("".into()).unwrap();
 
-        assert!(email.is_empty(), "empty email should be allowed");
+        assert_eq!(email.as_str(), "", "empty email should be allowed");
         assert_eq!(email.as_str(), "");
     }
 
