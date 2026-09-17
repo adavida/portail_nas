@@ -2,7 +2,7 @@ pub mod error;
 pub mod health;
 pub mod users;
 
-use axum::{Router, routing::get};
+use axum::{routing::get, Router};
 
 pub fn router() -> Router {
     Router::new()

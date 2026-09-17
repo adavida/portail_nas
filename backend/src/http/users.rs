@@ -1,4 +1,4 @@
-use axum::{Json, extract::Path, http::StatusCode};
+use axum::{extract::Path, http::StatusCode, Json};
 
 use crate::{
     controllers::users::{create, list, update_password},
