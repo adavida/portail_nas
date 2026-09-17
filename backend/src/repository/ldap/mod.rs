@@ -1,7 +1,9 @@
 pub mod groups;
 pub mod users;
 
-pub use groups::{create_group, delete_group, list_groups, update_group};
+pub use groups::{
+    add_member, create_group, delete_group, list_groups, remove_member, update_group,
+};
 pub use users::{
     authenticate_user, create_user, delete_user, list_users, update_user, update_user_password,
 };

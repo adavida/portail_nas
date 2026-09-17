@@ -1,17 +1,34 @@
 import { useCallback, useEffect, useState } from "react";
 import { UsersTable, type User } from "../components/UsersTable";
+import type { Group } from "../components/GroupsTable";
 
 export default function Users() {
   const [users, setUsers] = useState<User[] | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const fetchUsers = useCallback(() => {
-    fetch("/api/users")
-      .then((r) => {
+    Promise.all([
+      fetch("/api/users").then(async (r) => {
         if (!r.ok) throw new Error(String(r.status));
-        return r.json();
+        return (await r.json()) as User[];
+      }),
+      fetch("/api/groups").then(async (r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return (await r.json()) as Group[];
+      }),
+    ])
+      .then(([usersList, groupsList]) => {
+        setUsers(
+          usersList.map((u) => ({
+            ...u,
+            groups: groupsList
+              .filter((g) => g.members.includes(u.uid))
+              .map((g) => g.gid),
+          })),
+        );
+        setGroups(groupsList);
       })
-      .then((d) => setUsers(d as User[]))
       .catch(() => setError("error"));
   }, []);
 
@@ -29,6 +46,7 @@ export default function Users() {
       ) : (
         <UsersTable
           users={users}
+          allGroups={groups.map((g) => g.gid)}
           onCreated={fetchUsers}
           onUpdated={fetchUsers}
           onDeleted={fetchUsers}

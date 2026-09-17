@@ -2,16 +2,27 @@ import { render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import Users from "./Users";
 
-test("loading then data", async () => {
-  const mockUsers = [
-    { uid: "alice", name: "Alice", email: "alice@example.com" },
-  ];
-  globalThis.fetch = vi.fn(() =>
+function mockFetchByUrl(byUrl: Record<string, unknown>) {
+  return vi.fn((url: string) =>
     Promise.resolve({
       ok: true,
-      json: () => Promise.resolve(mockUsers),
-    } as Response),
+      json: () => Promise.resolve(byUrl[url] ?? []),
+    } as unknown as Response),
   );
+}
+
+test("loading then data", async () => {
+  globalThis.fetch = mockFetchByUrl({
+    "/api/users": [{ uid: "alice", name: "Alice", email: "alice@example.com" }],
+    "/api/groups": [
+      {
+        gid: "devs",
+        name: "Devs",
+        description: "",
+        members: ["alice"],
+      },
+    ],
+  });
 
   render(<Users />);
 
@@ -22,12 +33,11 @@ test("loading then data", async () => {
 
   expect(table).toBeInTheDocument();
   expect(row).toHaveTextContent("Alice");
+  expect(row).toHaveTextContent("devs");
 });
 
 test("empty shows message", async () => {
-  globalThis.fetch = vi.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response),
-  );
+  globalThis.fetch = mockFetchByUrl({});
 
   render(<Users />);
 

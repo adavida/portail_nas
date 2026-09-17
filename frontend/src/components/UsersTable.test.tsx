@@ -143,3 +143,80 @@ test("edit error keeps editor open", async () => {
   expect(error).toHaveTextContent("name is empty");
   expect(screen.getByTestId("edit-input-name-alice")).toBeInTheDocument();
 });
+
+test("groups cell shows memberships", () => {
+  const alice = { uid: "alice", name: "Alice", email: "", groups: ["devs"] };
+
+  render(<UsersTable users={[alice]} />);
+
+  expect(screen.getByTestId("cell-groups-alice")).toHaveTextContent("devs");
+});
+
+test("groups cell edit proposes groups and diffs membership", async () => {
+  const fetchMock = vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+  );
+  globalThis.fetch = fetchMock;
+  const onUpdated = vi.fn();
+
+  const alice = { uid: "alice", name: "Alice", email: "", groups: ["devs"] };
+
+  render(
+    <UsersTable
+      users={[alice]}
+      allGroups={["devs", "ops"]}
+      onUpdated={onUpdated}
+    />,
+  );
+
+  fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+
+  expect(screen.getByTestId("groups-toggle-alice-devs")).toHaveTextContent("✓");
+  expect(screen.getByTestId("groups-toggle-alice-ops")).toHaveTextContent("✗");
+
+  fireEvent.click(screen.getByTestId("groups-toggle-alice-ops"));
+  fireEvent.click(screen.getByTestId("groups-toggle-alice-devs"));
+  fireEvent.click(screen.getByTestId("groups-save-alice"));
+
+  await vi.waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/groups/ops/members",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ uid: "alice" }),
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/groups/devs/members/alice",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  await vi.waitFor(() => {
+    expect(onUpdated).toHaveBeenCalled();
+  });
+});
+
+test("groups save error keeps editor open with message", async () => {
+  globalThis.fetch = vi.fn(() =>
+    Promise.resolve({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({ error: "not found: uid=ghost" }),
+    } as Response),
+  );
+
+  const alice = { uid: "alice", name: "Alice", email: "", groups: [] };
+
+  render(<UsersTable users={[alice]} allGroups={["devs"]} />);
+
+  fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  fireEvent.click(screen.getByTestId("groups-toggle-alice-devs"));
+  fireEvent.click(screen.getByTestId("groups-save-alice"));
+
+  const error = await screen.findByTestId("groups-error-alice");
+
+  expect(error).toHaveTextContent("not found: uid=ghost");
+  expect(screen.getByTestId("groups-save-alice")).toBeInTheDocument();
+});

@@ -1,12 +1,13 @@
 use serde::Deserialize;
 
-use super::{Description, Gid, Name};
+use super::{Description, Gid, Members, Name};
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct NewGroup {
     pub gid: Gid,
     pub name: Name,
     pub description: Description,
+    pub members: Members,
 }
 
 impl NewGroup {
@@ -14,7 +15,7 @@ impl NewGroup {
         format!("cn={},ou=groups,{base}", self.gid.as_str())
     }
 
-    pub fn to_attrs(&self) -> Vec<(String, std::collections::HashSet<String>)> {
+    pub fn to_attrs(&self, base: &str) -> Vec<(String, std::collections::HashSet<String>)> {
         let mut attrs = vec![
             (
                 "objectClass".to_string(),
@@ -30,8 +31,10 @@ impl NewGroup {
             ),
             (
                 "member".to_string(),
-                [format!("cn={},ou=groups", self.gid.as_str())]
-                    .into_iter()
+                self.members
+                    .as_slice()
+                    .iter()
+                    .map(|uid| format!("uid={},ou=people,{base}", uid.as_str()))
                     .collect(),
             ),
         ];
@@ -49,55 +52,55 @@ impl NewGroup {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::users::Uid;
 
-    #[test]
-    fn new_group_dn_and_attrs() {
-        let g = NewGroup {
+    fn test_group() -> NewGroup {
+        NewGroup {
             gid: Gid::try_new("devs".into()).unwrap(),
             name: Name::try_new("Devs".into()).unwrap(),
             description: Description::try_new("Devs team".into()),
-        };
-
-        let dn = g.dn("dc=dev,dc=example,dc=com");
-
-        assert_eq!(
-            dn, "cn=devs,ou=groups,dc=dev,dc=example,dc=com",
-            "dn should be cn + ou=groups + base"
-        );
-
-        let attrs = g.to_attrs();
-        let find = |k: &str| attrs.iter().find(|(kk, _)| kk == k).unwrap().1.clone();
-
-        assert!(
-            find("objectClass").contains("groupOfNames"),
-            "attrs should contain groupOfNames"
-        );
-        assert!(find("cn").contains("devs"), "attrs should contain cn=gid");
-        assert!(find("o").contains("Devs"), "attrs should contain o=name");
-        assert!(
-            find("description").contains("Devs team"),
-            "attrs should contain description"
-        );
+            members: Members::try_new(vec![
+                Uid::try_new("alice".into()).unwrap(),
+                Uid::try_new("bob".into()).unwrap(),
+            ])
+            .unwrap(),
+        }
     }
 
     #[test]
-    fn deserialize_accepts_empty_description() {
-        let g: NewGroup =
-            serde_json::from_str(r#"{"gid":"devs","name":"x","description":""}"#).unwrap();
+    fn dn_and_member_dns() {
+        let g = test_group();
 
         assert_eq!(
-            g.description.as_str(),
-            "",
-            "empty description is allowed for groups"
+            g.dn("dc=dev,dc=example,dc=com"),
+            "cn=devs,ou=groups,dc=dev,dc=example,dc=com",
+            "dn should be cn + ou=groups + base"
         );
+
+        let attrs = g.to_attrs("dc=dev,dc=example,dc=com");
+        let member = attrs
+            .iter()
+            .find(|(k, _)| k == "member")
+            .map(|(_, v)| v.clone())
+            .unwrap();
+
+        assert!(
+            member.contains("uid=alice,ou=people,dc=dev,dc=example,dc=com"),
+            "member should be user DN, got {member:?}"
+        );
+        assert!(
+            member.contains("uid=bob,ou=people,dc=dev,dc=example,dc=com"),
+            "all initial members should be DNs, got {member:?}"
+        );
+        assert!(!member.contains("cn=devs"), "no placeholder self-DN");
     }
 
     #[test]
     fn attrs_omit_description_when_empty() {
-        let g: NewGroup =
-            serde_json::from_str(r#"{"gid":"devs","name":"x","description":""}"#).unwrap();
+        let mut g = test_group();
+        g.description = Description::try_new("".into());
 
-        let attrs = g.to_attrs();
+        let attrs = g.to_attrs("dc=dev,dc=example,dc=com");
 
         assert!(
             attrs.iter().all(|(k, _)| k != "description"),
@@ -107,7 +110,7 @@ mod tests {
 
     #[test]
     fn deserialize_validates_gid() {
-        let json = r#"{"gid":"","name":"x","description":"x"}"#;
+        let json = r#"{"gid":"","name":"x","description":"x","members":["alice"]}"#;
 
         let err = serde_json::from_str::<NewGroup>(json).unwrap_err();
 
@@ -119,13 +122,25 @@ mod tests {
 
     #[test]
     fn deserialize_validates_name() {
-        let json = r#"{"gid":"devs","name":"","description":"x"}"#;
+        let json = r#"{"gid":"devs","name":"","description":"x","members":["alice"]}"#;
 
         let err = serde_json::from_str::<NewGroup>(json).unwrap_err();
 
         assert!(
             err.to_string().contains("name is empty"),
             "empty name should be rejected"
+        );
+    }
+
+    #[test]
+    fn deserialize_rejects_empty_members() {
+        let json = r#"{"gid":"devs","name":"x","description":"","members":[]}"#;
+
+        let err = serde_json::from_str::<NewGroup>(json).unwrap_err();
+
+        assert!(
+            err.to_string().contains("members is empty"),
+            "group needs at least one member at creation, got {err}"
         );
     }
 }

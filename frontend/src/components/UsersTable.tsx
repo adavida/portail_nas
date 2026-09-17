@@ -1,20 +1,151 @@
-export type User = { uid: string; name: string; email: string };
+export type User = {
+  uid: string;
+  name: string;
+  email: string;
+  groups?: string[];
+};
 
 import { useState } from "react";
 import EditableCell from "./EditableCell";
 
+function GroupsCell({
+  uid,
+  groups,
+  allGroups,
+  onSave,
+}: {
+  uid: string;
+  groups: string[];
+  allGroups: string[];
+  onSave: (next: string[]) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<string[]>(groups);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggle = (gid: string) =>
+    setDraft((d) =>
+      d.includes(gid) ? d.filter((x) => x !== gid) : [...d, gid],
+    );
+
+  const save = async () => {
+    const res = await onSave(draft);
+    if (res.ok) {
+      setEditing(false);
+    } else {
+      setError(res.error || `error`);
+    }
+  };
+
+  const cancel = () => {
+    setDraft(groups);
+    setError(null);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <td
+        data-testid={`cell-groups-${uid}`}
+        onDoubleClick={() => setEditing(true)}
+        style={{ border: "1px solid #ccc", padding: 8, cursor: "text" }}
+      >
+        {groups.length ? groups.join(" ") : "-"}
+      </td>
+    );
+  }
+
+  return (
+    <td style={{ border: "1px solid #ccc", padding: 8 }}>
+      {allGroups.map((gid) => (
+        <button
+          key={gid}
+          type="button"
+          data-testid={`groups-toggle-${uid}-${gid}`}
+          style={{
+            margin: 2,
+            fontWeight: draft.includes(gid) ? "bold" : "normal",
+            textDecoration: draft.includes(gid) ? "underline" : "none",
+          }}
+          onClick={() => toggle(gid)}
+        >
+          {draft.includes(gid) ? "✓" : "✗"} {gid}
+        </button>
+      ))}
+      <button type="button" data-testid={`groups-save-${uid}`} onClick={save}>
+        Valider
+      </button>
+      <button
+        type="button"
+        data-testid={`groups-cancel-${uid}`}
+        onClick={cancel}
+      >
+        Annuler
+      </button>
+      {error && <span data-testid={`groups-error-${uid}`}> {error}</span>}
+    </td>
+  );
+}
+
 function UserRow({
   user,
+  allGroups,
   onUpdated,
   onDeleted,
 }: {
   user: User;
+  allGroups?: string[];
   onUpdated?: () => void;
   onDeleted?: () => void;
 }) {
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
+  const groups = user.groups ?? [];
+
+  const saveGroups = async (
+    next: string[],
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const adds = next.filter((gid) => !groups.includes(gid));
+    const removes = groups.filter((gid) => !next.includes(gid));
+
+    for (const gid of adds) {
+      const res = await fetch(
+        `/api/groups/${encodeURIComponent(gid)}/members`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid: user.uid }),
+        },
+      );
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        const error = j.error || `error ${res.status}`;
+        setMsg(error);
+        setIsError(true);
+        return { ok: false, error };
+      }
+    }
+
+    for (const gid of removes) {
+      const res = await fetch(
+        `/api/groups/${encodeURIComponent(gid)}/members/${encodeURIComponent(user.uid)}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        const error = j.error || `error ${res.status}`;
+        setMsg(error);
+        setIsError(true);
+        return { ok: false, error };
+      }
+    }
+
+    setMsg("ok");
+    setIsError(false);
+    onUpdated?.();
+    return { ok: true };
+  };
 
   const submit = async () => {
     if (!password) {
@@ -91,6 +222,12 @@ function UserRow({
         field="email"
         rowId={user.uid}
         onSave={saveField}
+      />
+      <GroupsCell
+        uid={user.uid}
+        groups={groups}
+        allGroups={allGroups ?? []}
+        onSave={saveGroups}
       />
       <td style={{ border: "1px solid #ccc", padding: 8 }}>
         <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -211,11 +348,13 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
 
 export function UsersTable({
   users,
+  allGroups,
   onCreated,
   onUpdated,
   onDeleted,
 }: {
   users: User[];
+  allGroups?: string[];
   onCreated?: () => void;
   onUpdated?: () => void;
   onDeleted?: () => void;
@@ -241,6 +380,11 @@ export function UsersTable({
             style={{ border: "1px solid #ccc", padding: 8, textAlign: "left" }}
           >
             Email
+          </th>
+          <th
+            style={{ border: "1px solid #ccc", padding: 8, textAlign: "left" }}
+          >
+            Groupes
           </th>
           <th
             style={{ border: "1px solid #ccc", padding: 8, textAlign: "left" }}
@@ -275,6 +419,7 @@ export function UsersTable({
             <UserRow
               key={u.uid}
               user={u}
+              allGroups={allGroups}
               onUpdated={onUpdated}
               onDeleted={onDeleted}
             />

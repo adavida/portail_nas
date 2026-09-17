@@ -1,4 +1,9 @@
-export type Group = { gid: string; name: string; description: string };
+export type Group = {
+  gid: string;
+  name: string;
+  description: string;
+  members: string[];
+};
 
 import { useState } from "react";
 import EditableCell from "./EditableCell";
@@ -82,18 +87,24 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
   const [gid, setGid] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [member, setMember] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
-    if (!gid.trim() || !name.trim()) {
-      setError("gid et nom requis, description optionnelle");
+    if (!gid.trim() || !name.trim() || !member.trim()) {
+      setError("gid, nom et au moins un membre requis");
       return;
     }
     setError(null);
     const res = await fetch("/api/groups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gid, name, description }),
+      body: JSON.stringify({
+        gid,
+        name,
+        description,
+        members: [member.trim()],
+      }),
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
@@ -103,6 +114,7 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
     setGid("");
     setName("");
     setDescription("");
+    setMember("");
     onCreated?.();
   };
 
@@ -130,6 +142,14 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
           placeholder="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+        />
+      </td>
+      <td style={td}>
+        <input
+          data-testid="input-member"
+          placeholder="membre initial (uid)"
+          value={member}
+          onChange={(e) => setMember(e.target.value)}
         />
       </td>
       <td style={td}>
@@ -167,6 +187,7 @@ export function GroupsTable({
           <th style={{ ...td, textAlign: "left" }}>GID</th>
           <th style={{ ...td, textAlign: "left" }}>Nom</th>
           <th style={{ ...td, textAlign: "left" }}>Description</th>
+          <th style={{ ...td, textAlign: "left" }}>Membre initial</th>
           <th style={{ ...td, textAlign: "left" }}>Action</th>
         </tr>
       </thead>
@@ -175,7 +196,7 @@ export function GroupsTable({
         {groups.length === 0 ? (
           <tr>
             <td
-              colSpan={4}
+              colSpan={5}
               style={{ ...td, textAlign: "center" }}
               data-testid="groups-empty"
             >
