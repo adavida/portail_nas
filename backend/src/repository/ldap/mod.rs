@@ -9,26 +9,36 @@ pub use users::{
 use crate::error::AppError;
 
 pub(crate) fn ldap_url() -> String {
-    if cfg!(test) {
-        std::env::var("LDAP_TEST_URL")
-            .or_else(|_| std::env::var("LDAP_URL"))
-            .unwrap_or_else(|_| "ldap://127.0.0.1:3891".into())
-    } else {
-        std::env::var("LDAP_URL")
-            .or_else(|_| std::env::var("LDAP_TEST_URL"))
-            .unwrap_or_else(|_| "ldap://127.0.0.1:3890".into())
-    }
+    std::env::var("LDAP_URL").unwrap_or_else(|_| "ldap://127.0.0.1:3890".into())
 }
 
 pub(crate) fn ldap_base() -> String {
-    if cfg!(test) {
-        std::env::var("LDAP_TEST_BASE_DN")
-            .or_else(|_| std::env::var("LDAP_BASE_DN"))
-            .unwrap_or_else(|_| "dc=test,dc=example,dc=com".into())
-    } else {
-        std::env::var("LDAP_BASE_DN")
-            .or_else(|_| std::env::var("LDAP_TEST_BASE_DN"))
-            .unwrap_or_else(|_| "dc=dev,dc=example,dc=com".into())
+    std::env::var("LDAP_BASE_DN").unwrap_or_else(|_| "dc=dev,dc=example,dc=com".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ldap_url;
+
+    #[ctor::ctor(unsafe)]
+    fn redirect_ldap_to_test() {
+        std::env::set_var(
+            "LDAP_URL",
+            std::env::var("LDAP_TEST_URL").unwrap_or_else(|_| "ldap://127.0.0.1:3891".into()),
+        );
+        std::env::set_var(
+            "LDAP_BASE_DN",
+            std::env::var("LDAP_TEST_BASE_DN")
+                .unwrap_or_else(|_| "dc=test,dc=example,dc=com".into()),
+        );
+    }
+
+    #[test]
+    fn ldap_url_reads_env() {
+        std::env::set_var("LDAP_URL", "ldap://example:1");
+        assert_eq!(ldap_url(), "ldap://example:1");
+        std::env::remove_var("LDAP_URL");
+        assert_eq!(ldap_url(), "ldap://127.0.0.1:3890");
     }
 }
 
