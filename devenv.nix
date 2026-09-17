@@ -9,16 +9,28 @@
 let
   codiumWithExt = pkgs.vscode-with-extensions.override {
     vscode = pkgs.vscodium;
-    vscodeExtensions = with pkgs.vscode-extensions; [
-      rust-lang.rust-analyzer
-      tamasfe.even-better-toml
-      vadimcn.vscode-lldb
-      esbenp.prettier-vscode
-      dbaeumer.vscode-eslint
-      jnoortheen.nix-ide
-      mkhl.direnv
-      bradlc.vscode-tailwindcss
-    ];
+    vscodeExtensions =
+      with pkgs.vscode-extensions;
+      [
+        bradlc.vscode-tailwindcss
+        dbaeumer.vscode-eslint
+        esbenp.prettier-vscode
+        fill-labs.dependi
+        jnoortheen.nix-ide
+        mhutchie.git-graph
+        mkhl.direnv
+        rust-lang.rust-analyzer
+        tamasfe.even-better-toml
+        vadimcn.vscode-lldb
+      ]
+      ++ pkgs.vscode-utils.extensionsFromVscodeMarketplace [
+        {
+          name = "amvim";
+          publisher = "auiworks";
+          version = "1.37.0";
+          sha256 = "0jh43cajpkpgnnkn4ficsphsrbjnykiz5fml88w2s202101pf1l1";
+        }
+      ];
   };
   mkSlapd =
     {
