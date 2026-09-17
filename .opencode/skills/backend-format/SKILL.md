@@ -12,12 +12,23 @@ Executable source of truth: `devenv.nix:127` + `backend/Cargo.toml:2`.
 ### How to format
 
 ```bash
-devenv shell -- treefmt          # rustfmt via treefmt-nix, also on enterShell
+devenv shell -- cargo fmt        # obligatoire après toute modif Rust (*.rs, Cargo.toml)
+devenv shell -- treefmt          # rustfmt via treefmt-nix, also on enterShell (nix+rust+prettier)
 devenv shell -- cargo clippy -- -D warnings   # 0 warnings allowed
 devenv shell -- cargo clippy --fix --allow-dirty  # auto-fix when possible
 ```
 
 Never run `cargo fmt`/`rustfmt`/`clippy` outside `devenv shell` (rust 1.98 toolchain).
+
+### Après toute modification Rust — obligatoire
+
+Après édition de `backend/src/**/*.rs` ou `backend/Cargo.toml`, lancer systématiquement en fin de modif:
+
+```bash
+devenv shell -- cargo fmt
+```
+
+puis `devenv shell -- treefmt` (vérif globale) avant `git add`. `treefmt` seul ne suffit pas comme preuve `cargo fmt`.
 
 ### What `rustfmt` enforces (treefmt)
 
@@ -34,6 +45,7 @@ Never run `cargo fmt`/`rustfmt`/`clippy` outside `devenv shell` (rust 1.98 toolc
 ### Verification
 
 ```bash
+devenv shell -- cargo fmt -- --check   # doit être clean après modif Rust
 devenv shell -- treefmt --fail-on-change
 devenv shell -- cargo clippy -- -D warnings
 devenv shell -- cargo test
