@@ -2,6 +2,7 @@ pub mod controllers;
 pub mod domain;
 pub mod error;
 pub mod http;
+pub mod repository;
 
 pub use http::router as app;
 
@@ -22,10 +23,13 @@ mod tests {
             .uri("/api/health")
             .body(Body::empty())
             .unwrap();
+
         let resp = app.oneshot(req).await.unwrap();
+
         assert_eq!(resp.status(), StatusCode::OK);
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
         assert_eq!(v["status"], "ok");
     }
 
@@ -36,7 +40,9 @@ mod tests {
             .uri("/api/unknown")
             .body(Body::empty())
             .unwrap();
+
         let resp = app.oneshot(req).await.unwrap();
+
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
@@ -47,14 +53,17 @@ mod tests {
             .uri("/api/users")
             .body(Body::empty())
             .unwrap();
+
         let resp = app.oneshot(req).await.unwrap();
-        // LDAP test (3891) pas dispo en CI -> 500 toléré, sinon 200 array
+
         if resp.status() == StatusCode::INTERNAL_SERVER_ERROR {
             let body = resp.into_body().collect().await.unwrap().to_bytes();
             let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
             assert!(v.get("error").is_some(), "500 doit retourner {{error}}");
             return;
         }
+
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
             resp.headers()
@@ -63,8 +72,10 @@ mod tests {
                 .unwrap_or(""),
             "application/json"
         );
+
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
         assert!(v.is_array(), "GET /api/users doit retourner []");
         if let Some(first) = v.as_array().unwrap().first() {
             assert!(first.get("uid").is_some(), "User.uid manquant");
@@ -75,16 +86,15 @@ mod tests {
 
     #[tokio::test]
     async fn users_lists_seeded_user() {
-        // Seed 1 user dans LDAP_TEST (3891) puis vérifie tri uid
         let url = std::env::var("LDAP_TEST_URL").unwrap_or_else(|_| "ldap://127.0.0.1:3891".into());
         let base = std::env::var("LDAP_TEST_BASE_DN")
             .unwrap_or_else(|_| "dc=test,dc=example,dc=com".into());
-        // tente de peupler, ignore si LDAP down -> test devient no-op (couvert par users_returns_array)
+
         if let Ok((conn, mut ldap)) = ldap3::LdapConnAsync::new(&url).await {
             ldap3::drive!(conn);
             let bind_dn = format!("cn=admin,{base}");
             let _ = ldap.simple_bind(&bind_dn, "admin").await;
-            // 2 users pour vérifier tri
+
             for (uid, cn, mail) in [
                 ("apitest2", "Api Test2", "apitest2@example.com"),
                 ("apitest1", "Api Test1", "apitest1@example.com"),
@@ -110,27 +120,34 @@ mod tests {
             .uri("/api/users")
             .body(Body::empty())
             .unwrap();
+
         let resp = app.oneshot(req).await.unwrap();
+
         if resp.status() == StatusCode::INTERNAL_SERVER_ERROR {
-            return; // LDAP down -> déjà testé
+            return;
         }
+
         assert_eq!(resp.status(), StatusCode::OK);
+
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
         let arr = v.as_array().unwrap();
-        // si seed a réussi, on doit retrouver les 2 uids triés
+
         let uids: Vec<_> = arr
             .iter()
             .filter_map(|o| o.get("uid").and_then(|x| x.as_str()))
             .collect();
+
         if uids.contains(&"apitest1") {
             assert!(uids.contains(&"apitest2"));
-            // tri asc: apitest1 avant apitest2
+
             let p1 = uids.iter().position(|&x| x == "apitest1").unwrap();
             let p2 = uids.iter().position(|&x| x == "apitest2").unwrap();
+
             assert!(p1 < p2, "tri uid asc attendu");
-            // shape d'un seeded user
+
             let apitest1 = arr.iter().find(|o| o["uid"] == "apitest1").unwrap();
+
             assert_eq!(apitest1["name"], "Api Test1");
             assert_eq!(apitest1["email"], "apitest1@example.com");
         }

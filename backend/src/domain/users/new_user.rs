@@ -82,39 +82,38 @@ mod tests {
 
     #[test]
     fn new_user_validate() {
-        assert_eq!(
-            NewUser {
-                uid: "".into(),
-                name: "x".into(),
-                email: "".into(),
-                password: "p".into()
-            }
-            .validate()
-            .unwrap_err(),
-            CreateUserError::MissingUid
-        );
-        assert_eq!(
-            NewUser {
-                uid: "a".into(),
-                name: "".into(),
-                email: "".into(),
-                password: "p".into()
-            }
-            .validate()
-            .unwrap_err(),
-            CreateUserError::MissingName
-        );
-        assert_eq!(
-            NewUser {
-                uid: "a".into(),
-                name: "n".into(),
-                email: "".into(),
-                password: "".into()
-            }
-            .validate()
-            .unwrap_err(),
-            CreateUserError::MissingPassword
-        );
+        let err1 = NewUser {
+            uid: "".into(),
+            name: "x".into(),
+            email: "".into(),
+            password: "p".into(),
+        }
+        .validate()
+        .unwrap_err();
+
+        assert_eq!(err1, CreateUserError::MissingUid);
+
+        let err2 = NewUser {
+            uid: "a".into(),
+            name: "".into(),
+            email: "".into(),
+            password: "p".into(),
+        }
+        .validate()
+        .unwrap_err();
+
+        assert_eq!(err2, CreateUserError::MissingName);
+
+        let err3 = NewUser {
+            uid: "a".into(),
+            name: "n".into(),
+            email: "".into(),
+            password: "".into(),
+        }
+        .validate()
+        .unwrap_err();
+
+        assert_eq!(err3, CreateUserError::MissingPassword);
     }
 
     #[test]
@@ -125,12 +124,14 @@ mod tests {
             email: "bob@example.com".into(),
             password: "secret".into(),
         };
-        assert_eq!(
-            u.dn("dc=dev,dc=example,dc=com"),
-            "uid=bob,ou=people,dc=dev,dc=example,dc=com"
-        );
+
+        let dn = u.dn("dc=dev,dc=example,dc=com");
+
+        assert_eq!(dn, "uid=bob,ou=people,dc=dev,dc=example,dc=com");
+
         let attrs = u.to_attrs();
         let find = |k: &str| attrs.iter().find(|(kk, _)| kk == k).unwrap().1.clone();
+
         assert!(find("uid").contains("bob"));
         assert!(find("cn").contains("Bob Dupont"));
         assert!(find("sn").contains("Dupont"));

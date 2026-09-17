@@ -1,125 +1,17 @@
-use ldap3::{LdapConnAsync, Scope, SearchEntry};
-
 use crate::{
     domain::users::{NewUser, UpdatePassword, User},
     error::AppError,
+    repository::ldap as ldap_repo,
 };
 
-fn ldap_url() -> String {
-    if cfg!(test) {
-        std::env::var("LDAP_TEST_URL")
-            .or_else(|_| std::env::var("LDAP_URL"))
-            .unwrap_or_else(|_| "ldap://127.0.0.1:3891".into())
-    } else {
-        std::env::var("LDAP_URL")
-            .or_else(|_| std::env::var("LDAP_TEST_URL"))
-            .unwrap_or_else(|_| "ldap://127.0.0.1:3890".into())
-    }
-}
-
-fn ldap_base() -> String {
-    if cfg!(test) {
-        std::env::var("LDAP_TEST_BASE_DN")
-            .or_else(|_| std::env::var("LDAP_BASE_DN"))
-            .unwrap_or_else(|_| "dc=test,dc=example,dc=com".into())
-    } else {
-        std::env::var("LDAP_BASE_DN")
-            .or_else(|_| std::env::var("LDAP_TEST_BASE_DN"))
-            .unwrap_or_else(|_| "dc=dev,dc=example,dc=com".into())
-    }
-}
-
 pub async fn list() -> Result<Vec<User>, AppError> {
-    let url = ldap_url();
-    let base = ldap_base();
-    let search_base = format!("ou=people,{base}");
-
-    let (conn, mut ldap) = LdapConnAsync::new(&url)
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-    ldap3::drive!(conn);
-
-    let (rs, _res) = ldap
-        .search(
-            &search_base,
-            Scope::Subtree,
-            "(objectClass=inetOrgPerson)",
-            vec!["uid", "cn", "displayName", "mail"],
-        )
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?
-        .success()
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-
-    let entries: Vec<SearchEntry> = rs.into_iter().map(SearchEntry::construct).collect();
-    let users = User::from_search(entries);
-    let _ = ldap.unbind().await;
-    Ok(users)
+    ldap_repo::list_users().await
 }
 
 pub async fn create(new: NewUser) -> Result<User, AppError> {
-    new.validate()
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    let url = ldap_url();
-    let base = ldap_base();
-    let dn = new.dn(&base);
-
-    let (conn, mut ldap) = LdapConnAsync::new(&url)
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-    ldap3::drive!(conn);
-    let bind_dn = format!("cn=admin,{base}");
-    ldap.simple_bind(&bind_dn, "admin")
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?
-        .success()
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-
-    let attrs = new.to_attrs();
-    ldap.add(&dn, attrs)
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?
-        .success()
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-    let _ = ldap.unbind().await;
-
-    Ok(User {
-        uid: new.uid,
-        name: new.name,
-        email: new.email,
-    })
+    ldap_repo::create_user(new).await
 }
 
 pub async fn update_password(uid: String, req: UpdatePassword) -> Result<(), AppError> {
-    req.validate()
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    if uid.trim().is_empty() {
-        return Err(AppError::Internal("missing uid".into()));
-    }
-    let url = ldap_url();
-    let base = ldap_base();
-    let dn = format!("uid={uid},ou=people,{base}");
-
-    let (conn, mut ldap) = LdapConnAsync::new(&url)
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-    ldap3::drive!(conn);
-    let bind_dn = format!("cn=admin,{base}");
-    ldap.simple_bind(&bind_dn, "admin")
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?
-        .success()
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-
-    use ldap3::Mod;
-    use std::collections::HashSet;
-    let mut set = HashSet::new();
-    set.insert(req.password);
-    ldap.modify(&dn, vec![Mod::Replace("userPassword".to_string(), set)])
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?
-        .success()
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-    let _ = ldap.unbind().await;
-    Ok(())
+    ldap_repo::update_user_password(uid, req).await
 }

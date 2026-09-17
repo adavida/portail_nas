@@ -41,14 +41,14 @@ impl User {
         })
     }
 
-    pub fn from_search(entries: Vec<ldap3::SearchEntry>) -> Vec<Self> {
+    pub fn from_search(entries: Vec<std::collections::HashMap<String, Vec<String>>>) -> Vec<Self> {
         let mut users: Vec<Self> = entries
             .into_iter()
-            .filter_map(|e| {
-                let uid = e.attrs.get("uid").and_then(|v| v.first().cloned());
-                let cn = e.attrs.get("cn").and_then(|v| v.first().cloned());
-                let display_name = e.attrs.get("displayName").and_then(|v| v.first().cloned());
-                let mail = e.attrs.get("mail").and_then(|v| v.first().cloned());
+            .filter_map(|attrs| {
+                let uid = attrs.get("uid").and_then(|v| v.first().cloned());
+                let cn = attrs.get("cn").and_then(|v| v.first().cloned());
+                let display_name = attrs.get("displayName").and_then(|v| v.first().cloned());
+                let mail = attrs.get("mail").and_then(|v| v.first().cloned());
                 Self::from_attrs(uid, cn, display_name, mail).ok()
             })
             .collect();
@@ -70,21 +70,22 @@ mod tests {
             Some("a@ex.com".into()),
         )
         .unwrap();
+
         assert_eq!(u.name, "Alice D");
     }
 
     #[test]
     fn cn_fallback_when_no_display() {
         let u = User::from_attrs(Some("bob".into()), Some("Bob C".into()), None, None).unwrap();
+
         assert_eq!(u.name, "Bob C");
         assert_eq!(u.email, "");
     }
 
     #[test]
     fn needs_uid() {
-        assert_eq!(
-            User::from_attrs(None, Some("x".into()), None, None).unwrap_err(),
-            UserError::MissingUid
-        );
+        let result = User::from_attrs(None, Some("x".into()), None, None).unwrap_err();
+
+        assert_eq!(result, UserError::MissingUid);
     }
 }

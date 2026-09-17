@@ -4,6 +4,7 @@ import Home from "./Home";
 
 test("renders title", () => {
   render(<Home />);
+
   expect(screen.getByText("Portail LDAP")).toBeInTheDocument();
 });
 
@@ -13,6 +14,8 @@ test("shows backend status", async () => {
       json: () => Promise.resolve({ status: "ok" }),
     } as Response),
   );
+
   render(<Home />);
+
   expect(await screen.findByTestId("health")).toHaveTextContent("backend: ok");
 });

@@ -10,6 +10,7 @@
 - Watchers `backend-test`/`frontend-test` tournent en permanence — ne pas relancer `cargo test` en boucle manuelle.
 - `just test` (`justfile:9`) = `cargo test` + `npm --prefix frontend test -- --run` (raccourci local).
 - Nouvelle route LDAP → trait `LdapClient` mockable, pas de vrai LDAP en unit test (intégration seulement via `LDAP_TEST_*`).
+- Tests AAA : tout `#[test]` / `test(` suit Arrange, Act, Assert avec **ligne vide entre les 3** (skill `.opencode/skills/test-aaa/SKILL.md` trigger `*.rs` `*.test.tsx`).
 
 ## VSCode
 

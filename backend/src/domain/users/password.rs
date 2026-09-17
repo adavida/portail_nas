@@ -35,24 +35,22 @@ mod tests {
 
     #[test]
     fn validate_ok() {
-        assert!(
-            UpdatePassword {
-                password: "secret".into()
-            }
-            .validate()
-            .is_ok()
-        );
+        let result = UpdatePassword {
+            password: "secret".into(),
+        }
+        .validate();
+
+        assert!(result.is_ok());
     }
 
     #[test]
     fn missing_password() {
-        assert_eq!(
-            UpdatePassword {
-                password: "".into()
-            }
-            .validate()
-            .unwrap_err(),
-            PasswordError::MissingPassword
-        );
+        let err = UpdatePassword {
+            password: "".into(),
+        }
+        .validate()
+        .unwrap_err();
+
+        assert_eq!(err, PasswordError::MissingPassword);
     }
 }
