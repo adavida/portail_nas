@@ -101,6 +101,7 @@ in
     git
     just
     openldap
+    xdg-utils
   ];
 
   processes = {
@@ -120,6 +121,8 @@ in
     };
     vscode.exec = "${codiumWithExt}/bin/codium . 2>/dev/null || code . 2>/dev/null || echo 'vscode/codium non installé — ouvrez manuellement code .'; sleep infinity";
   };
+
+  scripts.openfrontend.exec = "xdg-open http://localhost:5173/ 2>/dev/null || echo 'Ouvrez manuellement http://localhost:5173/'";
 
   treefmt = {
     enable = true;
