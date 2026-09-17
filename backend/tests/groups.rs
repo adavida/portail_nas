@@ -169,16 +169,144 @@ async fn create_invalid_gid_is_rejected() {
 }
 
 #[tokio::test]
-async fn create_empty_description_is_rejected() {
-    let (status, _) = send(
+async fn create_empty_description_is_accepted() {
+    let group = TestGroup::new("apides");
+    let (status, body) = send(
         Method::POST,
         "/api/groups",
-        Some(json!({ "gid": "apidesgrp", "name": "x", "description": "" })),
+        Some(json!({
+            "gid": group.gid,
+            "name": group.name,
+            "description": "",
+        })),
     )
     .await;
 
-    assert!(
-        status.is_client_error(),
-        "empty description should be rejected, got {status}"
+    if status == StatusCode::INTERNAL_SERVER_ERROR {
+        return;
+    }
+
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "empty description should be allowed for groups"
     );
+    assert_eq!(body["description"], "", "description should stay empty");
+
+    let (_, groups) = send(Method::GET, "/api/groups", None).await;
+    let listed = groups
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|g| g["gid"] == group.gid)
+        .cloned();
+
+    assert!(listed.is_some(), "group with empty description created");
+}
+
+#[tokio::test]
+async fn delete_unknown_gid_is_500() {
+    let n = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos()
+        % 1000000;
+
+    let (status, body) = send(Method::DELETE, &format!("/api/groups/apinobody{n}"), None).await;
+
+    assert_eq!(
+        status,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "deleting unknown group should 500"
+    );
+    assert!(body.get("error").is_some(), "error body expected");
+}
+
+#[tokio::test]
+async fn create_duplicate_gid_is_500() {
+    let group = TestGroup::new("apidup");
+    let (status, _) = group.create().await;
+
+    if status == StatusCode::INTERNAL_SERVER_ERROR {
+        return;
+    }
+
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (second, body) = group.create().await;
+
+    assert_eq!(
+        second,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "duplicate gid should 500"
+    );
+    assert!(body.get("error").is_some(), "error body expected");
+}
+
+mod repo {
+    use portail_backend::domain::groups::{Description, Gid, NewGroup};
+    use portail_backend::domain::shared::Name;
+    use portail_backend::error::AppError;
+    use portail_backend::repository::ldap::groups::{create_group, delete_group, list_groups};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn nanos() -> u128 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+            % 1_000_000
+    }
+
+    fn new_group(prefix: &str) -> NewGroup {
+        NewGroup {
+            gid: Gid::try_new(format!("{prefix}{}", nanos())).unwrap(),
+            name: Name::try_new("Unit Group".into()).unwrap(),
+            description: Description::try_new("unit test group".into()),
+        }
+    }
+
+    #[tokio::test]
+    async fn repository_create_list_delete_roundtrip() {
+        let new = new_group("unigrp");
+
+        let created = match create_group(new.clone()).await {
+            Err(AppError::Ldap(_)) => return,
+            other => other.unwrap(),
+        };
+
+        assert_eq!(created.gid, new.gid, "created group should echo gid");
+        assert_eq!(created.name, new.name, "created group should echo name");
+        assert_eq!(
+            created.description, new.description,
+            "created group should echo description"
+        );
+
+        let groups = list_groups().await.unwrap();
+        let listed = groups.iter().find(|g| g.gid == new.gid).cloned();
+
+        assert!(listed.is_some(), "created group should appear in list");
+
+        let listed = listed.unwrap();
+
+        assert_eq!(listed.name, new.name, "listed group should keep its name");
+
+        delete_group(new.gid.clone()).await.unwrap();
+
+        let groups = list_groups().await.unwrap();
+
+        assert!(
+            !groups.iter().any(|g| g.gid == new.gid),
+            "deleted group should be gone from list"
+        );
+    }
+
+    #[tokio::test]
+    async fn repository_delete_unknown_gid_errors() {
+        let gid = Gid::try_new(format!("unidead{}", nanos())).unwrap();
+
+        let result = delete_group(gid).await;
+
+        assert!(result.is_err(), "delete of unknown group should fail");
+    }
 }

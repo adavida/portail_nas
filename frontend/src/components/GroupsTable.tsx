@@ -52,8 +52,8 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
-    if (!gid.trim() || !name.trim() || !description.trim()) {
-      setError("gid, nom et description requis");
+    if (!gid.trim() || !name.trim()) {
+      setError("gid et nom requis, description optionnelle");
       return;
     }
     setError(null);

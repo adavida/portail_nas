@@ -4,28 +4,9 @@ use serde::{Deserialize, Serialize};
 #[serde(transparent)]
 pub struct Description(String);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DescriptionError {
-    Empty,
-}
-
-impl std::fmt::Display for DescriptionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Empty => write!(f, "description is empty"),
-        }
-    }
-}
-
-impl std::error::Error for DescriptionError {}
-
 impl Description {
-    pub fn try_new(raw: String) -> Result<Self, DescriptionError> {
-        let s = raw.trim().to_string();
-        if s.is_empty() {
-            return Err(DescriptionError::Empty);
-        }
-        Ok(Self(s))
+    pub fn try_new(raw: String) -> Self {
+        Self(raw.trim().to_string())
     }
 
     pub fn as_str(&self) -> &str {
@@ -36,7 +17,7 @@ impl Description {
 impl<'de> Deserialize<'de> for Description {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        Self::try_new(s).map_err(serde::de::Error::custom)
+        Ok(Self::try_new(s))
     }
 }
 
@@ -46,29 +27,22 @@ mod tests {
 
     #[test]
     fn accepts_valid() {
-        let d = Description::try_new("Devs team".into()).unwrap();
+        let d = Description::try_new("Devs team".into());
 
         assert_eq!(d.as_str(), "Devs team");
     }
 
     #[test]
     fn trims_whitespace() {
-        let d = Description::try_new("  Devs  ".into()).unwrap();
+        let d = Description::try_new("  Devs  ".into());
 
         assert_eq!(d.as_str(), "Devs", "description should be trimmed");
     }
 
     #[test]
-    fn rejects_empty() {
-        let err = Description::try_new("   ".into()).unwrap_err();
+    fn accepts_empty() {
+        let d = Description::try_new("   ".into());
 
-        assert_eq!(err, DescriptionError::Empty);
-    }
-
-    #[test]
-    fn deserialize_validates() {
-        let d: Description = serde_json::from_str("\"x\"").unwrap();
-
-        assert_eq!(d.as_str(), "x");
+        assert_eq!(d.as_str(), "", "empty description is allowed for groups");
     }
 }

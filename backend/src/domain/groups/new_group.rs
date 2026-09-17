@@ -16,7 +16,7 @@ impl NewGroup {
     }
 
     pub fn to_attrs(&self) -> Vec<(String, std::collections::HashSet<String>)> {
-        vec![
+        let mut attrs = vec![
             (
                 "objectClass".to_string(),
                 ["groupOfNames".to_string()].into_iter().collect(),
@@ -30,18 +30,20 @@ impl NewGroup {
                 [self.name.as_str().to_string()].into_iter().collect(),
             ),
             (
-                "description".to_string(),
-                [self.description.as_str().to_string()]
-                    .into_iter()
-                    .collect(),
-            ),
-            (
                 "member".to_string(),
                 [format!("cn={},ou=groups", self.gid.as_str())]
                     .into_iter()
                     .collect(),
             ),
-        ]
+        ];
+        let desc = self.description.as_str();
+        if !desc.trim().is_empty() {
+            attrs.push((
+                "description".to_string(),
+                [desc.to_string()].into_iter().collect(),
+            ));
+        }
+        attrs
     }
 }
 
@@ -54,7 +56,7 @@ mod tests {
         let g = NewGroup {
             gid: Gid::try_new("devs".into()).unwrap(),
             name: Name::try_new("Devs".into()).unwrap(),
-            description: Description::try_new("Devs team".into()).unwrap(),
+            description: Description::try_new("Devs team".into()),
         };
 
         let dn = g.dn("dc=dev,dc=example,dc=com");
@@ -80,6 +82,31 @@ mod tests {
     }
 
     #[test]
+    fn deserialize_accepts_empty_description() {
+        let g: NewGroup =
+            serde_json::from_str(r#"{"gid":"devs","name":"x","description":""}"#).unwrap();
+
+        assert_eq!(
+            g.description.as_str(),
+            "",
+            "empty description is allowed for groups"
+        );
+    }
+
+    #[test]
+    fn attrs_omit_description_when_empty() {
+        let g: NewGroup =
+            serde_json::from_str(r#"{"gid":"devs","name":"x","description":""}"#).unwrap();
+
+        let attrs = g.to_attrs();
+
+        assert!(
+            attrs.iter().all(|(k, _)| k != "description"),
+            "empty description should not be sent to LDAP"
+        );
+    }
+
+    #[test]
     fn deserialize_validates_gid() {
         let json = r#"{"gid":"","name":"x","description":"x"}"#;
 
@@ -100,18 +127,6 @@ mod tests {
         assert!(
             err.to_string().contains("name is empty"),
             "empty name should be rejected"
-        );
-    }
-
-    #[test]
-    fn deserialize_validates_description() {
-        let json = r#"{"gid":"devs","name":"x","description":""}"#;
-
-        let err = serde_json::from_str::<NewGroup>(json).unwrap_err();
-
-        assert!(
-            err.to_string().contains("description is empty"),
-            "empty description should be rejected"
         );
     }
 }

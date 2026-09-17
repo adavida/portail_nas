@@ -15,7 +15,6 @@ pub enum GroupError {
     MissingCn,
     InvalidGid,
     InvalidName,
-    InvalidDescription,
 }
 
 impl std::fmt::Display for GroupError {
@@ -24,7 +23,6 @@ impl std::fmt::Display for GroupError {
             Self::MissingCn => write!(f, "missing cn"),
             Self::InvalidGid => write!(f, "invalid gid"),
             Self::InvalidName => write!(f, "invalid name"),
-            Self::InvalidDescription => write!(f, "invalid description"),
         }
     }
 }
@@ -41,8 +39,7 @@ impl Group {
         let gid = Gid::try_new(cn).map_err(|_| GroupError::InvalidGid)?;
         let raw_name = o.unwrap_or_else(|| gid.as_str().to_string());
         let name = Name::try_new(raw_name).map_err(|_| GroupError::InvalidName)?;
-        let description = Description::try_new(description.unwrap_or_default())
-            .map_err(|_| GroupError::InvalidDescription)?;
+        let description = Description::try_new(description.unwrap_or_default());
         Ok(Self {
             gid,
             name,

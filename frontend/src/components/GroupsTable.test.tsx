@@ -61,3 +61,30 @@ test("delete shows error on failure", async () => {
 
   expect(error).toHaveTextContent("ldap: boom");
 });
+
+test("create sends empty description", async () => {
+  const fetchMock = vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+  );
+  globalThis.fetch = fetchMock;
+
+  render(<GroupsTable groups={[]} onCreated={() => {}} />);
+
+  fireEvent.change(screen.getByTestId("input-gid"), {
+    target: { value: "devs" },
+  });
+  fireEvent.change(screen.getByTestId("input-name"), {
+    target: { value: "Devs" },
+  });
+  fireEvent.click(screen.getByTestId("group-create-button"));
+
+  await vi.waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/groups",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ gid: "devs", name: "Devs", description: "" }),
+      }),
+    );
+  });
+});
