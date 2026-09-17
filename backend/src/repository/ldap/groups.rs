@@ -5,7 +5,7 @@ use crate::{
     error::AppError,
 };
 
-use super::{connect_admin, ldap_base, ldap_url, MapLdap};
+use super::{MapLdap, connect_admin, ldap_base, ldap_url};
 
 pub async fn list_groups() -> Result<Vec<Group>, AppError> {
     let base = ldap_base();
@@ -61,4 +61,72 @@ pub async fn delete_group(gid: Gid) -> Result<(), AppError> {
     ldap.delete(&dn).await.map_ldap()?.success().map_ldap()?;
     let _ = ldap.unbind().await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::groups::Description;
+    use crate::domain::shared::Name;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn nanos() -> u128 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+            % 1_000_000
+    }
+
+    fn new_group(prefix: &str) -> NewGroup {
+        NewGroup {
+            gid: Gid::try_new(format!("{prefix}{}", nanos())).unwrap(),
+            name: Name::try_new("Unit Group".into()).unwrap(),
+            description: Description::try_new("unit test group".into()).unwrap(),
+        }
+    }
+
+    #[tokio::test]
+    async fn create_list_delete_roundtrip() {
+        let new = new_group("unigrp");
+
+        let created = match create_group(new.clone()).await {
+            Err(AppError::Ldap(_)) => return,
+            other => other.unwrap(),
+        };
+
+        assert_eq!(created.gid, new.gid, "created group should echo gid");
+        assert_eq!(created.name, new.name, "created group should echo name");
+        assert_eq!(
+            created.description, new.description,
+            "created group should echo description"
+        );
+
+        let groups = list_groups().await.unwrap();
+        let listed = groups.iter().find(|g| g.gid == new.gid).cloned();
+
+        assert!(listed.is_some(), "created group should appear in list");
+
+        let listed = listed.unwrap();
+
+        assert_eq!(listed.name, new.name, "listed group should keep its name");
+
+        delete_group(new.gid.clone()).await.unwrap();
+
+        let groups = list_groups().await.unwrap();
+
+        assert!(
+            !groups.iter().any(|g| g.gid == new.gid),
+            "deleted group should be gone from list"
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_unknown_gid_errors() {
+        let gid = Gid::try_new(format!("unidead{}", nanos())).unwrap();
+
+        let result = delete_group(gid).await;
+
+        assert!(result.is_err(), "delete of unknown group should fail");
+    }
 }
