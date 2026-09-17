@@ -24,8 +24,7 @@
     "grep": "allow",
     "task": "allow",
     "external_directory": {
-      "/home/david/projects/rust/nas/202260917_portail/**": "allow",
-      "*": "ask"
+      "/home/david/projects/rust/nas/202260917_portail/**": "allow"
     }
   },
   "formatter": false
