@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Groups from "./pages/Groups";
 import Users from "./pages/Users";
+import { Toaster } from "./components/Toaster";
 
 export default function App() {
   const [tab, setTab] = useState<"users" | "groups">("users");
@@ -16,6 +17,7 @@ export default function App() {
         </button>
       </nav>
       {tab === "users" ? <Users /> : <Groups />}
+      <Toaster />
     </div>
   );
 }

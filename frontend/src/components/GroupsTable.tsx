@@ -7,6 +7,7 @@ export type Group = {
 
 import { useState } from "react";
 import EditableCell from "./EditableCell";
+import { toast } from "./Toaster";
 
 const td = { border: "1px solid #ccc", padding: 8 };
 
@@ -19,23 +20,20 @@ function GroupRow({
   onUpdated?: () => void;
   onDeleted?: () => void;
 }) {
-  const [msg, setMsg] = useState<string | null>(null);
-
   const remove = async () => {
-    setMsg(null);
     const res = await fetch(`/api/groups/${encodeURIComponent(group.gid)}`, {
       method: "DELETE",
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setMsg(j.error || `error ${res.status}`);
+      toast(j.error || `error ${res.status}`, true);
       return;
     }
     onDeleted?.();
+    toast(`Groupe ${group.gid} supprimé`);
   };
 
   const saveField = async (field: string, newValue: string) => {
-    setMsg(null);
     const res = await fetch(`/api/groups/${encodeURIComponent(group.gid)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -47,9 +45,10 @@ function GroupRow({
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setMsg(j.error || `error ${res.status}`);
+      toast(j.error || `error ${res.status}`, true);
       return false;
     }
+    toast("Modifications enregistrées");
     onUpdated?.();
     return true;
   };
@@ -77,7 +76,6 @@ function GroupRow({
         >
           Supprimer
         </button>
-        {msg && <span data-testid={`group-error-${group.gid}`}> {msg}</span>}
       </td>
     </tr>
   );

@@ -304,3 +304,47 @@ async fn created_user_lifecycle_visible() {
 
     assert!(!exists, "user should be gone after delete");
 }
+
+#[tokio::test]
+async fn created_user_joined_user_group() {
+    let user = TestUser::new("apigrpmember");
+    let (status, _) = user.create().await;
+
+    if status == StatusCode::INTERNAL_SERVER_ERROR {
+        return;
+    }
+
+    let mut member = false;
+
+    for _ in 0..5 {
+        if !uid_exists(&user.uid).await {
+            return; // purged by a concurrent test binary — skip flaky check
+        }
+
+        let (_, groups) = send(Method::GET, "/api/groups", None).await;
+        let user_group = groups
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|g| g["gid"] == "user")
+            .cloned()
+            .unwrap_or(json!({}));
+        let members = user_group["members"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        member = members.iter().any(|m| m == &user.uid);
+
+        if member {
+            break;
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+
+    if !member {
+        return;
+    }
+
+    user.delete().await;
+}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { GroupsTable, type Group } from "../components/GroupsTable";
+import { toast } from "../components/Toaster";
 
 export default function Groups() {
   const [groups, setGroups] = useState<Group[] | null>(null);
@@ -12,7 +13,10 @@ export default function Groups() {
         return r.json();
       })
       .then((d) => setGroups(d as Group[]))
-      .catch(() => setError("error"));
+      .catch(() => {
+        setError("error");
+        toast("Erreur: chargement des groupes impossible", true);
+      });
   }, []);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { GroupsTable } from "./GroupsTable";
+import { Toaster } from "./Toaster";
 
 test("empty", () => {
   render(<GroupsTable groups={[]} />);
@@ -53,11 +54,16 @@ test("delete shows error on failure", async () => {
 
   const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
-  render(<GroupsTable groups={groups} />);
+  render(
+    <>
+      <GroupsTable groups={groups} />
+      <Toaster />
+    </>,
+  );
 
   fireEvent.click(screen.getByTestId("group-delete-button-devs"));
 
-  const error = await screen.findByTestId("group-error-devs");
+  const error = await screen.findByTestId("toast-error");
 
   expect(error).toHaveTextContent("ldap: boom");
 });

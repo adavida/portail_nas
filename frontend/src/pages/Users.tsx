@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { UsersTable, type User } from "../components/UsersTable";
 import type { Group } from "../components/GroupsTable";
+import { toast } from "../components/Toaster";
 
 export default function Users() {
   const [users, setUsers] = useState<User[] | null>(null);
@@ -29,7 +30,10 @@ export default function Users() {
         );
         setGroups(groupsList);
       })
-      .catch(() => setError("error"));
+      .catch(() => {
+        setError("error");
+        toast("Erreur: chargement des utilisateurs impossible", true);
+      });
   }, []);
 
   useEffect(() => {

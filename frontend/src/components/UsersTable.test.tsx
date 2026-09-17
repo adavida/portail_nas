@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { UsersTable } from "./UsersTable";
+import { Toaster } from "./Toaster";
 
 test("empty", () => {
   render(<UsersTable users={[]} />);
@@ -30,6 +31,7 @@ test("create row is first line of table", () => {
   expect(firstRowId).toBe("create-row");
   expect(screen.getByTestId("input-uid")).toBeInTheDocument();
   expect(screen.getByTestId("input-password")).toBeInTheDocument();
+  expect(screen.queryByTestId("input-user-group")).not.toBeInTheDocument();
 });
 
 test("existing user has password field", () => {
@@ -76,11 +78,16 @@ test("delete shows error on failure", async () => {
 
   const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
 
-  render(<UsersTable users={[alice]} />);
+  render(
+    <>
+      <UsersTable users={[alice]} />
+      <Toaster />
+    </>,
+  );
 
   fireEvent.click(screen.getByTestId("delete-button-alice"));
 
-  const error = await screen.findByTestId("password-error-alice");
+  const error = await screen.findByTestId("toast-error");
 
   expect(error).toHaveTextContent("ldap: boom");
 });
@@ -128,7 +135,12 @@ test("edit error keeps editor open", async () => {
 
   const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
 
-  render(<UsersTable users={[alice]} />);
+  render(
+    <>
+      <UsersTable users={[alice]} />
+      <Toaster />
+    </>,
+  );
 
   fireEvent.doubleClick(screen.getByTestId("cell-name-alice"));
   fireEvent.change(screen.getByTestId("edit-input-name-alice"), {
@@ -138,7 +150,7 @@ test("edit error keeps editor open", async () => {
     key: "Enter",
   });
 
-  const error = await screen.findByTestId("password-error-alice");
+  const error = await screen.findByTestId("toast-error");
 
   expect(error).toHaveTextContent("name is empty");
   expect(screen.getByTestId("edit-input-name-alice")).toBeInTheDocument();
@@ -147,7 +159,12 @@ test("edit error keeps editor open", async () => {
 test("groups cell shows memberships", () => {
   const alice = { uid: "alice", name: "Alice", email: "", groups: ["devs"] };
 
-  render(<UsersTable users={[alice]} />);
+  render(
+    <>
+      <UsersTable users={[alice]} />
+      <Toaster />
+    </>,
+  );
 
   expect(screen.getByTestId("cell-groups-alice")).toHaveTextContent("devs");
 });
@@ -209,13 +226,18 @@ test("groups save error keeps editor open with message", async () => {
 
   const alice = { uid: "alice", name: "Alice", email: "", groups: [] };
 
-  render(<UsersTable users={[alice]} allGroups={["devs"]} />);
+  render(
+    <>
+      <UsersTable users={[alice]} allGroups={["devs"]} />
+      <Toaster />
+    </>,
+  );
 
   fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
   fireEvent.click(screen.getByTestId("groups-toggle-alice-devs"));
   fireEvent.click(screen.getByTestId("groups-save-alice"));
 
-  const error = await screen.findByTestId("groups-error-alice");
+  const error = await screen.findByTestId("toast-error");
 
   expect(error).toHaveTextContent("not found: uid=ghost");
   expect(screen.getByTestId("groups-save-alice")).toBeInTheDocument();
@@ -264,7 +286,12 @@ test("create group error keeps input and shows message", async () => {
 
   const alice = { uid: "alice", name: "Alice", email: "", groups: [] };
 
-  render(<UsersTable users={[alice]} />);
+  render(
+    <>
+      <UsersTable users={[alice]} />
+      <Toaster />
+    </>,
+  );
 
   fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
   fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
@@ -272,7 +299,7 @@ test("create group error keeps input and shows message", async () => {
   });
   fireEvent.click(screen.getByTestId("groups-new-button-alice"));
 
-  const error = await screen.findByTestId("groups-error-alice");
+  const error = await screen.findByTestId("toast-error");
 
   expect(error).toHaveTextContent("ldap: boom");
   expect(screen.getByTestId("groups-new-input-alice")).toBeInTheDocument();

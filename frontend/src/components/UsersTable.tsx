@@ -7,6 +7,7 @@ export type User = {
 
 import { useState } from "react";
 import EditableCell from "./EditableCell";
+import { toast } from "./Toaster";
 
 function GroupsCell({
   uid,
@@ -23,7 +24,6 @@ function GroupsCell({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string[]>(groups);
-  const [error, setError] = useState<string | null>(null);
   const [newGid, setNewGid] = useState("");
 
   const toggle = (gid: string) =>
@@ -35,14 +35,11 @@ function GroupsCell({
     const res = await onSave(draft);
     if (res.ok) {
       setEditing(false);
-    } else {
-      setError(res.error || `error`);
     }
   };
 
   const cancel = () => {
     setDraft(groups);
-    setError(null);
     setEditing(false);
   };
 
@@ -53,8 +50,6 @@ function GroupsCell({
     if (res.ok) {
       setDraft((d) => [...d, gid]);
       setNewGid("");
-    } else {
-      setError(res.error || `error`);
     }
   };
 
@@ -112,7 +107,6 @@ function GroupsCell({
       >
         Annuler
       </button>
-      {error && <span data-testid={`groups-error-${uid}`}> {error}</span>}
     </td>
   );
 }
@@ -129,8 +123,6 @@ function UserRow({
   onDeleted?: () => void;
 }) {
   const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-  const [isError, setIsError] = useState(false);
   const groups = user.groups ?? [];
 
   const saveGroups = async (
@@ -151,8 +143,7 @@ function UserRow({
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         const error = j.error || `error ${res.status}`;
-        setMsg(error);
-        setIsError(true);
+        toast(error, true);
         return { ok: false, error };
       }
     }
@@ -165,14 +156,12 @@ function UserRow({
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         const error = j.error || `error ${res.status}`;
-        setMsg(error);
-        setIsError(true);
+        toast(error, true);
         return { ok: false, error };
       }
     }
 
-    setMsg("ok");
-    setIsError(false);
+    toast("Modifications enregistrées");
     onUpdated?.();
     return { ok: true };
   };
@@ -180,7 +169,6 @@ function UserRow({
   const createGroupWithMember = async (
     gid: string,
   ): Promise<{ ok: boolean; error?: string }> => {
-    setMsg(null);
     const res = await fetch("/api/groups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -194,23 +182,19 @@ function UserRow({
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
       const error = j.error || `error ${res.status}`;
-      setMsg(error);
-      setIsError(true);
+      toast(error, true);
       return { ok: false, error };
     }
-    setMsg("ok");
-    setIsError(false);
+    toast(`Groupe ${gid} créé`);
     onUpdated?.();
     return { ok: true };
   };
 
   const submit = async () => {
     if (!password) {
-      setMsg("mot de passe requis");
-      setIsError(true);
+      toast("mot de passe requis", true);
       return;
     }
-    setMsg(null);
     const res = await fetch(
       `/api/users/${encodeURIComponent(user.uid)}/password`,
       {
@@ -221,31 +205,27 @@ function UserRow({
     );
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setMsg(j.error || `error ${res.status}`);
-      setIsError(true);
+      toast(j.error || `error ${res.status}`, true);
       return;
     }
     setPassword("");
-    setMsg("ok");
-    setIsError(false);
+    toast("Mot de passe modifié");
   };
 
   const remove = async () => {
-    setMsg(null);
     const res = await fetch(`/api/users/${encodeURIComponent(user.uid)}`, {
       method: "DELETE",
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setMsg(j.error || `error ${res.status}`);
-      setIsError(true);
+      toast(j.error || `error ${res.status}`, true);
       return;
     }
     onDeleted?.();
+    toast(`Utilisateur ${user.uid} supprimé`);
   };
 
   const saveField = async (field: string, newValue: string) => {
-    setMsg(null);
     const body =
       field === "name"
         ? { name: newValue, email: user.email }
@@ -257,8 +237,7 @@ function UserRow({
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setMsg(j.error || `error ${res.status}`);
-      setIsError(true);
+      toast(j.error || `error ${res.status}`, true);
       return false;
     }
     onUpdated?.();
@@ -303,17 +282,6 @@ function UserRow({
           >
             Modifier
           </button>
-          {msg && (
-            <span
-              data-testid={
-                isError
-                  ? `password-error-${user.uid}`
-                  : `password-success-${user.uid}`
-              }
-            >
-              {msg}
-            </span>
-          )}
         </span>
       </td>
       <td style={{ border: "1px solid #ccc", padding: 8 }}>
@@ -334,14 +302,12 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     if (!uid.trim() || !name.trim() || !password) {
-      setError("uid, nom et mot de passe requis");
+      toast("uid, nom et mot de passe requis", true);
       return;
     }
-    setError(null);
     const res = await fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -349,7 +315,7 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setError(j.error || `error ${res.status}`);
+      toast(j.error || `error ${res.status}`, true);
       return;
     }
     setUid("");
@@ -357,6 +323,7 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
     setEmail("");
     setPassword("");
     onCreated?.();
+    toast(`Utilisateur ${uid} créé${gid ? ` + groupe ${gid}` : ""}`);
   };
 
   return (
@@ -385,6 +352,7 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
           onChange={(e) => setEmail(e.target.value)}
         />
       </td>
+      <td style={{ border: "1px solid #ccc", padding: 8 }} />
       <td style={{ border: "1px solid #ccc", padding: 8 }}>
         <input
           data-testid="input-password"
@@ -398,7 +366,6 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
         <button data-testid="create-button" onClick={submit} type="button">
           Créer
         </button>
-        {error && <span data-testid="create-error"> {error}</span>}
       </td>
     </tr>
   );
@@ -461,7 +428,7 @@ export function UsersTable({
         {users.length === 0 ? (
           <tr>
             <td
-              colSpan={5}
+              colSpan={6}
               style={{
                 border: "1px solid #ccc",
                 padding: 8,
