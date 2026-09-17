@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { UsersTable, type User } from "../components/UsersTable";
 
 export default function Users() {
   const [users, setUsers] = useState<User[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchUsers = useCallback(() => {
     fetch("/api/users")
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
@@ -15,13 +15,20 @@ export default function Users() {
       .catch(() => setError("error"));
   }, []);
 
-  if (error) return <p data-testid="users-error">Erreur: {error}</p>;
-  if (users === null) return <p data-testid="users-loading">Chargement...</p>;
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   return (
     <section style={{ marginTop: 24 }}>
       <h2>Utilisateurs</h2>
-      <UsersTable users={users} />
+      {error ? (
+        <p data-testid="users-error">Erreur: {error}</p>
+      ) : users === null ? (
+        <p data-testid="users-loading">Chargement...</p>
+      ) : (
+        <UsersTable users={users} onCreated={fetchUsers} />
+      )}
     </section>
   );
 }

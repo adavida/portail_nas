@@ -17,29 +17,38 @@ backend/src/
   http/<name>.rs           # async fn handler() -> Result<Json<T>, AppError> (axum only, appelle controllers)
   http/error.rs            # impl IntoResponse for AppError (500 Json{error}) — seul fichier avec IntoResponse
   controllers/<name>.rs    # orchestration I/O ldap3, map erreurs -> AppError::Ldap (pas d'axum)
-  domain/<name>.rs         # struct + impl + enum Error pur (serde, no axum/ldap3)
+  domain/<aggregate>/      # répertoire dédié par agrégat (health, users) — 1 objet / fichier
+    mod.rs                 # pub mod <object>; pub use <object>::{Struct,Error}
+    <object>.rs            # pub struct Struct + pub enum StructError + impl Struct pur (serde, no axum/ldap3)
   error.rs                 # enum AppError {Ldap,Internal} + Display+Error pur (pas d'axum)
-  http/mod.rs + controllers/mod.rs + domain/mod.rs  # pub mod <name>;
+  http/mod.rs + controllers/mod.rs + domain/mod.rs  # pub mod <aggregate>;
 ```
 
 ### Adding a new endpoint
 
-1. `domain/foo.rs`: `#[derive(Serialize)] pub struct Foo { ... }` + `pub enum FooError {MissingId}` + `impl Foo { pub fn from_attrs(...) -> Result<Self,FooError> / pub fn from_search(...) -> Vec<Self> }` — pas de `pub fn foo_logic` libre (ex `domain/users.rs:11` `UserError::MissingUid`, `User::from_attrs:Result`)
-2. `controllers/foo.rs`: `pub async fn list() -> Result<Vec<Foo>, AppError> { ldap search.map_err(|e| AppError::Ldap(e.to_string()))? + Foo::from_search }` — I/O `ldap3` seul, pas d'`axum`, pas de `String`
-3. `http/foo.rs`: `use crate::controllers::foo; pub async fn foo() -> Result<Json<Vec<Foo>>, AppError> { Ok(Json(foo::list().await?)) }` — `axum` seul, `?` propage `AppError::IntoResponse`
-4. `domain/mod.rs:1` + `http/mod.rs:1` + `controllers/mod.rs:1` → `pub mod foo;` + `error.rs` inchangé
-5. `lib.rs:7` → `.route("/api/foo", get(http::foo::foo))`
-6. Ne pas déplacer `/api/health` sans MAJ `frontend/src/App.tsx:7` + `frontend/vite.config.ts:8` proxy
+1. `domain/<aggregate>/<object>.rs`: `#[derive(Serialize)] pub struct Foo { ... }` + `pub enum FooError {MissingId}` + `impl Foo { pub fn from_attrs(...) -> Result<Self,FooError> / pub fn from_search(...) -> Vec<Self> }` — 1 objet / fichier (ex `domain/users/user.rs:11` `UserError::MissingUid`, `domain/users/new_user.rs:11` `CreateUserError`, `domain/health/mod.rs:3` `Health` — 1 objet → `mod.rs` suffit, `clippy::module_inception` évité)
+2. `domain/<aggregate>/mod.rs`: `pub mod <object>; pub use <object>::{Foo,FooError};` pour ré-export plat (`crate::domain::users::User` reste valide)
+3. `controllers/foo.rs`: `pub async fn list() -> Result<Vec<Foo>, AppError> { ldap search.map_err(|e| AppError::Ldap(e.to_string()))? + Foo::from_search }` — I/O `ldap3` seul, pas d'`axum`, pas de `String`
+4. `http/foo.rs`: `use crate::controllers::foo; pub async fn foo() -> Result<Json<Vec<Foo>>, AppError> { Ok(Json(foo::list().await?)) }` — `axum` seul, `?` propage `AppError::IntoResponse`
+5. `domain/mod.rs:1` + `http/mod.rs:1` + `controllers/mod.rs:1` → `pub mod <aggregate>;` + `error.rs` inchangé
+6. `lib.rs:7` → `.route("/api/foo", get(http::foo::foo))`
+7. Ne pas déplacer `/api/health` sans MAJ `frontend/src/App.tsx:7` + `frontend/vite.config.ts:8` proxy
+
+### Domain — répertoire dédié + 1 objet / fichier
+
+- `domain/<aggregate>/` répertoire dédié par agrégat (`users`, `health`) — `domain/users/user.rs` + `domain/users/new_user.rs`, `domain/health/mod.rs` (1 objet → `mod.rs`, évite `module_inception`) (ex `domain/users.rs` avec `User+NewUser` interdit).
+- 1 fichier = 1 objet : `pub struct Foo` + `pub enum FooError` + `impl Foo` + `#[cfg(test)]` dans le même fichier (ex `domain/users/user.rs:11` `UserError`, `domain/users/new_user.rs:11` `CreateUserError`).
+- Re-export `domain/<aggregate>/mod.rs:1` `pub use <object>::{Foo,FooError}` pour garder `crate::domain::users::User` plat.
 
 ### Domain impl — méthodes associées, pas de free fns
 
-- Tout comportement du domaine lié à un struct va dans `impl Struct` (`domain/users.rs:10` `impl User`). `http/` ne contient que `axum::Json`, `controllers/` seul fait `ldap3`.
+- Tout comportement du domaine lié à un struct va dans `impl Struct` (`domain/users/user.rs:10` `impl User`). `http/` ne contient que `axum::Json`, `controllers/` seul fait `ldap3`.
 - Nommage: `from_attrs`, `from_search`, `from_ldap`, `new` — `Self`/`Result<Self,FooError>`/`Vec<Self>`, tri/filtrage dedans si déterministe.
-- Test collocalisé `domain/foo.rs:43` `#[cfg(test)]` appelle `Foo::from_attrs` directement, pas de mock LDAP.
+- Test collocalisé `domain/<aggregate>/<object>.rs:60` `#[cfg(test)]` appelle `Foo::from_attrs` directement, pas de mock LDAP.
 
 ### Errors — enums, pas de String
 
-- `domain/<name>.rs:11` `pub enum FooError {MissingId}` + `Display + Error` propre au domaine (`domain/users.rs:11` `UserError::MissingUid`). `from_attrs` retourne `Result<Self,FooError>`, `from_search` filtre via `.ok()` et trie.
+- `domain/<aggregate>/<object>.rs:11` `pub enum FooError {MissingId}` + `Display + Error` propre au domaine (`domain/users/user.rs:11` `UserError::MissingUid`). `from_attrs` retourne `Result<Self,FooError>`, `from_search` filtre via `.ok()` et trie.
 - `error.rs:5` `pub enum AppError {Ldap(String),Internal(String)}` + `Display + Error` pur (pas d'axum) — `http/error.rs:5` y ajoute `IntoResponse (500 Json{error})`. Seul `http/` et `controllers/` l'utilisent (`http/users.rs:5` `Result<Json<Vec<User>>, AppError>`, `controllers/users.rs:29` `Result<Vec<User>,AppError>` avec `map_err(|e| AppError::Ldap(e.to_string()))`).
 - Interdit: `Result<_, String>` ou `(StatusCode, Json<Value>)` dans `http/`/`controllers/`, `Option` silencieux sans `FooError` dans `domain/`.
 

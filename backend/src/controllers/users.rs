@@ -1,6 +1,9 @@
 use ldap3::{LdapConnAsync, Scope, SearchEntry};
 
-use crate::{domain::users::User, error::AppError};
+use crate::{
+    domain::users::{NewUser, User},
+    error::AppError,
+};
 
 fn ldap_url() -> String {
     if cfg!(test) {
@@ -52,4 +55,37 @@ pub async fn list() -> Result<Vec<User>, AppError> {
     let users = User::from_search(entries);
     let _ = ldap.unbind().await;
     Ok(users)
+}
+
+pub async fn create(new: NewUser) -> Result<User, AppError> {
+    new.validate()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let url = ldap_url();
+    let base = ldap_base();
+    let dn = new.dn(&base);
+
+    let (conn, mut ldap) = LdapConnAsync::new(&url)
+        .await
+        .map_err(|e| AppError::Ldap(e.to_string()))?;
+    ldap3::drive!(conn);
+    let bind_dn = format!("cn=admin,{base}");
+    ldap.simple_bind(&bind_dn, "admin")
+        .await
+        .map_err(|e| AppError::Ldap(e.to_string()))?
+        .success()
+        .map_err(|e| AppError::Ldap(e.to_string()))?;
+
+    let attrs = new.to_attrs();
+    ldap.add(&dn, attrs)
+        .await
+        .map_err(|e| AppError::Ldap(e.to_string()))?
+        .success()
+        .map_err(|e| AppError::Ldap(e.to_string()))?;
+    let _ = ldap.unbind().await;
+
+    Ok(User {
+        uid: new.uid,
+        name: new.name,
+        email: new.email,
+    })
 }

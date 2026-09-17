@@ -20,3 +20,11 @@ test("renders rows", () => {
   expect(screen.getByTestId("user-row-alice")).toHaveTextContent("alice");
   expect(screen.getByTestId("user-row-bob")).toHaveTextContent("Bob");
 });
+
+test("create row is first line of table", () => {
+  const { container } = render(<UsersTable users={[]} onCreated={() => {}} />);
+  const rows = container.querySelectorAll("tbody tr");
+  expect(rows[0].getAttribute("data-testid")).toBe("create-row");
+  expect(screen.getByTestId("input-uid")).toBeInTheDocument();
+  expect(screen.getByTestId("input-password")).toBeInTheDocument();
+});
