@@ -28,3 +28,14 @@ test("create row is first line of table", () => {
   expect(screen.getByTestId("input-uid")).toBeInTheDocument();
   expect(screen.getByTestId("input-password")).toBeInTheDocument();
 });
+
+test("existing user has password field", () => {
+  render(
+    <UsersTable
+      users={[{ uid: "alice", name: "Alice", email: "a@ex.com" }]}
+      onCreated={() => {}}
+    />,
+  );
+  expect(screen.getByTestId("password-input-alice")).toBeInTheDocument();
+  expect(screen.getByTestId("password-button-alice")).toBeInTheDocument();
+});

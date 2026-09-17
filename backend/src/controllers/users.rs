@@ -1,7 +1,7 @@
 use ldap3::{LdapConnAsync, Scope, SearchEntry};
 
 use crate::{
-    domain::users::{NewUser, User},
+    domain::users::{NewUser, UpdatePassword, User},
     error::AppError,
 };
 
@@ -88,4 +88,38 @@ pub async fn create(new: NewUser) -> Result<User, AppError> {
         name: new.name,
         email: new.email,
     })
+}
+
+pub async fn update_password(uid: String, req: UpdatePassword) -> Result<(), AppError> {
+    req.validate()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    if uid.trim().is_empty() {
+        return Err(AppError::Internal("missing uid".into()));
+    }
+    let url = ldap_url();
+    let base = ldap_base();
+    let dn = format!("uid={uid},ou=people,{base}");
+
+    let (conn, mut ldap) = LdapConnAsync::new(&url)
+        .await
+        .map_err(|e| AppError::Ldap(e.to_string()))?;
+    ldap3::drive!(conn);
+    let bind_dn = format!("cn=admin,{base}");
+    ldap.simple_bind(&bind_dn, "admin")
+        .await
+        .map_err(|e| AppError::Ldap(e.to_string()))?
+        .success()
+        .map_err(|e| AppError::Ldap(e.to_string()))?;
+
+    use ldap3::Mod;
+    use std::collections::HashSet;
+    let mut set = HashSet::new();
+    set.insert(req.password);
+    ldap.modify(&dn, vec![Mod::Replace("userPassword".to_string(), set)])
+        .await
+        .map_err(|e| AppError::Ldap(e.to_string()))?
+        .success()
+        .map_err(|e| AppError::Ldap(e.to_string()))?;
+    let _ = ldap.unbind().await;
+    Ok(())
 }

@@ -11,4 +11,8 @@ pub fn router() -> Router {
             "/api/users",
             get(users::list_users).post(users::create_user),
         )
+        .route(
+            "/api/users/:uid/password",
+            axum::routing::put(users::update_user_password),
+        )
 }

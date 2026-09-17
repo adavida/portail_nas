@@ -2,6 +2,75 @@ export type User = { uid: string; name: string; email: string };
 
 import { useState } from "react";
 
+function UserRow({ user }: { user: User }) {
+  const [password, setPassword] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [isError, setIsError] = useState(false);
+
+  const submit = async () => {
+    if (!password) {
+      setMsg("mot de passe requis");
+      setIsError(true);
+      return;
+    }
+    setMsg(null);
+    const res = await fetch(
+      `/api/users/${encodeURIComponent(user.uid)}/password`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      },
+    );
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setMsg(j.error || `error ${res.status}`);
+      setIsError(true);
+      return;
+    }
+    setPassword("");
+    setMsg("ok");
+    setIsError(false);
+  };
+
+  return (
+    <tr data-testid={`user-row-${user.uid}`}>
+      <td style={{ border: "1px solid #ccc", padding: 8 }}>{user.uid}</td>
+      <td style={{ border: "1px solid #ccc", padding: 8 }}>{user.name}</td>
+      <td style={{ border: "1px solid #ccc", padding: 8 }}>{user.email}</td>
+      <td colSpan={2} style={{ border: "1px solid #ccc", padding: 8 }}>
+        <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            data-testid={`password-input-${user.uid}`}
+            placeholder="nouveau mdp"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button
+            data-testid={`password-button-${user.uid}`}
+            onClick={submit}
+            type="button"
+          >
+            Modifier
+          </button>
+          {msg && (
+            <span
+              data-testid={
+                isError
+                  ? `password-error-${user.uid}`
+                  : `password-success-${user.uid}`
+              }
+            >
+              {msg}
+            </span>
+          )}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
 function CreateRow({ onCreated }: { onCreated?: () => void }) {
   const [uid, setUid] = useState("");
   const [name, setName] = useState("");
@@ -135,17 +204,7 @@ export function UsersTable({
             </td>
           </tr>
         ) : (
-          users.map((u) => (
-            <tr key={u.uid} data-testid={`user-row-${u.uid}`}>
-              <td style={{ border: "1px solid #ccc", padding: 8 }}>{u.uid}</td>
-              <td style={{ border: "1px solid #ccc", padding: 8 }}>{u.name}</td>
-              <td style={{ border: "1px solid #ccc", padding: 8 }}>
-                {u.email}
-              </td>
-              <td style={{ border: "1px solid #ccc", padding: 8 }}></td>
-              <td style={{ border: "1px solid #ccc", padding: 8 }}></td>
-            </tr>
-          ))
+          users.map((u) => <UserRow key={u.uid} user={u} />)
         )}
       </tbody>
     </table>
