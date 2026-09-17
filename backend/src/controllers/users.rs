@@ -1,5 +1,5 @@
 use crate::{
-    domain::users::{NewUser, Password, Uid, User},
+    domain::users::{NewUser, Password, Uid, UpdateUser, User},
     error::AppError,
     repository::ldap as ldap_repo,
 };
@@ -18,4 +18,8 @@ pub async fn update_password(uid: Uid, password: Password) -> Result<(), AppErro
 
 pub async fn delete(uid: Uid) -> Result<(), AppError> {
     ldap_repo::delete_user(uid).await
+}
+
+pub async fn update(uid: Uid, data: UpdateUser) -> Result<(), AppError> {
+    ldap_repo::update_user(uid, data).await
 }

@@ -30,6 +30,7 @@ export default function Users() {
         <UsersTable
           users={users}
           onCreated={fetchUsers}
+          onUpdated={fetchUsers}
           onDeleted={fetchUsers}
         />
       )}

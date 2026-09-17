@@ -1,8 +1,8 @@
-use axum::{Json, extract::Path, http::StatusCode};
+use axum::{extract::Path, http::StatusCode, Json};
 
 use crate::{
-    controllers::users::{create, delete, list, update_password},
-    domain::users::{NewUser, Uid, UpdatePassword, User},
+    controllers::users::{create, delete, list, update, update_password},
+    domain::users::{NewUser, Uid, UpdatePassword, UpdateUser, User},
     error::AppError,
 };
 
@@ -28,5 +28,13 @@ pub async fn update_user_password(
 
 pub async fn delete_user(Path(uid): Path<Uid>) -> Result<StatusCode, AppError> {
     delete(uid).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn update_user(
+    Path(uid): Path<Uid>,
+    Json(payload): Json<UpdateUser>,
+) -> Result<StatusCode, AppError> {
+    update(uid, payload).await?;
     Ok(StatusCode::NO_CONTENT)
 }

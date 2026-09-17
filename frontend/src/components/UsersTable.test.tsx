@@ -84,3 +84,62 @@ test("delete shows error on failure", async () => {
 
   expect(error).toHaveTextContent("ldap: boom");
 });
+
+test("double-click name opens editor then saves", async () => {
+  const onUpdated = vi.fn();
+  globalThis.fetch = vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+  );
+
+  const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
+
+  render(<UsersTable users={[alice]} onUpdated={onUpdated} />);
+
+  fireEvent.doubleClick(screen.getByTestId("cell-name-alice"));
+
+  const input = screen.getByTestId("edit-input-name-alice");
+
+  fireEvent.change(input, { target: { value: "Alice Dupont" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+
+  await vi.waitFor(() => {
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/users/alice",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ name: "Alice Dupont", email: "a@ex.com" }),
+      }),
+    );
+  });
+
+  await vi.waitFor(() => {
+    expect(onUpdated).toHaveBeenCalled();
+  });
+});
+
+test("edit error keeps editor open", async () => {
+  globalThis.fetch = vi.fn(() =>
+    Promise.resolve({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "name is empty" }),
+    } as Response),
+  );
+
+  const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
+
+  render(<UsersTable users={[alice]} />);
+
+  fireEvent.doubleClick(screen.getByTestId("cell-name-alice"));
+  fireEvent.change(screen.getByTestId("edit-input-name-alice"), {
+    target: { value: "" },
+  });
+  fireEvent.keyDown(screen.getByTestId("edit-input-name-alice"), {
+    key: "Enter",
+  });
+
+  const error = await screen.findByTestId("password-error-alice");
+
+  expect(error).toHaveTextContent("name is empty");
+  expect(screen.getByTestId("edit-input-name-alice")).toBeInTheDocument();
+});

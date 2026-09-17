@@ -2,7 +2,63 @@ export type User = { uid: string; name: string; email: string };
 
 import { useState } from "react";
 
-function UserRow({ user, onDeleted }: { user: User; onDeleted?: () => void }) {
+function EditableCell({
+  value,
+  field,
+  uid,
+  onSave,
+}: {
+  value: string;
+  field: "name" | "email";
+  uid: string;
+  onSave: (field: "name" | "email", value: string) => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  const save = async () => {
+    const ok = await onSave(field, draft);
+    if (ok) setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <td
+        data-testid={`cell-${field}-${uid}`}
+        onDoubleClick={() => setEditing(true)}
+        style={{ border: "1px solid #ccc", padding: 8, cursor: "text" }}
+      >
+        {value}
+      </td>
+    );
+  }
+
+  return (
+    <td style={{ border: "1px solid #ccc", padding: 8 }}>
+      <input
+        data-testid={`edit-input-${field}-${uid}`}
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+          if (e.key === "Escape") setEditing(false);
+        }}
+      />
+    </td>
+  );
+}
+
+function UserRow({
+  user,
+  onUpdated,
+  onDeleted,
+}: {
+  user: User;
+  onUpdated?: () => void;
+  onDeleted?: () => void;
+}) {
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -47,11 +103,42 @@ function UserRow({ user, onDeleted }: { user: User; onDeleted?: () => void }) {
     onDeleted?.();
   };
 
+  const saveField = async (field: "name" | "email", newValue: string) => {
+    setMsg(null);
+    const body =
+      field === "name"
+        ? { name: newValue, email: user.email }
+        : { name: user.name, email: newValue };
+    const res = await fetch(`/api/users/${encodeURIComponent(user.uid)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setMsg(j.error || `error ${res.status}`);
+      setIsError(true);
+      return false;
+    }
+    onUpdated?.();
+    return true;
+  };
+
   return (
     <tr data-testid={`user-row-${user.uid}`}>
       <td style={{ border: "1px solid #ccc", padding: 8 }}>{user.uid}</td>
-      <td style={{ border: "1px solid #ccc", padding: 8 }}>{user.name}</td>
-      <td style={{ border: "1px solid #ccc", padding: 8 }}>{user.email}</td>
+      <EditableCell
+        value={user.name}
+        field="name"
+        uid={user.uid}
+        onSave={saveField}
+      />
+      <EditableCell
+        value={user.email}
+        field="email"
+        uid={user.uid}
+        onSave={saveField}
+      />
       <td style={{ border: "1px solid #ccc", padding: 8 }}>
         <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input
@@ -172,10 +259,12 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
 export function UsersTable({
   users,
   onCreated,
+  onUpdated,
   onDeleted,
 }: {
   users: User[];
   onCreated?: () => void;
+  onUpdated?: () => void;
   onDeleted?: () => void;
 }) {
   return (
@@ -230,7 +319,12 @@ export function UsersTable({
           </tr>
         ) : (
           users.map((u) => (
-            <UserRow key={u.uid} user={u} onDeleted={onDeleted} />
+            <UserRow
+              key={u.uid}
+              user={u}
+              onUpdated={onUpdated}
+              onDeleted={onDeleted}
+            />
           ))
         )}
       </tbody>

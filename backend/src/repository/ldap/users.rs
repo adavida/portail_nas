@@ -2,34 +2,24 @@ use ldap3::{LdapConnAsync, Mod, Scope, SearchEntry};
 use std::collections::HashSet;
 
 use crate::{
-    domain::users::{NewUser, Password, Uid, User},
+    domain::users::{NewUser, Password, Uid, UpdateUser, User},
     error::AppError,
 };
 
-use super::{bind_admin, ldap_base, ldap_url};
+use super::{connect_admin, ldap_base, ldap_url, user_dn, MapLdap};
+
+fn one_set(v: String) -> HashSet<String> {
+    [v].into_iter().collect()
+}
 
 pub async fn list_users() -> Result<Vec<User>, AppError> {
-    let url = ldap_url();
     let base = ldap_base();
     let search_base = format!("ou=people,{base}");
 
-    let (conn, mut ldap) = LdapConnAsync::new(&url)
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
+    let (conn, mut ldap) = LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
     ldap3::drive!(conn);
 
-    let (rs, _res) = ldap
-        .search(
-            &search_base,
-            Scope::Subtree,
-            "(objectClass=inetOrgPerson)",
-            vec!["uid", "cn", "displayName", "mail"],
-        )
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?
-        .success()
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-
+    let (rs, _res) = ldap_conn_search(&mut ldap, &search_base).await?;
     let entries: Vec<SearchEntry> = rs.into_iter().map(SearchEntry::construct).collect();
     let attrs_list: Vec<std::collections::HashMap<String, Vec<String>>> =
         entries.into_iter().map(|e| e.attrs).collect();
@@ -38,23 +28,32 @@ pub async fn list_users() -> Result<Vec<User>, AppError> {
     Ok(users)
 }
 
+async fn ldap_conn_search(
+    ldap: &mut ldap3::Ldap,
+    base: &str,
+) -> Result<(Vec<ldap3::ResultEntry>, ldap3::LdapResult), AppError> {
+    ldap.search(
+        base,
+        Scope::Subtree,
+        "(objectClass=inetOrgPerson)",
+        vec!["uid", "cn", "displayName", "mail"],
+    )
+    .await
+    .map_ldap()?
+    .success()
+    .map_ldap()
+}
+
 pub async fn create_user(new: NewUser) -> Result<User, AppError> {
-    let url = ldap_url();
     let base = ldap_base();
     let dn = new.dn(&base);
+    let mut ldap = connect_admin(&base).await?;
 
-    let (conn, mut ldap) = LdapConnAsync::new(&url)
+    ldap.add(&dn, new.to_attrs())
         .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-    ldap3::drive!(conn);
-    bind_admin(&mut ldap, &base).await?;
-
-    let attrs = new.to_attrs();
-    ldap.add(&dn, attrs)
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?
+        .map_ldap()?
         .success()
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
+        .map_ldap()?;
     let _ = ldap.unbind().await;
 
     Ok(User {
@@ -65,61 +64,79 @@ pub async fn create_user(new: NewUser) -> Result<User, AppError> {
 }
 
 pub async fn update_user_password(uid: Uid, password: Password) -> Result<(), AppError> {
-    let url = ldap_url();
     let base = ldap_base();
-    let dn = format!("uid={},ou=people,{base}", uid.as_str());
+    let dn = user_dn(&uid, &base);
+    let mut ldap = connect_admin(&base).await?;
 
-    let (conn, mut ldap) = LdapConnAsync::new(&url)
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-    ldap3::drive!(conn);
-    bind_admin(&mut ldap, &base).await?;
+    ldap.modify(
+        &dn,
+        vec![Mod::Replace(
+            "userPassword".to_string(),
+            one_set(password.as_str().to_string()),
+        )],
+    )
+    .await
+    .map_ldap()?
+    .success()
+    .map_ldap()?;
+    let _ = ldap.unbind().await;
+    Ok(())
+}
 
-    let mut set = HashSet::new();
-    set.insert(password.as_str().to_string());
-    ldap.modify(&dn, vec![Mod::Replace("userPassword".to_string(), set)])
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?
-        .success()
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
+pub async fn update_user(uid: Uid, data: UpdateUser) -> Result<(), AppError> {
+    let base = ldap_base();
+    let dn = user_dn(&uid, &base);
+    let mut ldap = connect_admin(&base).await?;
+
+    let sn = data
+        .name
+        .as_str()
+        .split_whitespace()
+        .last()
+        .unwrap_or(data.name.as_str())
+        .to_string();
+    let set_name = one_set(data.name.as_str().to_string());
+    let set_mail = if data.email.as_str().is_empty() {
+        HashSet::new()
+    } else {
+        one_set(data.email.as_str().to_string())
+    };
+
+    ldap.modify(
+        &dn,
+        vec![
+            Mod::Replace("cn".to_string(), set_name.clone()),
+            Mod::Replace("displayName".to_string(), set_name),
+            Mod::Replace("sn".to_string(), one_set(sn)),
+            Mod::Replace("mail".to_string(), set_mail),
+        ],
+    )
+    .await
+    .map_ldap()?
+    .success()
+    .map_ldap()?;
     let _ = ldap.unbind().await;
     Ok(())
 }
 
 pub async fn delete_user(uid: Uid) -> Result<(), AppError> {
-    let url = ldap_url();
     let base = ldap_base();
-    let dn = format!("uid={},ou=people,{base}", uid.as_str());
+    let dn = user_dn(&uid, &base);
+    let mut ldap = connect_admin(&base).await?;
 
-    let (conn, mut ldap) = LdapConnAsync::new(&url)
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
-    ldap3::drive!(conn);
-    bind_admin(&mut ldap, &base).await?;
-
-    ldap.delete(&dn)
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?
-        .success()
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
+    ldap.delete(&dn).await.map_ldap()?.success().map_ldap()?;
     let _ = ldap.unbind().await;
     Ok(())
 }
 
 pub async fn authenticate_user(uid: Uid, password: Password) -> Result<bool, AppError> {
-    let url = ldap_url();
     let base = ldap_base();
-    let dn = format!("uid={},ou=people,{base}", uid.as_str());
+    let dn = user_dn(&uid, &base);
 
-    let (conn, mut ldap) = LdapConnAsync::new(&url)
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
+    let (conn, mut ldap) = LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
     ldap3::drive!(conn);
 
-    let res = ldap
-        .simple_bind(&dn, password.as_str())
-        .await
-        .map_err(|e| AppError::Ldap(e.to_string()))?;
+    let res = ldap.simple_bind(&dn, password.as_str()).await.map_ldap()?;
     let rc = res.rc;
     let _ = ldap.unbind().await;
     match rc {
@@ -144,6 +161,15 @@ mod tests {
         format!("{prefix}{n}")
     }
 
+    fn new_user(uid: &str, name: &str, email: &str, password: &str) -> NewUser {
+        NewUser {
+            uid: Uid::try_new(uid.to_string()).unwrap(),
+            name: Name::try_new(name.into()).unwrap(),
+            email: Email::try_new(email.into()).unwrap(),
+            password: Password::try_new(password.into()).unwrap(),
+        }
+    }
+
     async fn ensure_clean(uid: &str) {
         let url = ldap_url();
         let base = ldap_base();
@@ -160,6 +186,20 @@ mod tests {
 
     fn is_ldap_down<T>(r: &Result<T, AppError>) -> bool {
         matches!(r, Err(AppError::Ldap(_)))
+    }
+
+    async fn seed_and_create_user(uid: &str, name: &str, email: &str, password: &str) -> bool {
+        ensure_clean(uid).await;
+
+        let new = new_user(uid, name, email, password);
+
+        let r = create_user(new).await;
+        if is_ldap_down(&r) {
+            return false;
+        }
+
+        r.unwrap();
+        true
     }
 
     async fn assert_auth_ok(uid: &str, password: &str) {
@@ -206,23 +246,45 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn delete_user_removes_entry() {
-        let uid = gen_uid("del");
-        ensure_clean(&uid).await;
-
-        let new = NewUser {
-            uid: Uid::try_new(uid.clone()).unwrap(),
-            name: Name::try_new("Delete Me".into()).unwrap(),
-            email: Email::try_new("".into()).unwrap(),
-            password: Password::try_new("pw".into()).unwrap(),
-        };
-
-        let r = create_user(new).await;
-        if is_ldap_down(&r) {
+    async fn update_user_changes_name_and_email() {
+        let uid = gen_uid("upd");
+        if !seed_and_create_user(&uid, "Old Name", "old@ex.com", "pw").await {
             return;
         }
 
-        r.unwrap();
+        let req: UpdateUser =
+            serde_json::from_str(r#"{"name":"New Name","email":"new@ex.com"}"#).unwrap();
+
+        update_user(Uid::try_new(uid.clone()).unwrap(), req)
+            .await
+            .unwrap();
+
+        let users = list_users().await.unwrap();
+        let updated = users.iter().find(|u| u.uid.as_str() == uid);
+
+        assert!(
+            updated.is_some(),
+            "user {uid} should still exist after update"
+        );
+
+        let updated = updated.unwrap();
+
+        assert_eq!(updated.name.as_str(), "New Name", "name should be updated");
+        assert_eq!(
+            updated.email.as_str(),
+            "new@ex.com",
+            "email should be updated"
+        );
+
+        ensure_clean(&uid).await;
+    }
+
+    #[tokio::test]
+    async fn delete_user_removes_entry() {
+        let uid = gen_uid("del");
+        if !seed_and_create_user(&uid, "Delete Me", "", "pw").await {
+            return;
+        }
 
         delete_user(Uid::try_new(uid.clone()).unwrap())
             .await
@@ -241,21 +303,9 @@ mod tests {
     #[tokio::test]
     async fn authenticate_ok_and_wrong() {
         let uid = gen_uid("auth");
-        ensure_clean(&uid).await;
-
-        let new: NewUser = NewUser {
-            uid: Uid::try_new(uid.clone()).unwrap(),
-            name: Name::try_new("Auth Test".into()).unwrap(),
-            email: Email::try_new("a@ex.com".into()).unwrap(),
-            password: Password::try_new("secret123".into()).unwrap(),
-        };
-
-        let r = create_user(new).await;
-        if is_ldap_down(&r) {
+        if !seed_and_create_user(&uid, "Auth Test", "a@ex.com", "secret123").await {
             return;
         }
-
-        r.unwrap();
 
         assert_auth_ok(&uid, "secret123").await;
         assert_auth_fail(&uid, "wrong").await;
@@ -267,21 +317,9 @@ mod tests {
     #[tokio::test]
     async fn authenticate_after_password_update() {
         let uid = gen_uid("auth2");
-        ensure_clean(&uid).await;
-
-        let new = NewUser {
-            uid: Uid::try_new(uid.clone()).unwrap(),
-            name: Name::try_new("T".into()).unwrap(),
-            email: Email::try_new("".into()).unwrap(),
-            password: Password::try_new("old".into()).unwrap(),
-        };
-
-        let r = create_user(new).await;
-        if is_ldap_down(&r) {
+        if !seed_and_create_user(&uid, "T", "", "old").await {
             return;
         }
-
-        r.unwrap();
 
         update_user_password(
             Uid::try_new(uid.clone()).unwrap(),
