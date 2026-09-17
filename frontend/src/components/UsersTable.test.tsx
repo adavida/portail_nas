@@ -188,11 +188,19 @@ test("groups cell edit proposes groups and diffs membership", async () => {
 
   fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
 
-  expect(screen.getByTestId("groups-toggle-alice-devs")).toHaveTextContent("✓");
-  expect(screen.getByTestId("groups-toggle-alice-ops")).toHaveTextContent("✗");
+  expect(
+    Array.from(
+      screen
+        .getByTestId("groups-editor-alice")
+        .querySelectorAll("[data-testid^='groups-chip-']"),
+    ).map((el) => el.getAttribute("data-testid")),
+  ).toContain("groups-chip-alice-devs");
 
-  fireEvent.click(screen.getByTestId("groups-toggle-alice-ops"));
-  fireEvent.click(screen.getByTestId("groups-toggle-alice-devs"));
+  fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
+    target: { value: "ops" },
+  });
+  fireEvent.click(screen.getByTestId("groups-suggest-alice-ops"));
+  fireEvent.click(screen.getByTestId("groups-remove-alice-devs"));
   fireEvent.click(screen.getByTestId("groups-save-alice"));
 
   await vi.waitFor(() => {
@@ -234,7 +242,12 @@ test("groups save error keeps editor open with message", async () => {
   );
 
   fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
-  fireEvent.click(screen.getByTestId("groups-toggle-alice-devs"));
+  fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
+    target: { value: "devs" },
+  });
+  fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
+    key: "Enter",
+  });
   fireEvent.click(screen.getByTestId("groups-save-alice"));
 
   const error = await screen.findByTestId("toast-error");
@@ -257,7 +270,9 @@ test("create group from groups cell with user as member", async () => {
   fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
     target: { value: "devs" },
   });
-  fireEvent.click(screen.getByTestId("groups-new-button-alice"));
+  fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
+    key: "Enter",
+  });
 
   await vi.waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(
@@ -297,7 +312,9 @@ test("create group error keeps input and shows message", async () => {
   fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
     target: { value: "devs" },
   });
-  fireEvent.click(screen.getByTestId("groups-new-button-alice"));
+  fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
+    key: "Enter",
+  });
 
   const error = await screen.findByTestId("toast-error");
 

@@ -7,6 +7,7 @@ export type User = {
 
 import { useState } from "react";
 import EditableCell from "./EditableCell";
+import { GroupsEditor } from "./GroupsEditor";
 import { toast } from "./Toaster";
 
 function GroupsCell({
@@ -23,35 +24,6 @@ function GroupsCell({
   onCreateGroup?: (gid: string) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<string[]>(groups);
-  const [newGid, setNewGid] = useState("");
-
-  const toggle = (gid: string) =>
-    setDraft((d) =>
-      d.includes(gid) ? d.filter((x) => x !== gid) : [...d, gid],
-    );
-
-  const save = async () => {
-    const res = await onSave(draft);
-    if (res.ok) {
-      setEditing(false);
-    }
-  };
-
-  const cancel = () => {
-    setDraft(groups);
-    setEditing(false);
-  };
-
-  const createGroup = async () => {
-    const gid = newGid.trim();
-    if (!gid || !onCreateGroup) return;
-    const res = await onCreateGroup(gid);
-    if (res.ok) {
-      setDraft((d) => [...d, gid]);
-      setNewGid("");
-    }
-  };
 
   if (!editing) {
     return (
@@ -67,46 +39,14 @@ function GroupsCell({
 
   return (
     <td style={{ border: "1px solid #ccc", padding: 8 }}>
-      {allGroups.map((gid) => (
-        <button
-          key={gid}
-          type="button"
-          data-testid={`groups-toggle-${uid}-${gid}`}
-          style={{
-            margin: 2,
-            fontWeight: draft.includes(gid) ? "bold" : "normal",
-            textDecoration: draft.includes(gid) ? "underline" : "none",
-          }}
-          onClick={() => toggle(gid)}
-        >
-          {draft.includes(gid) ? "✓" : "✗"} {gid}
-        </button>
-      ))}
-      <input
-        data-testid={`groups-new-input-${uid}`}
-        placeholder="nouveau groupe (gid)"
-        value={newGid}
-        onChange={(e) => setNewGid(e.target.value)}
+      <GroupsEditor
+        uid={uid}
+        groups={groups}
+        allGroups={allGroups}
+        onSave={async (next) => (await onSave(next)).ok}
+        onCreateGroup={onCreateGroup}
+        onCancel={() => setEditing(false)}
       />
-      {onCreateGroup && (
-        <button
-          type="button"
-          data-testid={`groups-new-button-${uid}`}
-          onClick={createGroup}
-        >
-          Créer
-        </button>
-      )}
-      <button type="button" data-testid={`groups-save-${uid}`} onClick={save}>
-        Valider
-      </button>
-      <button
-        type="button"
-        data-testid={`groups-cancel-${uid}`}
-        onClick={cancel}
-      >
-        Annuler
-      </button>
     </td>
   );
 }
