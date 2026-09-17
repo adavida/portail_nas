@@ -2,7 +2,7 @@ export type User = { uid: string; name: string; email: string };
 
 import { useState } from "react";
 
-function UserRow({ user }: { user: User }) {
+function UserRow({ user, onDeleted }: { user: User; onDeleted?: () => void }) {
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -33,12 +33,26 @@ function UserRow({ user }: { user: User }) {
     setIsError(false);
   };
 
+  const remove = async () => {
+    setMsg(null);
+    const res = await fetch(`/api/users/${encodeURIComponent(user.uid)}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setMsg(j.error || `error ${res.status}`);
+      setIsError(true);
+      return;
+    }
+    onDeleted?.();
+  };
+
   return (
     <tr data-testid={`user-row-${user.uid}`}>
       <td style={{ border: "1px solid #ccc", padding: 8 }}>{user.uid}</td>
       <td style={{ border: "1px solid #ccc", padding: 8 }}>{user.name}</td>
       <td style={{ border: "1px solid #ccc", padding: 8 }}>{user.email}</td>
-      <td colSpan={2} style={{ border: "1px solid #ccc", padding: 8 }}>
+      <td style={{ border: "1px solid #ccc", padding: 8 }}>
         <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input
             data-testid={`password-input-${user.uid}`}
@@ -66,6 +80,15 @@ function UserRow({ user }: { user: User }) {
             </span>
           )}
         </span>
+      </td>
+      <td style={{ border: "1px solid #ccc", padding: 8 }}>
+        <button
+          data-testid={`delete-button-${user.uid}`}
+          onClick={remove}
+          type="button"
+        >
+          Supprimer
+        </button>
       </td>
     </tr>
   );
@@ -149,9 +172,11 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
 export function UsersTable({
   users,
   onCreated,
+  onDeleted,
 }: {
   users: User[];
   onCreated?: () => void;
+  onDeleted?: () => void;
 }) {
   return (
     <table
@@ -204,7 +229,9 @@ export function UsersTable({
             </td>
           </tr>
         ) : (
-          users.map((u) => <UserRow key={u.uid} user={u} />)
+          users.map((u) => (
+            <UserRow key={u.uid} user={u} onDeleted={onDeleted} />
+          ))
         )}
       </tbody>
     </table>

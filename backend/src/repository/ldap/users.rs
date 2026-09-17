@@ -86,6 +86,26 @@ pub async fn update_user_password(uid: Uid, password: Password) -> Result<(), Ap
     Ok(())
 }
 
+pub async fn delete_user(uid: Uid) -> Result<(), AppError> {
+    let url = ldap_url();
+    let base = ldap_base();
+    let dn = format!("uid={},ou=people,{base}", uid.as_str());
+
+    let (conn, mut ldap) = LdapConnAsync::new(&url)
+        .await
+        .map_err(|e| AppError::Ldap(e.to_string()))?;
+    ldap3::drive!(conn);
+    bind_admin(&mut ldap, &base).await?;
+
+    ldap.delete(&dn)
+        .await
+        .map_err(|e| AppError::Ldap(e.to_string()))?
+        .success()
+        .map_err(|e| AppError::Ldap(e.to_string()))?;
+    let _ = ldap.unbind().await;
+    Ok(())
+}
+
 pub async fn authenticate_user(uid: Uid, password: Password) -> Result<bool, AppError> {
     let url = ldap_url();
     let base = ldap_base();
@@ -183,6 +203,39 @@ mod tests {
             result.is_err(),
             "authenticate should error for uid={uid} with empty password"
         );
+    }
+
+    #[tokio::test]
+    async fn delete_user_removes_entry() {
+        let uid = gen_uid("del");
+        ensure_clean(&uid).await;
+
+        let new = NewUser {
+            uid: Uid::try_new(uid.clone()).unwrap(),
+            name: Name::try_new("Delete Me".into()).unwrap(),
+            email: Email::try_new("".into()).unwrap(),
+            password: Password::try_new("pw".into()).unwrap(),
+        };
+
+        let r = create_user(new).await;
+        if is_ldap_down(&r) {
+            return;
+        }
+
+        r.unwrap();
+
+        delete_user(Uid::try_new(uid.clone()).unwrap())
+            .await
+            .unwrap();
+
+        let again = delete_user(Uid::try_new(uid.clone()).unwrap()).await;
+
+        assert!(
+            again.is_err(),
+            "second delete should fail: entry no longer exists"
+        );
+
+        ensure_clean(&uid).await;
     }
 
     #[tokio::test]

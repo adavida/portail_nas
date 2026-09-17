@@ -1,6 +1,6 @@
 pub mod users;
 
-pub use users::{authenticate_user, create_user, list_users, update_user_password};
+pub use users::{authenticate_user, create_user, delete_user, list_users, update_user_password};
 
 use crate::error::AppError;
 

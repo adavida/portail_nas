@@ -15,4 +15,5 @@ pub fn router() -> Router {
             "/api/users/:uid/password",
             axum::routing::put(users::update_user_password),
         )
+        .route("/api/users/:uid", axum::routing::delete(users::delete_user))
 }

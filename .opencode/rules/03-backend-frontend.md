@@ -17,9 +17,9 @@
 > - Structure: `.opencode/skills/frontend-structure/SKILL.md` (trigger `frontend/src/main.tsx`, `pages/`, `components/`)
 
 - `frontend/package.json:6` scripts `dev`/`build`/`test` (`vitest run`)/`test:watch` (`vitest`). `frontend/vite.config.ts:12` `test.environment=jsdom`, `setupFiles=./src/test/setup.ts`.
-- `frontend/vite.config.ts:8` proxy `/api → http://localhost:3000`, port `5173`. `frontend/src/pages/Home.tsx:7` fetch `/api/health` → `components/HealthBadge.tsx:1` pure. `App.tsx:1` glue `pages/Home`.
+- `frontend/vite.config.ts:8` proxy `/api → http://localhost:3000`, port `5173`. `frontend/src/pages/Users.tsx` fetch `/api/users`, `App.tsx` glue `pages/Users`.
 - Commandes: `devenv shell -- npm --prefix frontend test -- --run`, single `devenv shell -- npm --prefix frontend test -- --run -t "renders title"`. Prérequis `devenv shell -- bash -c 'cd frontend && npm install'` (pas de `node` hors devenv).
-- Tests collocalisés `@testing-library/react` + `jsdom` (`pages/Home.test.tsx`, `components/HealthBadge.test.tsx`, `App.test.tsx` legacy).
+- Tests collocalisés `@testing-library/react` + `jsdom` (`pages/Users.test.tsx`, `components/*.test.tsx`, `App.test.tsx`).
 
 ## Lien backend ↔ frontend
 

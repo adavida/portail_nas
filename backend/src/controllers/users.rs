@@ -15,3 +15,7 @@ pub async fn create(new: NewUser) -> Result<User, AppError> {
 pub async fn update_password(uid: Uid, password: Password) -> Result<(), AppError> {
     ldap_repo::update_user_password(uid, password).await
 }
+
+pub async fn delete(uid: Uid) -> Result<(), AppError> {
+    ldap_repo::delete_user(uid).await
+}

@@ -27,7 +27,11 @@ export default function Users() {
       ) : users === null ? (
         <p data-testid="users-loading">Chargement...</p>
       ) : (
-        <UsersTable users={users} onCreated={fetchUsers} />
+        <UsersTable
+          users={users}
+          onCreated={fetchUsers}
+          onDeleted={fetchUsers}
+        />
       )}
     </section>
   );
