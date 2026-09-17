@@ -40,7 +40,7 @@ mod tests {
         }
         .validate();
 
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "non-empty password should be valid");
     }
 
     #[test]
@@ -51,6 +51,10 @@ mod tests {
         .validate()
         .unwrap_err();
 
-        assert_eq!(err, PasswordError::MissingPassword);
+        assert_eq!(
+            err,
+            PasswordError::MissingPassword,
+            "empty password should be rejected"
+        );
     }
 }

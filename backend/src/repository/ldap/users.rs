@@ -153,26 +153,33 @@ mod tests {
     }
 
     async fn assert_auth_ok(uid: &str, password: &str) {
+        let ok = authenticate_user(uid.to_string(), password.to_string())
+            .await
+            .unwrap();
+
         assert!(
-            authenticate_user(uid.to_string(), password.to_string())
-                .await
-                .unwrap()
+            ok,
+            "authenticate should succeed for uid={uid} with correct password"
         );
     }
 
     async fn assert_auth_fail(uid: &str, password: &str) {
+        let ok = authenticate_user(uid.to_string(), password.to_string())
+            .await
+            .unwrap();
+
         assert!(
-            !authenticate_user(uid.to_string(), password.to_string())
-                .await
-                .unwrap()
+            !ok,
+            "authenticate should fail for uid={uid} with wrong password"
         );
     }
 
     async fn assert_auth_err(uid: &str, password: &str) {
+        let result = authenticate_user(uid.to_string(), password.to_string()).await;
+
         assert!(
-            authenticate_user(uid.to_string(), password.to_string())
-                .await
-                .is_err()
+            result.is_err(),
+            "authenticate should error for uid={uid} with empty password"
         );
     }
 

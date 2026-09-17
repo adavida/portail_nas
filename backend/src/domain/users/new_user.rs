@@ -91,7 +91,11 @@ mod tests {
         .validate()
         .unwrap_err();
 
-        assert_eq!(err1, CreateUserError::MissingUid);
+        assert_eq!(
+            err1,
+            CreateUserError::MissingUid,
+            "empty uid should be rejected"
+        );
 
         let err2 = NewUser {
             uid: "a".into(),
@@ -102,7 +106,11 @@ mod tests {
         .validate()
         .unwrap_err();
 
-        assert_eq!(err2, CreateUserError::MissingName);
+        assert_eq!(
+            err2,
+            CreateUserError::MissingName,
+            "empty name should be rejected"
+        );
 
         let err3 = NewUser {
             uid: "a".into(),
@@ -113,7 +121,11 @@ mod tests {
         .validate()
         .unwrap_err();
 
-        assert_eq!(err3, CreateUserError::MissingPassword);
+        assert_eq!(
+            err3,
+            CreateUserError::MissingPassword,
+            "empty password should be rejected"
+        );
     }
 
     #[test]
@@ -127,14 +139,26 @@ mod tests {
 
         let dn = u.dn("dc=dev,dc=example,dc=com");
 
-        assert_eq!(dn, "uid=bob,ou=people,dc=dev,dc=example,dc=com");
+        assert_eq!(
+            dn, "uid=bob,ou=people,dc=dev,dc=example,dc=com",
+            "dn should be uid + ou=people + base"
+        );
 
         let attrs = u.to_attrs();
         let find = |k: &str| attrs.iter().find(|(kk, _)| kk == k).unwrap().1.clone();
 
-        assert!(find("uid").contains("bob"));
-        assert!(find("cn").contains("Bob Dupont"));
-        assert!(find("sn").contains("Dupont"));
-        assert!(find("userPassword").contains("secret"));
+        assert!(find("uid").contains("bob"), "attrs should contain uid=bob");
+        assert!(
+            find("cn").contains("Bob Dupont"),
+            "attrs should contain cn=Bob Dupont"
+        );
+        assert!(
+            find("sn").contains("Dupont"),
+            "sn should be last word of name"
+        );
+        assert!(
+            find("userPassword").contains("secret"),
+            "attrs should contain userPassword"
+        );
     }
 }

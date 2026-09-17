@@ -26,11 +26,16 @@ mod tests {
 
         let resp = app.oneshot(req).await.unwrap();
 
-        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "GET /api/health should return 200 OK"
+        );
+
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-        assert_eq!(v["status"], "ok");
+        assert_eq!(v["status"], "ok", "health status should be ok");
     }
 
     #[tokio::test]
@@ -43,7 +48,11 @@ mod tests {
 
         let resp = app.oneshot(req).await.unwrap();
 
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            resp.status(),
+            StatusCode::NOT_FOUND,
+            "unknown route should return 404"
+        );
     }
 
     #[tokio::test]

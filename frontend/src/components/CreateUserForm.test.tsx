@@ -28,21 +28,25 @@ test("submits and clears", async () => {
   });
   fireEvent.click(screen.getByTestId("create-button"));
 
-  await vi.waitFor(() =>
+  await vi.waitFor(() => {
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/users",
       expect.objectContaining({ method: "POST" }),
-    ),
-  );
-  await vi.waitFor(() => expect(onCreated).toHaveBeenCalled());
+    );
+  });
+
+  await vi.waitFor(() => {
+    expect(onCreated).toHaveBeenCalled();
+  });
 });
 
 test("shows error on 500", async () => {
+  const errorResponse = { error: "uid exists" };
   globalThis.fetch = vi.fn(() =>
     Promise.resolve({
       ok: false,
       status: 500,
-      json: () => Promise.resolve({ error: "uid exists" }),
+      json: () => Promise.resolve(errorResponse),
     } as Response),
   );
 
@@ -59,7 +63,7 @@ test("shows error on 500", async () => {
   });
   fireEvent.click(screen.getByTestId("create-button"));
 
-  expect(await screen.findByTestId("create-error")).toHaveTextContent(
-    "uid exists",
-  );
+  const error = await screen.findByTestId("create-error");
+
+  expect(error).toHaveTextContent("uid exists");
 });

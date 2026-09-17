@@ -71,21 +71,31 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(u.name, "Alice D");
+        assert_eq!(
+            u.name, "Alice D",
+            "displayName should win over cn for user name"
+        );
     }
 
     #[test]
     fn cn_fallback_when_no_display() {
         let u = User::from_attrs(Some("bob".into()), Some("Bob C".into()), None, None).unwrap();
 
-        assert_eq!(u.name, "Bob C");
-        assert_eq!(u.email, "");
+        assert_eq!(
+            u.name, "Bob C",
+            "cn should be fallback when displayName is None"
+        );
+        assert_eq!(u.email, "", "email should be empty when mail is None");
     }
 
     #[test]
     fn needs_uid() {
         let result = User::from_attrs(None, Some("x".into()), None, None).unwrap_err();
 
-        assert_eq!(result, UserError::MissingUid);
+        assert_eq!(
+            result,
+            UserError::MissingUid,
+            "from_attrs without uid should fail with MissingUid"
+        );
     }
 }

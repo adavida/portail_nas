@@ -3,21 +3,25 @@ import { expect, test, vi } from "vitest";
 import Users from "./Users";
 
 test("loading then data", async () => {
+  const mockUsers = [
+    { uid: "alice", name: "Alice", email: "alice@example.com" },
+  ];
   globalThis.fetch = vi.fn(() =>
     Promise.resolve({
       ok: true,
-      json: () =>
-        Promise.resolve([
-          { uid: "alice", name: "Alice", email: "alice@example.com" },
-        ]),
+      json: () => Promise.resolve(mockUsers),
     } as Response),
   );
 
   render(<Users />);
 
   expect(screen.getByTestId("users-loading")).toBeInTheDocument();
-  expect(await screen.findByTestId("users-table")).toBeInTheDocument();
-  expect(screen.getByTestId("user-row-alice")).toBeInTheDocument();
+
+  const table = await screen.findByTestId("users-table");
+  const row = screen.getByTestId("user-row-alice");
+
+  expect(table).toBeInTheDocument();
+  expect(row).toHaveTextContent("Alice");
 });
 
 test("empty shows message", async () => {
@@ -27,7 +31,9 @@ test("empty shows message", async () => {
 
   render(<Users />);
 
-  expect(await screen.findByTestId("users-empty")).toBeInTheDocument();
+  const empty = await screen.findByTestId("users-empty");
+
+  expect(empty).toHaveTextContent("Aucun utilisateur");
 });
 
 test("error", async () => {
@@ -35,5 +41,7 @@ test("error", async () => {
 
   render(<Users />);
 
-  expect(await screen.findByTestId("users-error")).toBeInTheDocument();
+  const error = await screen.findByTestId("users-error");
+
+  expect(error).toHaveTextContent("Erreur");
 });
