@@ -5,7 +5,6 @@ export type Group = {
   members: string[];
 };
 
-import { useState } from "react";
 import EditableCell from "./EditableCell";
 import { toast } from "./Toaster";
 

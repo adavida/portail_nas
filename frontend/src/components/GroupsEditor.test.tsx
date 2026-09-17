@@ -108,7 +108,7 @@ test("enter with unknown gid creates group then adds", async () => {
   const onSave = vi.fn(async () => true);
   let resolve: (v: { ok: boolean }) => void = () => {};
   const onCreateGroup = vi.fn(
-    (gid: string) =>
+    () =>
       new Promise<{ ok: boolean }>((r) => {
         resolve = r;
       }),

@@ -263,7 +263,7 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
     setEmail("");
     setPassword("");
     onCreated?.();
-    toast(`Utilisateur ${uid} créé${gid ? ` + groupe ${gid}` : ""}`);
+    toast(`Utilisateur ${uid} créé`);
   };
 
   return (
