@@ -16,6 +16,11 @@ impl IntoResponse for AppError {
                 let body = Json(json!({"error": m}));
                 return (StatusCode::UNAUTHORIZED, body).into_response();
             }
+            Self::Forbidden(m) => {
+                tracing::warn!("403 {}", m);
+                let body = Json(json!({"error": m}));
+                return (StatusCode::FORBIDDEN, body).into_response();
+            }
             Self::Ldap(m) | Self::Internal(m) => {
                 tracing::error!("500 {}", m);
                 m

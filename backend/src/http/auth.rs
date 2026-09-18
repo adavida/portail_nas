@@ -2,7 +2,7 @@ use axum::{Extension, Json, Router, http::StatusCode, routing::get, routing::pos
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
 
-use crate::{auth::middleware::AuthUser, error::AppError};
+use crate::{auth::middleware::AuthUser, env, error::AppError};
 
 pub fn auth_router() -> Router {
     Router::new()
@@ -22,13 +22,10 @@ pub struct AuthConfig {
 }
 
 pub async fn config() -> Json<AuthConfig> {
-    let issuer =
-        std::env::var("OIDC_ISSUER_URL").unwrap_or_else(|_| "https://127.0.0.1:9091".into());
-    let client_id = std::env::var("OIDC_CLIENT_ID").unwrap_or_else(|_| "portail-dev".into());
     Json(AuthConfig {
-        issuer: issuer.clone(),
-        client_id,
-        redirect_uri: "http://localhost:5173/callback".into(),
+        issuer: env::OIDC_ISSUER_URL.to_string(),
+        client_id: env::OIDC_CLIENT_ID.to_string(),
+        redirect_uri: env::OIDC_REDIRECT_URI.to_string(),
     })
 }
 
@@ -55,14 +52,12 @@ pub async fn callback(
         payload.code.len(),
         payload.redirect_uri
     );
-    let issuer =
-        std::env::var("OIDC_ISSUER_URL").unwrap_or_else(|_| "https://127.0.0.1:9091".into());
-    let client_id = std::env::var("OIDC_CLIENT_ID").unwrap_or_else(|_| "portail-dev".into());
-    let client_secret =
-        std::env::var("OIDC_CLIENT_SECRET").unwrap_or_else(|_| "portail-dev-secret".into());
+    let issuer = env::OIDC_ISSUER_URL.to_string();
+    let client_id = env::OIDC_CLIENT_ID.to_string();
+    let client_secret = env::OIDC_CLIENT_SECRET.to_string();
     let redirect_uri = payload
         .redirect_uri
-        .unwrap_or_else(|| "http://localhost:5173/callback".into());
+        .unwrap_or_else(|| env::OIDC_REDIRECT_URI.to_string());
 
     let token_url = format!("{issuer}/api/oidc/token");
     let client = reqwest::Client::builder()

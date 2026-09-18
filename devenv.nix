@@ -94,7 +94,7 @@ let
             authorization_policy: one_factor
             consent_mode: implicit #need ?
             redirect_uris:
-              - http://localhost:5173/callback
+              - $OIDC_REDIRECT_URI
               - http://127.0.0.1:5173/callback
               - http://localhost:3000/callback
             scopes:
@@ -114,7 +114,7 @@ let
       secret: portail-dev-session-secret
       cookies:
         - domain: 127.0.0.1
-          authelia_url: https://127.0.0.1:9091
+          authelia_url: $OIDC_ISSUER_URL
     storage:
       encryption_key: portail-dev-encryption-key
       local:
@@ -175,6 +175,8 @@ let
 in
 {
   env = {
+    APP_URL = "http://localhost:5173";
+    BIND_ADDR = "0.0.0.0:3000";
     AUTHELIA_CONFIG = "${config.env.DEVENV_STATE}/authelia-dev/config.yml";
     LDAP_BASE_DN = "dc=dev,dc=example,dc=com";
     LDAP_TEST_BASE_DN = "dc=test,dc=example,dc=com";
@@ -183,6 +185,11 @@ in
     OIDC_CLIENT_ID = "portail-dev";
     OIDC_CLIENT_SECRET = "portail-dev-secret";
     OIDC_ISSUER_URL = "https://127.0.0.1:9091";
+    OIDC_REDIRECT_URI = "http://localhost:5173/callback";
+    VITE_APP_URL = "http://localhost:5173";
+    VITE_BACKEND_URL = "http://localhost:3000";
+    VITE_OIDC_ISSUER_URL = "https://127.0.0.1:9091";
+    VITE_OIDC_REDIRECT_URI = "http://localhost:5173/callback";
   };
 
   enterShell = ''
@@ -236,7 +243,7 @@ in
     vscode.exec = "${codiumWithExt}/bin/codium . 2>/dev/null || code . 2>/dev/null || echo 'vscode/codium non installé — ouvrez manuellement code .'; sleep infinity";
   };
 
-  scripts.openfrontend.exec = "xdg-open http://localhost:5173/ 2>/dev/null || echo 'Ouvrez manuellement http://localhost:5173/'";
+  scripts.openfrontend.exec = "xdg-open $APP_URL/ 2>/dev/null || echo \"Ouvrez manuellement $APP_URL/\"";
 
   treefmt = {
     enable = true;

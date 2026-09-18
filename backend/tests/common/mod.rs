@@ -79,8 +79,8 @@ use portail_backend::auth::{Claims, middleware::AuthUser};
 async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCode> {
     let claims = Claims {
         sub: "admin".into(),
-        aud: serde_json::json!("portail-dev"),
-        iss: std::env::var("OIDC_ISSUER_URL").unwrap_or_else(|_| "https://127.0.0.1:9091".into()),
+        aud: serde_json::json!(env!("OIDC_CLIENT_ID")),
+        iss: env!("OIDC_ISSUER_URL").to_string(),
         exp: 9999999999,
         groups: vec!["admin".into()],
         email: Some("admin@example.com".into()),
@@ -91,8 +91,30 @@ async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCo
 }
 
 #[allow(dead_code)]
+async fn inject_user(mut req: Request, next: Next) -> Result<Response, StatusCode> {
+    let claims = Claims {
+        sub: "user".into(),
+        aud: serde_json::json!(env!("OIDC_CLIENT_ID")),
+        iss: env!("OIDC_ISSUER_URL").to_string(),
+        exp: 9999999999,
+        groups: vec![],
+        email: Some("user@example.com".into()),
+        preferred_username: Some("user".into()),
+    };
+    req.extensions_mut().insert(AuthUser(claims));
+    Ok(next.run(req).await)
+}
+
+#[allow(dead_code)]
 pub fn test_app() -> axum::Router {
     use axum::middleware;
     let prod = portail_backend::app();
     prod.layer(middleware::from_fn(inject_admin))
+}
+
+#[allow(dead_code)]
+pub fn test_app_as_user() -> axum::Router {
+    use axum::middleware;
+    let prod = portail_backend::app();
+    prod.layer(middleware::from_fn(inject_user))
 }

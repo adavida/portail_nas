@@ -433,7 +433,7 @@ mod repo {
         if matches!(seeded, Err(AppError::Ldap(_))) {
             return;
         }
-        let _ = seeded.unwrap();
+        seeded.unwrap();
 
         let new = new_group_with_member("unigrp", &member);
 

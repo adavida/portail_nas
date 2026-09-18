@@ -14,24 +14,51 @@ export function setTokens(data: {
 }
 
 export function clearTokens() {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("id_token");
-  localStorage.removeItem("refresh_token");
+  localStorage.clear();
+  sessionStorage.clear();
 }
 
 export function authHeader(): Record<string, string> {
-  const t = localStorage.getItem("id_token") ?? getToken();
+  const t = getToken() ?? localStorage.getItem("id_token");
   return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+export function isAdmin(): boolean {
+  const token = localStorage.getItem("id_token") ?? getToken();
+  if (!token) return false;
+  try {
+    const payload = token.split(".")[1];
+    const json = JSON.parse(
+      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
+    );
+    const groups: string[] = json.groups ?? [];
+    return groups.includes("admin");
+  } catch {
+    return false;
+  }
 }
 
 export function installAuthFetch() {
   const orig = window.fetch;
-  window.fetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
+  window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const headers = new Headers(init.headers as HeadersInit);
     const ah = authHeader();
     for (const [k, v] of Object.entries(ah))
       if (!headers.has(k)) headers.set(k, v);
-    return orig(input, { ...init, headers });
+    const resp = await orig(input, { ...init, headers });
+    if (
+      resp.status === 401 &&
+      !String(input).includes("/api/auth/config") &&
+      !String(input).includes("/api/auth/callback") &&
+      !String(input).includes("/api/auth/me")
+    ) {
+      if (sessionStorage.getItem("login_in_progress") !== "1") {
+        clearTokens();
+        sessionStorage.setItem("login_in_progress", "1");
+        login();
+      }
+    }
+    return resp;
   };
 }
 
@@ -57,7 +84,7 @@ export async function login() {
   url.searchParams.set("client_id", cfg.client_id);
   url.searchParams.set("redirect_uri", cfg.redirect_uri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "openid groups email profile offline_access");
+  url.searchParams.set("scope", "openid groups email profile");
   url.searchParams.set("state", safeState);
   window.location.href = url.toString();
 }
@@ -75,4 +102,40 @@ export async function handleCallback(code: string): Promise<void> {
   }
   const data = await r.json();
   setTokens(data);
+}
+
+export async function logout() {
+  const { OIDC_ISSUER_URL, APP_URL } = await import("../env");
+  // A: rester sur portail. On vide le storage immédiatement (feedback instantané)
+  // puis on détruit la session Authelia en silencieux via iframe POST
+  // (GET /api/logout = 405, fetch bloqué CORS).
+  clearTokens();
+  sessionStorage.setItem("logged_out", "1");
+  try {
+    const iframe = document.createElement("iframe");
+    iframe.name = "authelia-logout-iframe";
+    iframe.style.display = "none";
+    document.body.appendChild(iframe);
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = `${OIDC_ISSUER_URL}/api/logout`;
+    form.target = iframe.name;
+    form.style.display = "none";
+    document.body.appendChild(form);
+    form.submit();
+    await new Promise((r) => setTimeout(r, 500));
+    iframe.remove();
+    form.remove();
+  } catch {
+    try {
+      await fetch(`${OIDC_ISSUER_URL}/api/logout`, {
+        method: "POST",
+        credentials: "include",
+        mode: "no-cors",
+      });
+    } catch {
+      // ignore
+    }
+  }
+  window.location.href = APP_URL + "/";
 }

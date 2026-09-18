@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { GroupsTable, type Group } from "../components/GroupsTable";
 import { toast } from "../components/Toaster";
-import { authHeader, login } from "../auth/oidc";
+import { authHeader } from "../auth/oidc";
 
 export default function Groups() {
   const [groups, setGroups] = useState<Group[] | null>(null);
@@ -10,10 +10,6 @@ export default function Groups() {
   const fetchGroups = useCallback(() => {
     fetch("/api/groups", { headers: authHeader() })
       .then((r) => {
-        if (r.status === 401) {
-          login();
-          throw new Error("401");
-        }
         if (!r.ok) throw new Error(String(r.status));
         return r.json();
       })

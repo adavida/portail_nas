@@ -10,7 +10,15 @@ use tower::ServiceExt;
 mod common;
 
 async fn req(method: Method, uri: &str, body: Option<serde_json::Value>) -> StatusCode {
-    let app = app();
+    req_with_app(app(), method, uri, body).await
+}
+
+async fn req_with_app(
+    app: axum::Router,
+    method: Method,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> StatusCode {
     let mut builder = Request::builder().method(method).uri(uri);
     let resp = if let Some(b) = body {
         builder = builder.header("content-type", "application/json");
@@ -24,7 +32,6 @@ async fn req(method: Method, uri: &str, body: Option<serde_json::Value>) -> Stat
             .unwrap()
     };
     let status = resp.status();
-    // drain body
     let _ = resp.into_body().collect().await.unwrap().to_bytes();
     status
 }
@@ -106,7 +113,10 @@ async fn public_endpoints_not_401_without_token() {
     let status = req(
         Method::POST,
         "/api/auth/callback",
-        Some(json!({ "code": "fake", "redirect_uri": "http://localhost:5173/callback" })),
+        Some(json!({
+            "code": "fake",
+            "redirect_uri": env!("OIDC_REDIRECT_URI")
+        })),
     )
     .await;
     assert_ne!(
@@ -130,4 +140,61 @@ async fn authenticate_endpoint_is_protected() {
         StatusCode::UNAUTHORIZED,
         "POST /api/users/:uid/authenticate should be 401 without token"
     );
+}
+
+#[tokio::test]
+async fn admin_can_access_protected_endpoints() {
+    let admin_app = common::test_app();
+    let protected = vec![
+        (Method::GET, "/api/users"),
+        (Method::GET, "/api/groups"),
+        (Method::GET, "/api/auth/me"),
+    ];
+    for (method, uri) in protected {
+        let status = req_with_app(admin_app.clone(), method.clone(), uri, None).await;
+        assert_ne!(
+            status,
+            StatusCode::UNAUTHORIZED,
+            "{} {} admin should not be 401",
+            method,
+            uri
+        );
+        assert_ne!(
+            status,
+            StatusCode::FORBIDDEN,
+            "{} {} admin should not be 403",
+            method,
+            uri
+        );
+    }
+}
+
+#[tokio::test]
+async fn user_gets_403_on_admin_endpoints() {
+    let user_app = common::test_app_as_user();
+    let admin_endpoints = vec![
+        (Method::GET, "/api/users", None),
+        (Method::GET, "/api/groups", None),
+        (Method::GET, "/api/auth/me", None),
+        (
+            Method::POST,
+            "/api/users",
+            Some(json!({ "uid": "x", "name": "x", "email": "", "password": "x" })),
+        ),
+        (
+            Method::POST,
+            "/api/groups",
+            Some(json!({ "gid": "x", "name": "x", "description": "", "members": ["x"] })),
+        ),
+    ];
+    for (method, uri, body) in admin_endpoints {
+        let status = req_with_app(user_app.clone(), method.clone(), uri, body).await;
+        assert_eq!(
+            status,
+            StatusCode::FORBIDDEN,
+            "{} {} user should be 403, got {status}",
+            method,
+            uri
+        );
+    }
 }

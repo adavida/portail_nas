@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod controllers;
 pub mod domain;
+pub mod env;
 pub mod error;
 pub mod http;
 pub mod repository;
@@ -19,9 +20,8 @@ mod tests {
     async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCode> {
         let claims = crate::auth::Claims {
             sub: "admin".into(),
-            aud: serde_json::json!("portail-dev"),
-            iss: std::env::var("OIDC_ISSUER_URL")
-                .unwrap_or_else(|_| "https://127.0.0.1:9091".into()),
+            aud: serde_json::json!(crate::env::OIDC_CLIENT_ID),
+            iss: crate::env::OIDC_ISSUER_URL.to_string(),
             exp: 9999999999,
             groups: vec!["admin".into()],
             email: Some("admin@example.com".into()),
@@ -89,7 +89,7 @@ mod tests {
             let body = resp.into_body().collect().await.unwrap().to_bytes();
             let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-            assert!(v.get("error").is_some(), "500 doit retourner {{error}}");
+            assert!(v.get("error").is_some(), "500 should return {{error}}");
             return;
         }
 
@@ -105,19 +105,18 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-        assert!(v.is_array(), "GET /api/users doit retourner []");
+        assert!(v.is_array(), "GET /api/users should return []");
         if let Some(first) = v.as_array().unwrap().first() {
-            assert!(first.get("uid").is_some(), "User.uid manquant");
-            assert!(first.get("name").is_some(), "User.name manquant");
-            assert!(first.get("email").is_some(), "User.email manquant");
+            assert!(first.get("uid").is_some(), "User.uid missing");
+            assert!(first.get("name").is_some(), "User.name missing");
+            assert!(first.get("email").is_some(), "User.email missing");
         }
     }
 
     #[tokio::test]
     async fn users_lists_seeded_user() {
-        let url = std::env::var("LDAP_TEST_URL").unwrap_or_else(|_| "ldap://127.0.0.1:3891".into());
-        let base = std::env::var("LDAP_TEST_BASE_DN")
-            .unwrap_or_else(|_| "dc=test,dc=example,dc=com".into());
+        let url = crate::env::ldap_test_url();
+        let base = crate::env::ldap_test_base_dn();
 
         if let Ok((conn, mut ldap)) = ldap3::LdapConnAsync::new(&url).await {
             ldap3::drive!(conn);
@@ -173,7 +172,7 @@ mod tests {
             let p1 = uids.iter().position(|&x| x == "apitest1").unwrap();
             let p2 = uids.iter().position(|&x| x == "apitest2").unwrap();
 
-            assert!(p1 < p2, "tri uid asc attendu");
+            assert!(p1 < p2, "uid sort asc expected");
 
             let apitest1 = arr.iter().find(|o| o["uid"] == "apitest1").unwrap();
 
