@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { UsersTable, type User } from "../components/UsersTable";
 import type { Group } from "../components/GroupsTable";
 import { toast } from "../components/Toaster";
+import { authHeader, login } from "../auth/oidc";
 
 export default function Users() {
   const [users, setUsers] = useState<User[] | null>(null);
@@ -9,12 +10,21 @@ export default function Users() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchUsers = useCallback(() => {
+    const headers = authHeader();
     Promise.all([
-      fetch("/api/users").then(async (r) => {
+      fetch("/api/users", { headers }).then(async (r) => {
+        if (r.status === 401) {
+          login();
+          throw new Error("401");
+        }
         if (!r.ok) throw new Error(String(r.status));
         return (await r.json()) as User[];
       }),
-      fetch("/api/groups").then(async (r) => {
+      fetch("/api/groups", { headers }).then(async (r) => {
+        if (r.status === 401) {
+          login();
+          throw new Error("401");
+        }
         if (!r.ok) throw new Error(String(r.status));
         return (await r.json()) as Group[];
       }),

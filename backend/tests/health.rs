@@ -3,14 +3,13 @@ use axum::{
     http::{Request, StatusCode},
 };
 use http_body_util::BodyExt;
-use portail_backend::app;
 use serde_json::json;
 use tower::ServiceExt;
 
 mod common;
 
 async fn oneshot(uri: &str) -> (StatusCode, serde_json::Value) {
-    let app = app();
+    let app = common::test_app();
     let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
 
     let resp = app.oneshot(req).await.unwrap();

@@ -92,8 +92,10 @@ let
             client_secret: "\$pbkdf2-sha512\$310000\$YudH3UkHfJ.RW5a8z2zTqw\$.cKmbS5jKBVNHGZo3g1B9AHBPfzKufixtQ4MFP57FN7n07FU5srD35VtG6u0lJEjg9XAoXiyJuyclai33XDjOw"
             public: false
             authorization_policy: one_factor
+            consent_mode: implicit #need ?
             redirect_uris:
               - http://localhost:5173/callback
+              - http://127.0.0.1:5173/callback
               - http://localhost:3000/callback
             scopes:
               - openid

@@ -3,7 +3,6 @@ use axum::{
     http::{Method, Request, StatusCode},
 };
 use http_body_util::BodyExt;
-use portail_backend::app;
 use serde_json::json;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tower::ServiceExt;
@@ -13,7 +12,7 @@ mod common;
 type BodyJson = serde_json::Value;
 
 async fn send(method: Method, uri: &str, json_body: Option<BodyJson>) -> (StatusCode, BodyJson) {
-    let app = app();
+    let app = common::test_app();
     let mut req = Request::builder().method(method).uri(uri);
     if let Some(b) = &json_body {
         req = req.header("content-type", "application/json");

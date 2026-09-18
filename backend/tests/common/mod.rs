@@ -71,3 +71,28 @@ fn purge_test_ldap_after() {
         purge_ou("groups").await;
     });
 }
+
+use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
+use portail_backend::auth::{Claims, middleware::AuthUser};
+
+#[allow(dead_code)]
+async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCode> {
+    let claims = Claims {
+        sub: "admin".into(),
+        aud: serde_json::json!("portail-dev"),
+        iss: std::env::var("OIDC_ISSUER_URL").unwrap_or_else(|_| "https://127.0.0.1:9091".into()),
+        exp: 9999999999,
+        groups: vec!["admin".into()],
+        email: Some("admin@example.com".into()),
+        preferred_username: Some("admin".into()),
+    };
+    req.extensions_mut().insert(AuthUser(claims));
+    Ok(next.run(req).await)
+}
+
+#[allow(dead_code)]
+pub fn test_app() -> axum::Router {
+    use axum::middleware;
+    let prod = portail_backend::app();
+    prod.layer(middleware::from_fn(inject_admin))
+}

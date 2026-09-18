@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod controllers;
 pub mod domain;
 pub mod error;
@@ -10,11 +11,30 @@ pub use http::router as app;
 mod tests {
     use super::*;
     use axum::{
-        body::Body,
-        http::{Request, StatusCode},
+        body::Body, extract::Request, http::StatusCode, middleware::Next, response::Response,
     };
     use http_body_util::BodyExt;
     use tower::ServiceExt;
+
+    async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCode> {
+        let claims = crate::auth::Claims {
+            sub: "admin".into(),
+            aud: serde_json::json!("portail-dev"),
+            iss: std::env::var("OIDC_ISSUER_URL")
+                .unwrap_or_else(|_| "https://127.0.0.1:9091".into()),
+            exp: 9999999999,
+            groups: vec!["admin".into()],
+            email: Some("admin@example.com".into()),
+            preferred_username: Some("admin".into()),
+        };
+        req.extensions_mut()
+            .insert(crate::auth::middleware::AuthUser(claims));
+        Ok(next.run(req).await)
+    }
+
+    fn test_app() -> axum::Router {
+        crate::app().layer(axum::middleware::from_fn(inject_admin))
+    }
 
     #[tokio::test]
     async fn health_returns_ok() {
@@ -40,7 +60,7 @@ mod tests {
 
     #[tokio::test]
     async fn unknown_returns_404() {
-        let app = app();
+        let app = test_app();
         let req = Request::builder()
             .uri("/api/unknown")
             .body(Body::empty())
@@ -57,7 +77,7 @@ mod tests {
 
     #[tokio::test]
     async fn users_returns_array() {
-        let app = app();
+        let app = test_app();
         let req = Request::builder()
             .uri("/api/users")
             .body(Body::empty())
@@ -124,7 +144,7 @@ mod tests {
             let _ = ldap.unbind().await;
         }
 
-        let app = app();
+        let app = test_app();
         let req = Request::builder()
             .uri("/api/users")
             .body(Body::empty())

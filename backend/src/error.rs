@@ -3,6 +3,7 @@ pub enum AppError {
     Ldap(String),
     NotFound(String),
     Internal(String),
+    Unauthorized(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -11,6 +12,7 @@ impl std::fmt::Display for AppError {
             Self::Ldap(m) => write!(f, "ldap: {m}"),
             Self::NotFound(m) => write!(f, "not found: {m}"),
             Self::Internal(m) => write!(f, "internal: {m}"),
+            Self::Unauthorized(m) => write!(f, "unauthorized: {m}"),
         }
     }
 }
