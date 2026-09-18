@@ -27,5 +27,6 @@
       "/home/david/projects/rust/nas/202260917_portail/**": "allow"
     }
   },
+  "plugin": ["openrtk"],
   "formatter": false
 }

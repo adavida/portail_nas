@@ -113,6 +113,7 @@ in
     git
     just
     openldap
+    rtk
     xdg-utils
   ];
 
