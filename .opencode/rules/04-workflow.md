@@ -2,7 +2,7 @@
 
 ## Environnement & process auto
 
-- Toujours `devenv shell -- <cmd>` (rust 1.98, nodejs_22). `devenv up` lance 7 process: `backend` (`cargo watch -w backend -x 'run -p portail-backend'` → 3000), `backend-test` (`cargo watch -w backend -x test`), `frontend` (`vite` 5173), `frontend-test` (`vitest` watch), `openldap` (3890), `openldap-test` (3891), `vscode`. `devenv down` arrête. Ne pas lancer `cargo run`/`npm run dev` hors process.
+- Toujours `devenv shell -- <cmd>` (rust 1.98, nodejs_22). `devenv up` lance 8 process: `backend` (`cargo watch -w backend -x 'run -p portail-backend'` → 3000), `backend-test` (`cargo watch -w backend -x test`), `frontend` (`vite` 5173), `frontend-test` (`vitest` watch), `openldap` (3890), `openldap-test` (3891), `authelia` (https://127.0.0.1:9091, LDAP dev 3890, self-signed), `vscode`. `devenv down` arrête. Ne pas lancer `cargo run`/`npm run dev` hors process.
 - Après modif `devenv.nix`/`devenv.yaml`/`opencode.json`/`.opencode/**` → quitter et relancer opencode.
 
 ## TDD
