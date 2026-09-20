@@ -1,3 +1,6 @@
+pub mod errors;
+pub use errors::GroupError;
+
 use serde::Serialize;
 
 use super::{Description, Gid, Name};
@@ -9,25 +12,6 @@ pub struct Group {
     pub description: Description,
     pub members: Vec<String>,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GroupError {
-    MissingCn,
-    InvalidGid,
-    InvalidName,
-}
-
-impl std::fmt::Display for GroupError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::MissingCn => write!(f, "missing cn"),
-            Self::InvalidGid => write!(f, "invalid gid"),
-            Self::InvalidName => write!(f, "invalid name"),
-        }
-    }
-}
-
-impl std::error::Error for GroupError {}
 
 impl Group {
     pub fn from_attrs(

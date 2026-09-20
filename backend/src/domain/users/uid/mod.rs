@@ -1,25 +1,11 @@
+pub mod errors;
+pub use errors::UidError;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 pub struct Uid(String);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum UidError {
-    Empty,
-    InvalidFormat,
-}
-
-impl std::fmt::Display for UidError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Empty => write!(f, "uid is empty"),
-            Self::InvalidFormat => write!(f, "uid invalid format"),
-        }
-    }
-}
-
-impl std::error::Error for UidError {}
 
 impl Uid {
     pub fn try_new(raw: String) -> Result<Self, UidError> {

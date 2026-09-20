@@ -1,22 +1,10 @@
+pub mod errors;
+pub use errors::PasswordError;
+
 use serde::Deserialize;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Password(String);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PasswordError {
-    Empty,
-}
-
-impl std::fmt::Display for PasswordError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Empty => write!(f, "password is empty"),
-        }
-    }
-}
-
-impl std::error::Error for PasswordError {}
 
 impl Password {
     pub fn try_new(raw: String) -> Result<Self, PasswordError> {

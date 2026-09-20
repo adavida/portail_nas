@@ -1,4 +1,5 @@
-//! Centralized environment — single struct validated at runtime.
+pub mod errors;
+pub use errors::EnvError;
 
 use std::sync::OnceLock;
 
@@ -19,7 +20,7 @@ static ENV: OnceLock<Env> = OnceLock::new();
 impl Env {
     /// Reads all required vars from `std::env`; collects every missing/empty
     /// name and returns a single error listing them all.
-    pub fn create() -> Result<Self, String> {
+    pub fn create() -> Result<Self, EnvError> {
         let mut missing: Vec<&'static str> = Vec::new();
 
         let take = |name: &'static str, missing: &mut Vec<&'static str>| -> String {
@@ -42,10 +43,10 @@ impl Env {
         let ldap_base_dn = take("LDAP_BASE_DN", &mut missing);
 
         if !missing.is_empty() {
-            return Err(format!(
+            return Err(EnvError(format!(
                 "missing or empty env vars: {}. set them in devenv.nix env",
                 missing.join(", ")
-            ));
+            )));
         }
 
         Ok(Self {
@@ -157,9 +158,9 @@ mod tests {
         let err = super::Env::create().unwrap_err();
 
         for k in vars {
-            assert!(err.contains(k), "error missing {k}: {err}");
+            assert!(err.0.contains(k), "error missing {k}: {err}");
         }
-        assert!(err.contains("devenv.nix env"), "hint missing: {err}");
+        assert!(err.0.contains("devenv.nix env"), "hint missing: {err}");
 
         for (k, v) in saved {
             if let Some(val) = v {
@@ -175,7 +176,7 @@ mod tests {
         unsafe { std::env::set_var("APP_URL", "") };
         let err = super::Env::create().unwrap_err();
         assert!(
-            err.contains("APP_URL"),
+            err.0.contains("APP_URL"),
             "empty should be treated as missing: {err}"
         );
         if let Some(v) = saved {

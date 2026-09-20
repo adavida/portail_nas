@@ -1,23 +1,11 @@
+pub mod errors;
+pub use errors::NameError;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 pub struct Name(String);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NameError {
-    Empty,
-}
-
-impl std::fmt::Display for NameError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Empty => write!(f, "name is empty"),
-        }
-    }
-}
-
-impl std::error::Error for NameError {}
 
 impl Name {
     pub fn try_new(raw: String) -> Result<Self, NameError> {
@@ -26,7 +14,7 @@ impl Name {
             return Err(NameError::Empty);
         }
         if s.len() > 100 {
-            return Err(NameError::Empty);
+            return Err(NameError::InvalidFormat);
         }
         Ok(Self(s))
     }
@@ -79,7 +67,11 @@ mod tests {
     fn rejects_too_long() {
         let err = Name::try_new("a".repeat(101)).unwrap_err();
 
-        assert_eq!(err, NameError::Empty, "too long name should be rejected");
+        assert_eq!(
+            err,
+            NameError::InvalidFormat,
+            "too long name should be InvalidFormat"
+        );
     }
 
     #[test]

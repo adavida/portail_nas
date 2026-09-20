@@ -1,23 +1,11 @@
+pub mod errors;
+pub use errors::EmailError;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 pub struct Email(String);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EmailError {
-    InvalidFormat,
-}
-
-impl std::fmt::Display for EmailError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::InvalidFormat => write!(f, "email invalid format"),
-        }
-    }
-}
-
-impl std::error::Error for EmailError {}
 
 impl Email {
     pub fn try_new(raw: String) -> Result<Self, EmailError> {
