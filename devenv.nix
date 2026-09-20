@@ -227,7 +227,7 @@ in
   processes = {
     authelia.exec = mkAuthelia;
     backend.exec = "cargo watch -w backend -x 'run -p portail-backend'";
-    "backend-test".exec = "cargo watch -w backend -x 'test --features test-api'";
+    "backend-test".exec = "cargo watch -w backend -x 'test --features test-api --quiet'";
     frontend.exec = "npm --prefix frontend run dev";
     "frontend-test".exec = "npm --prefix frontend run test:watch";
     openldap.exec = mkSlapd {
