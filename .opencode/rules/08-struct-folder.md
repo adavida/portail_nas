@@ -3,49 +3,40 @@
 > Skills de référence:
 >
 > - Structure: `.opencode/skills/backend-structure/SKILL.md` (trigger `backend/src/`)
+> - VO: `.opencode/rules/05-value-objects.md`
 
 ## Objectif
 
-1 objet = 1 fichier pour la struct, 1 fichier `errors.rs` séparé (snake_case) pour ses erreurs dans son sous-dossier — zéro warning `clippy::module_inception`.
+1 objet = 1 dossier `<object>/` : `mod.rs` (struct) + `errors.rs` (snake_case, error) — zéro `clippy::module_inception`, zéro `#[allow(module_inception)]`.
 
 ## Règle
 
-- `backend/src/<module>/<object>/mod.rs` contient `pub struct <Struct>` + `impl <Struct> { try_new/create/from_* }` + `#[cfg(test)]` — **pas** de `Error` dedans (évite `backend/src/<module>/<object>/<object>.rs` → `module_inception`).
-- `backend/src/<module>/<object>/errors.rs` contient `pub enum <Struct>Error` + `Display` + `Error` (snake_case, minuscules).
-- `backend/src/<module>/<object>/mod.rs` ré-exporte `pub mod errors; pub use errors::<Struct>Error;` et le `mod.rs` parent fait `pub mod <object>; pub use <object>::{<Struct>,<Struct>Error};` pour garder `crate::domain::groups::Group` plat.
-- Si `backend/src/<module>.rs` existe (ex: `env.rs` à la racine), le split devient `backend/src/<module>/mod.rs` (struct) + `backend/src/<module>/errors.rs`.
-- Frontend identique snake_case: `frontend/src/<module>/<object>/errors.ts`.
+```text
+backend/src/<module>/<object>/mod.rs     # pub struct <Struct> + impl try_new/create/from_* + #[cfg(test)] — pas de Error dedans
+backend/src/<module>/<object>/errors.rs  # pub enum <Struct>Error + Display + Error
+backend/src/<module>/<object>/mod.rs     # pub mod errors; pub use errors::<Struct>Error;
+backend/src/<module>/mod.rs?:            # pub mod <object>; pub use <object>::{<Struct>, <Struct>Error}; — plat
+```
 
-Exemples:
+- Racine type `env.rs` ⇒ `env/mod.rs` (struct) + `env/errors.rs`.
+- Frontend identique: `frontend/src/<module>/<object>/errors.ts`.
 
-- `backend/src/env.rs` → `backend/src/env/mod.rs` (`Env`) + `backend/src/env/errors.rs` (`EnvError`)
-- `backend/src/domain/groups/group.rs` → `backend/src/domain/groups/group/mod.rs` (`Group`) + `backend/src/domain/groups/group/errors.rs` (`GroupError`)
-- `backend/src/domain/groups/members.rs` → `backend/src/domain/groups/members/mod.rs` (`Members`) + `errors.rs`
-- VO suit même split: `backend/src/domain/users/uid.rs` → `backend/src/domain/users/uid/mod.rs` (`Uid`) + `errors.rs`.
+Exemples standards: `env/` (`Env`/`EnvError`), `domain/groups/group/` (`Group`/`GroupError`), `domain/groups/members/` (`Members`/`MembersError`), VOs `users/uid/` (`Uid`/`UidError`).
 
 ## Interdits
 
-- `pub enum <Struct>Error` dans le même fichier que `pub struct <Struct>` — déplacer dans `<object>/errors.rs`.
-- `backend/src/<module>/<object>.rs` contenant à la fois struct et error.
-- Fichiers `Errors.rs`/`Env.rs`/`Group.rs` en PascalCase — utiliser `snake_case` (`errors.rs`, `mod.rs` pour la struct) — `cargo clippy` exige minuscules.
-- `backend/src/<module>/<object>/<object>.rs` — déclenche `clippy::module_inception`.
+- `pub enum <Struct>Error` dans le même fichier que `pub struct <Struct>` → toujours `errors.rs`.
+- `backend/src/<module>/<object>/<object>.rs` (même nom que le dossier) → `clippy::module_inception` — si le lint se déclenche, **renommer** (struct → `mod.rs`, error → `errors.rs`), jamais `#[allow(clippy::module_inception)]`. Exception unique: `#[allow(...)]` avec `// ponytail: ...` si le nommage redondant est réellement voulu.
+- Fichiers PascalCase (`Env.rs`, `Group.rs`) → clippy exige minuscules.
+- Sub-module même nom que le parent qui déclenche E0255 → ne **jamais** contourner avec `mod.rs` + `#[path = "Env.rs"] pub mod env_;` : réécrire en `mod.rs` pour la structure + `errors.rs` pour l'error.
 
 ## Vérification
 
 ```bash
-# snake_case et errors séparés
-test -f backend/src/env/errors.rs && echo "OK env errors" || echo "FAIL"
-test -f backend/src/env/mod.rs && echo "OK env mod" || echo "FAIL"
-test -f backend/src/domain/groups/group/errors.rs && echo "OK group errors" || echo "FAIL"
-test -f backend/src/domain/groups/group/mod.rs && echo "OK group mod" || echo "FAIL"
-
-# pas de PascalCase, pas d'inception
-! ls backend/src/env/Env.rs 2>/dev/null && echo "OK no PascalCase"
-! ls backend/src/domain/groups/group/Group.rs 2>/dev/null && echo "OK no inception"
-
-# struct sans error dans mod.rs
-! rg -n "pub enum.*Error" backend/src/env/mod.rs && echo "OK Env clean"
-! rg -n "pub enum.*Error" backend/src/domain/groups/group/mod.rs && echo "OK Group clean"
+# snake_case + errors séparés + struct sans error
+test -f backend/src/env/mod.rs && test ! -f backend/src/env/Env.rs && echo "OK env"
+rg -n "pub enum.*Error" backend/src --glob '*/mod.rs' # doit être vide (hors sub-modules)
+rg -n "allow\(clippy::module_inception\)" backend/src # doit être vide
 
 devenv shell -- cargo clippy -- -D warnings
 devenv shell -- cargo test

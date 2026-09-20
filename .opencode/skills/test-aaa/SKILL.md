@@ -7,26 +7,28 @@ description: Enforce Arrange-Act-Assert with blank line between sections for all
 
 ## Rule — AAA avec ligne vide entre les 3 parties
 
-Tout test suit **Arrange, Act, Assert** séparés par **une ligne vide** :
+Rust:
 
 ```rust
 #[test]
 fn example() {
-    let input = "a"; // Arrange
+    let input = "a";
 
-    let result = do_something(input); // Act
+    let result = do_something(input);
 
-    assert_eq!(result, "b"); // Assert
+    assert_eq!(result, "b");
 }
 ```
 
+Frontend:
+
 ```tsx
 test("example", () => {
-  render(<Comp />); // Arrange
+  render(<Comp />);
 
-  fireEvent.click(screen.getByTestId("btn")); // Act
+  fireEvent.click(screen.getByTestId("btn"));
 
-  expect(screen.getByTestId("out")).toBeInTheDocument(); // Assert
+  expect(screen.getByTestId("out")).toBeInTheDocument();
 });
 ```
 
@@ -34,13 +36,11 @@ test("example", () => {
 - **Act** : l'appel testé (`User::from_attrs`, `create_user`, `app.oneshot`, `fireEvent`, `fetch`)
 - **Assert** : `assert_eq!`, `expect`, `assert_auth_*`
 
-Vérif : chaque `#[test]` / `test(` doit contenir `\n\n` entre Arrange/Act et Act/Assert. Pas de `let x = foo(); assert_eq!(x, ...)` sur lignes consécutives sans ligne vide.
+Vérif : chaque `#[test]` / `test(` contient `\n\n` entre sections. Pas de `let x = foo(); assert_eq!(x, ...)` consécutifs sans ligne vide.
 
-## Rule — Assertions faciles à lire
+## Assertions faciles à lire
 
-- **Message explicite** : toujours `assert_eq!(actual, expected, "contexte lisible")` / `assert!(cond, "message")` en Rust, `const actual = ...; expect(actual).toHaveTextContent(...)` en TS — jamais `assert!(a == b)` sans message
-- **Variable intermédiaire** : `let result = foo().unwrap_err(); assert_eq!(result, Err::MissingUid, "empty uid should be rejected")` pas `assert_eq!(foo().unwrap_err(), ...)` inline
-- **1 assertion = 1 intention** : `assert_eq!(u.name, "Alice D", "displayName should win over cn")` pas `assert!(u.name == "Alice D" && u.email == "")`
-- **Helpers nommés** : `assert_auth_ok(&uid, "pwd")` / `assert_auth_fail` / `assert_auth_err` au lieu de `assert!(authenticate_user(...).await.unwrap())` répété
-
-Source of truth : `backend/src/domain/users/user.rs:64` `backend/src/repository/ldap/users.rs:180` `frontend/src/components/UsersTable.test.tsx:5` `backend/src/domain/users/new_user.rs:83`
+- **Message explicite** : `assert_eq!(actual, expected, "contexte")` / `assert!(cond, "message")`; en TS variable intermédiaire `expect(actual).toHaveTextContent(...)` — jamais `assert!(a == b)` nue.
+- **Variable intermédiaire** : `let result = foo().unwrap_err(); assert_eq!(result, E::MissingUid, "...")` — pas d'appel inline.
+- **1 assertion = 1 intention** : pas de `assert!(a && b)` composite.
+- **Helpers nommés** : `assert_auth_ok(&uid, "pwd")` / `assert_auth_fail` / `assert_auth_err` pour `authenticate_user` — jamais d'appel direct répété.

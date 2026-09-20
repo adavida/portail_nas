@@ -5,39 +5,29 @@ description: Enforce devenv.nix formatting via treefmt/nixfmt — alphabetical t
 
 # devenv-format
 
-## Rule — `devenv.nix` must be formatted by `treefmt`, never by hand
-
-Executable source of truth: `devenv.nix:154` + `devenv.yaml:5`.
-
-### How to format
+## Rule — `devenv.nix` formatted by `treefmt`, never by hand
 
 ```bash
-devenv shell -- treefmt          # formats 15 files, 3 changed typical
-# also runs automatically on enterShell via tasks."devenv:treefmt:run"
+devenv shell -- treefmt --fail-on-change   # aussi auto sur enterShell
 ```
 
-Never run `nixfmt`, `rustfmt`, `prettier`, `alejandra` directly.
+Never run bare `nixfmt`/`rustfmt`/`prettier`/`alejandra` — toujours via devenv.
 
-### What `nixfmt` enforces (will fail CI if violated)
+### nixfmt rules (CI failed if violated)
 
-1. **Top-level alphabetical** inside `{ ... }:`  
-   `env` < `enterShell` < `enterTest` < `languages` < `packages` < `processes` < `scripts` < `tasks` < `treefmt`
-2. **Grouped vs dotted**
-   - `>1` prop → grouped: `env = { LDAP_BASE_DN; LDAP_URL; }`, `languages.javascript = { enable; package; }`, `tasks = { "x".exec; }`, `processes = { backend.exec; ... }`
-   - `1` prop → dotted singleton: `scripts.hello.exec`, `languages.rust.enable`, `processes.openldap.exec`  
-     Do not write `scripts = { hello = { exec; } }` or `env.LDAP_URL = ...` (grouped form required).
-3. **Inside `processes` alphabetical**: `backend` < `backend-test` < `frontend` < `frontend-test` < `openldap` < `openldap-test` < `vscode`
-4. **Inside `packages` alphabetical**: `cargo-watch` < `codiumWithExt` < `git` < `just` < `openldap`
-5. **No comments** in `devenv.nix` (enforced by `nixfmt` stripping).
-6. **Config**: `treefmt.config.projectRootFile = "devenv.nix"`; `programs.nixfmt/rustfmt/prettier.enable = true` via `treefmt-nix` input (`devenv.yaml:5` follows `nixpkgs`).
+1. Top-level `env < enterShell < enterTest < languages < packages < processes < scripts < tasks < treefmt` — ordre alphabétique dans `{ ... }:`.
+2. Grouped vs dotted — `>1` prop → grouped (`env = {LDAP_BASE_DN; LDAP_URL;}`), `1` prop → dotted singleton (`scripts.hello.exec`, `languages.rust.enable`).
+3. Inside `processes` & `packages` alphabetical (`backend < backend-test < frontend < frontend-test < openldap < openldap-test < vscode`).
+4. No comments in `devenv.nix`.
+5. `treefmt.config.projectRootFile = "devenv.nix"`; `programs.nixfmt/rustfmt/prettier.enable = true` vue `treefmt-nix` (`devenv.yaml:5`).
 
-### When adding a package/process
+### Adding package/process
 
-- Insert at the alphabetically correct position, keep grouping rule, then run `treefmt` immediately.
-- After editing `devenv.yaml` (adding inputs), run `devenv shell -- treefmt` to reformat `devenv.lock`.
+- Insert position alphabetique + grouped rule + `devenv shell -- treefmt` immédiatement.
+- Edit `devenv.yaml` (inputs) → `devenv shell -- treefmt` pour reformatter `devenv.lock`.
 
 ### Verification
 
 ```bash
-devenv shell -- treefmt --fail-on-change  # CI check — exits 1 if not formatted
+devenv shell -- treefmt --fail-on-change   # exits 1 si non formatted
 ```
