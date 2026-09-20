@@ -5,11 +5,14 @@ use crate::domain::groups::{Gid, Group, NewGroup, UpdateGroup};
 use crate::domain::users::Uid;
 use crate::error::AppError;
 
-use super::{MapLdap, connect_admin, ldap_base, ldap_url};
+use super::{
+    MapLdap, connect_admin, group_dn_from, groups_search_base, ldap_base, ldap_url, user_dn,
+    user_dn_from,
+};
 
 pub async fn list_groups() -> Result<Vec<Group>, AppError> {
     let base = ldap_base();
-    let search_base = format!("ou=groups,{base}");
+    let search_base = groups_search_base(&base);
 
     let (conn, mut ldap) = LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
     ldap3::drive!(conn);
@@ -36,7 +39,7 @@ pub async fn list_groups() -> Result<Vec<Group>, AppError> {
 
 pub async fn create_group(new: NewGroup) -> Result<Group, AppError> {
     let base = ldap_base();
-    let dn = new.dn(&base);
+    let dn = group_dn_from(new.gid.as_str(), &base);
     let mut ldap = connect_admin(&base).await?;
 
     for uid in new.members.as_slice() {
@@ -70,7 +73,7 @@ pub async fn create_group(new: NewGroup) -> Result<Group, AppError> {
 }
 
 async fn user_exists(ldap: &mut ldap3::Ldap, uid: &Uid, base: &str) -> bool {
-    let dn = format!("uid={},ou=people,{base}", uid.as_str());
+    let dn = user_dn(uid, base);
     let filter = format!("(uid={})", uid.as_str());
     match ldap.search(&dn, Scope::Base, &filter, vec!["uid"]).await {
         Ok(result) => result
@@ -83,8 +86,8 @@ async fn user_exists(ldap: &mut ldap3::Ldap, uid: &Uid, base: &str) -> bool {
 
 pub async fn add_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
     let base = ldap_base();
-    let group_dn = format!("cn={},ou=groups,{base}", gid.as_str());
-    let member_dn = format!("uid={},ou=people,{base}", uid.as_str());
+    let group_dn = group_dn_from(gid.as_str(), &base);
+    let member_dn = user_dn(&uid, &base);
     let mut ldap = connect_admin(&base).await?;
 
     if !user_exists(&mut ldap, &uid, &base).await {
@@ -112,8 +115,8 @@ pub async fn add_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
 
 pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
     let base = ldap_base();
-    let group_dn = format!("cn={},ou=groups,{base}", gid.as_str());
-    let member_dn = format!("uid={},ou=people,{base}", uid.as_str());
+    let group_dn = group_dn_from(gid.as_str(), &base);
+    let member_dn = user_dn(&uid, &base);
     let mut ldap = connect_admin(&base).await?;
 
     ldap.modify(
@@ -133,7 +136,7 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
 
 pub async fn update_group(gid: Gid, data: UpdateGroup) -> Result<(), AppError> {
     let base = ldap_base();
-    let dn = format!("cn={},ou=groups,{base}", gid.as_str());
+    let dn = group_dn_from(gid.as_str(), &base);
     let mut ldap = connect_admin(&base).await?;
 
     let set_description = if data.description.as_str().is_empty() {
@@ -164,7 +167,7 @@ pub async fn update_group(gid: Gid, data: UpdateGroup) -> Result<(), AppError> {
 
 pub async fn delete_group(gid: Gid) -> Result<(), AppError> {
     let base = ldap_base();
-    let dn = format!("cn={},ou=groups,{base}", gid.as_str());
+    let dn = group_dn_from(gid.as_str(), &base);
     let mut ldap = connect_admin(&base).await?;
 
     ldap.delete(&dn).await.map_ldap()?.success().map_ldap()?;

@@ -6,7 +6,7 @@ use crate::{
     error::AppError,
 };
 
-use super::{MapLdap, connect_admin, ldap_base, ldap_url, user_dn};
+use super::{MapLdap, connect_admin, ldap_base, ldap_url, people_search_base, user_dn};
 
 fn one_set(v: String) -> HashSet<String> {
     [v].into_iter().collect()
@@ -14,7 +14,7 @@ fn one_set(v: String) -> HashSet<String> {
 
 pub async fn list_users() -> Result<Vec<User>, AppError> {
     let base = ldap_base();
-    let search_base = format!("ou=people,{base}");
+    let search_base = people_search_base(&base);
 
     let (conn, mut ldap) = LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
     ldap3::drive!(conn);
@@ -46,7 +46,7 @@ async fn ldap_conn_search(
 
 pub async fn create_user(new: NewUser) -> Result<User, AppError> {
     let base = ldap_base();
-    let dn = new.dn(&base);
+    let dn = user_dn(&new.uid, &base);
     let mut ldap = connect_admin(&base).await?;
 
     ldap.add(&dn, new.to_attrs())
@@ -177,7 +177,7 @@ mod tests {
             ldap3::drive!(conn);
             let bind_dn = format!("cn=admin,{base}");
             if ldap.simple_bind(&bind_dn, "admin").await.is_ok() {
-                let dn = format!("uid={uid},ou=people,{base}");
+                let dn = user_dn_from(&uid, &base);
                 let _ = ldap.delete(&dn).await;
                 let _ = ldap.unbind().await;
             }

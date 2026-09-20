@@ -38,7 +38,41 @@ pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap, base: &str) -> Result<(),
 }
 
 pub(crate) fn user_dn(uid: &crate::domain::users::Uid, base: &str) -> String {
-    format!("uid={},ou=people,{base}", uid.as_str())
+    user_dn_from(uid.as_str(), base)
+}
+
+pub(crate) fn user_dn_from(uid: &str, base: &str) -> String {
+    format!(
+        "uid={},ou={},{}",
+        uid,
+        crate::env::Env::global().ldap_people_ou,
+        base
+    )
+}
+
+pub(crate) fn group_dn_from(gid: &str, base: &str) -> String {
+    format!(
+        "cn={},ou={},{}",
+        gid,
+        crate::env::Env::global().ldap_groups_ou,
+        base
+    )
+}
+
+pub(crate) fn people_search_base(base: &str) -> String {
+    format!(
+        "ou={},{}",
+        crate::env::Env::global().ldap_people_ou,
+        base
+    )
+}
+
+pub(crate) fn groups_search_base(base: &str) -> String {
+    format!(
+        "ou={},{}",
+        crate::env::Env::global().ldap_groups_ou,
+        base
+    )
 }
 
 pub(crate) trait MapLdap<T> {

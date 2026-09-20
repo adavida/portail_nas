@@ -13,6 +13,8 @@ pub struct Env {
     pub bind_addr: String,
     pub ldap_url: String,
     pub ldap_base_dn: String,
+    pub ldap_people_ou: String,
+    pub ldap_groups_ou: String,
 }
 
 static ENV: OnceLock<Env> = OnceLock::new();
@@ -20,6 +22,7 @@ static ENV: OnceLock<Env> = OnceLock::new();
 impl Env {
     /// Reads all required vars from `std::env`; collects every missing/empty
     /// name and returns a single error listing them all.
+    /// Optional vars fall back to documented defaults (see field docs).
     pub fn create() -> Result<Self, EnvError> {
         let mut missing: Vec<&'static str> = Vec::new();
 
@@ -33,6 +36,15 @@ impl Env {
             }
         };
 
+        // Optional: absent/empty value falls back to the documented default.
+        let take_opt = |name: &'static str, default: &str| -> String {
+            std::env::var(name)
+                .ok()
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| default.to_string())
+        };
+
         let oidc_issuer_url = take("OIDC_ISSUER_URL", &mut missing);
         let oidc_client_id = take("OIDC_CLIENT_ID", &mut missing);
         let oidc_client_secret = take("OIDC_CLIENT_SECRET", &mut missing);
@@ -41,6 +53,8 @@ impl Env {
         let bind_addr = take("BIND_ADDR", &mut missing);
         let ldap_url = take("LDAP_URL", &mut missing);
         let ldap_base_dn = take("LDAP_BASE_DN", &mut missing);
+        let ldap_people_ou = take_opt("LDAP_PEOPLE_OU", "people");
+        let ldap_groups_ou = take_opt("LDAP_GROUPS_OU", "groups");
 
         if !missing.is_empty() {
             return Err(EnvError(format!(
@@ -58,6 +72,8 @@ impl Env {
             bind_addr,
             ldap_url,
             ldap_base_dn,
+            ldap_people_ou,
+            ldap_groups_ou,
         })
     }
 
@@ -110,6 +126,13 @@ impl Env {
                 .to_string(),
             ldap_base_dn: option_env!("LDAP_BASE_DN")
                 .unwrap_or("dc=dev,dc=example,dc=com")
+                .to_string(),
+            // Optional vars: standard LDAP infra defaults.
+            ldap_people_ou: option_env!("LDAP_PEOPLE_OU")
+                .unwrap_or("people")
+                .to_string(),
+            ldap_groups_ou: option_env!("LDAP_GROUPS_OU")
+                .unwrap_or("groups")
                 .to_string(),
         }
     }
@@ -183,6 +206,66 @@ mod tests {
             unsafe { std::env::set_var("APP_URL", v) };
         } else {
             unsafe { std::env::remove_var("APP_URL") };
+        }
+    }
+
+    #[test]
+    fn optional_vars_default_when_absent() {
+        let _g = LOCK.lock().unwrap();
+        let saved = (
+            std::env::var("LDAP_PEOPLE_OU").ok(),
+            std::env::var("LDAP_GROUPS_OU").ok(),
+            std::env::var("APP_URL").ok(),
+        );
+        unsafe { std::env::remove_var("LDAP_PEOPLE_OU") };
+        unsafe { std::env::remove_var("LDAP_GROUPS_OU") };
+        unsafe { std::env::remove_var("APP_URL") };
+
+        let env = super::Env::create().unwrap();
+
+        assert_eq!(env.ldap_people_ou, "people", "default people OU expected");
+        assert_eq!(env.ldap_groups_ou, "groups", "default groups OU expected");
+
+        if let Some(v) = saved.0 {
+            unsafe { std::env::set_var("LDAP_PEOPLE_OU", v) };
+        }
+        if let Some(v) = saved.1 {
+            unsafe { std::env::set_var("LDAP_GROUPS_OU", v) };
+        }
+        if let Some(v) = saved.2 {
+            unsafe { std::env::set_var("APP_URL", v) };
+        }
+    }
+
+    #[test]
+    fn optional_vars_custom_and_empty_falls_back() {
+        let _g = LOCK.lock().unwrap();
+        let saved = (
+            std::env::var("LDAP_PEOPLE_OU").ok(),
+            std::env::var("LDAP_GROUPS_OU").ok(),
+            std::env::var("APP_URL").ok(),
+        );
+        unsafe { std::env::set_var("LDAP_PEOPLE_OU", "humains") };
+        unsafe { std::env::set_var("LDAP_GROUPS_OU", "") };
+        unsafe { std::env::remove_var("APP_URL") };
+
+        let env = super::Env::create().unwrap();
+
+        assert_eq!(env.ldap_people_ou, "humains", "custom OU expected");
+        assert_eq!(env.ldap_groups_ou, "groups", "empty should fall back");
+
+        if let Some(v) = saved.0 {
+            unsafe { std::env::set_var("LDAP_PEOPLE_OU", v) };
+        } else {
+            unsafe { std::env::remove_var("LDAP_PEOPLE_OU") };
+        }
+        if let Some(v) = saved.1 {
+            unsafe { std::env::set_var("LDAP_GROUPS_OU", v) };
+        } else {
+            unsafe { std::env::remove_var("LDAP_GROUPS_OU") };
+        }
+        if let Some(v) = saved.2 {
+            unsafe { std::env::set_var("APP_URL", v) };
         }
     }
 }
