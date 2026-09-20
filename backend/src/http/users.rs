@@ -7,8 +7,8 @@ use crate::{
     error::AppError,
 };
 
-pub(crate) fn users_router() -> Router {
-    let r = Router::new()
+pub(crate) fn users_router() -> Router<crate::env::Env> {
+    let r = Router::<crate::env::Env>::new()
         .route("/", get(list_users).post(create_user))
         .route("/{uid}", put(update_user).delete(delete_user))
         .route("/{uid}/password", put(update_user_password));

@@ -1,4 +1,4 @@
-use portail_backend::{app, env};
+use portail_backend::{app, env::Env};
 
 #[tokio::main]
 async fn main() {
@@ -8,8 +8,12 @@ async fn main() {
                 .add_directive("info".parse().unwrap()),
         )
         .init();
+    // Validate env once at startup — aggregated error if any var missing/empty.
+    let env = Env::create().unwrap_or_else(|e| panic!("{e}"));
+    let bind = env.bind_addr.clone();
+    Env::set(env);
     let app = app();
-    let listener = tokio::net::TcpListener::bind(env::BIND_ADDR).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(bind).await.unwrap();
     tracing::info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }

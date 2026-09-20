@@ -11,11 +11,11 @@ pub use users::{
 use crate::error::AppError;
 
 pub(crate) fn ldap_url() -> String {
-    crate::env::ldap_url()
+    crate::env::Env::global().ldap_url.clone()
 }
 
 pub(crate) fn ldap_base() -> String {
-    crate::env::ldap_base_dn()
+    crate::env::Env::global().ldap_base_dn.clone()
 }
 
 pub(crate) async fn connect_admin(base: &str) -> Result<ldap3::Ldap, AppError> {
@@ -53,18 +53,22 @@ impl<T> MapLdap<T> for Result<T, ldap3::LdapError> {
 
 #[cfg(test)]
 mod tests {
-    use super::ldap_url;
-
     #[ctor::ctor(unsafe)]
     fn redirect_ldap_to_test() {
+        crate::env::Env::ensure_init();
         std::env::set_var("LDAP_URL", crate::env::ldap_test_url());
         std::env::set_var("LDAP_BASE_DN", crate::env::ldap_test_base_dn());
     }
 
     #[test]
     fn ldap_url_reads_env() {
-        std::env::set_var("LDAP_URL", "ldap://example:1");
-        assert_eq!(ldap_url(), "ldap://example:1");
-        std::env::set_var("LDAP_URL", "ldap://127.0.0.1:3890");
+        // Env::create is called once; ldap_url reflects the global Env, not a
+        // dynamic env var after init.
+        let url = super::ldap_url();
+        assert!(!url.is_empty(), "ldap_url should be non-empty");
+        assert!(
+            url.starts_with("ldap://"),
+            "ldap_url should be ldap://..., got {url}"
+        );
     }
 }

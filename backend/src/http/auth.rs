@@ -1,16 +1,22 @@
-use axum::{Extension, Json, Router, http::StatusCode, routing::get, routing::post};
+use axum::{
+    Extension, Json, Router,
+    extract::State,
+    http::StatusCode,
+    routing::{get, post},
+};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
 
-use crate::{auth::middleware::AuthUser, env, error::AppError};
+use crate::{auth::middleware::AuthUser, env::Env, error::AppError};
 
-pub fn auth_router() -> Router {
+pub fn auth_router(env: Env) -> Router<Env> {
     Router::new()
         .route("/config", get(config))
         .route("/callback", post(callback))
+        .with_state(env)
 }
 
-pub fn protected_auth_router() -> Router {
+pub fn protected_auth_router() -> Router<Env> {
     Router::new().route("/me", get(me))
 }
 
@@ -21,11 +27,11 @@ pub struct AuthConfig {
     redirect_uri: String,
 }
 
-pub async fn config() -> Json<AuthConfig> {
+pub async fn config(State(env): State<Env>) -> Json<AuthConfig> {
     Json(AuthConfig {
-        issuer: env::OIDC_ISSUER_URL.to_string(),
-        client_id: env::OIDC_CLIENT_ID.to_string(),
-        redirect_uri: env::OIDC_REDIRECT_URI.to_string(),
+        issuer: env.oidc_issuer_url.clone(),
+        client_id: env.oidc_client_id.clone(),
+        redirect_uri: env.oidc_redirect_uri.clone(),
     })
 }
 
@@ -45,6 +51,7 @@ pub struct TokenResponse {
 }
 
 pub async fn callback(
+    State(env): State<Env>,
     Json(payload): Json<CallbackRequest>,
 ) -> Result<Json<TokenResponse>, AppError> {
     tracing::info!(
@@ -52,12 +59,12 @@ pub async fn callback(
         payload.code.len(),
         payload.redirect_uri
     );
-    let issuer = env::OIDC_ISSUER_URL.to_string();
-    let client_id = env::OIDC_CLIENT_ID.to_string();
-    let client_secret = env::OIDC_CLIENT_SECRET.to_string();
+    let issuer = env.oidc_issuer_url.clone();
+    let client_id = env.oidc_client_id.clone();
+    let client_secret = env.oidc_client_secret.clone();
     let redirect_uri = payload
         .redirect_uri
-        .unwrap_or_else(|| env::OIDC_REDIRECT_URI.to_string());
+        .unwrap_or_else(|| env.oidc_redirect_uri.clone());
 
     let token_url = format!("{issuer}/api/oidc/token");
     let client = reqwest::Client::builder()

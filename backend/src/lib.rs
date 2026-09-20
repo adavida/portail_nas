@@ -18,10 +18,11 @@ mod tests {
     use tower::ServiceExt;
 
     async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCode> {
+        crate::env::Env::ensure_init();
         let claims = crate::auth::Claims {
             sub: "admin".into(),
-            aud: serde_json::json!(crate::env::OIDC_CLIENT_ID),
-            iss: crate::env::OIDC_ISSUER_URL.to_string(),
+            aud: serde_json::json!(crate::env::Env::global().oidc_client_id.clone()),
+            iss: crate::env::Env::global().oidc_issuer_url.clone(),
             exp: 9999999999,
             groups: vec!["admin".into()],
             email: Some("admin@example.com".into()),

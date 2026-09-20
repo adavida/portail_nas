@@ -13,8 +13,8 @@ struct MemberPayload {
     uid: Uid,
 }
 
-pub fn groups_router() -> Router {
-    Router::new()
+pub fn groups_router() -> Router<crate::env::Env> {
+    Router::<crate::env::Env>::new()
         .route("/", get(list_groups).post(create_group))
         .route("/{gid}", put(update_group).delete(delete_group))
         .route("/{gid}/members", axum::routing::post(post_member))

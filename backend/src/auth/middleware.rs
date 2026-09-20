@@ -1,11 +1,13 @@
-use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
+use axum::{
+    extract::{Request, State},
+    http::StatusCode,
+    middleware::Next,
+    response::Response,
+};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode_header};
 use serde::Deserialize;
 
-use crate::{
-    auth::Claims,
-    env::{OIDC_CLIENT_ID, OIDC_ISSUER_URL},
-};
+use crate::{auth::Claims, env::Env};
 
 #[derive(Deserialize)]
 struct Jwks {
@@ -21,15 +23,8 @@ struct Jwk {
     _alg: Option<String>,
 }
 
-fn issuer() -> String {
-    OIDC_ISSUER_URL.to_string()
-}
-fn client_id() -> String {
-    OIDC_CLIENT_ID.to_string()
-}
-
-async fn fetch_jwks() -> Result<Jwks, String> {
-    let iss = issuer();
+async fn fetch_jwks(env: &Env) -> Result<Jwks, String> {
+    let iss = &env.oidc_issuer_url;
     let url = format!("{iss}/jwks.json");
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
@@ -46,8 +41,8 @@ async fn fetch_jwks() -> Result<Jwks, String> {
     Ok(jwks)
 }
 
-async fn fetch_userinfo(token: &str) -> Result<Claims, String> {
-    let url = format!("{}/api/oidc/userinfo", issuer());
+async fn fetch_userinfo(env: &Env, token: &str) -> Result<Claims, String> {
+    let url = format!("{}/api/oidc/userinfo", env.oidc_issuer_url);
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .build()
@@ -86,8 +81,8 @@ async fn fetch_userinfo(token: &str) -> Result<Claims, String> {
         .map(|s| s.to_string());
     Ok(Claims {
         sub,
-        aud: serde_json::json!([client_id()]),
-        iss: issuer(),
+        aud: serde_json::json!([env.oidc_client_id.clone()]),
+        iss: env.oidc_issuer_url.clone(),
         exp: 9999999999,
         groups,
         email,
@@ -95,10 +90,10 @@ async fn fetch_userinfo(token: &str) -> Result<Claims, String> {
     })
 }
 
-pub async fn verify_token(token: &str) -> Result<Claims, String> {
+pub async fn verify_token(env: &Env, token: &str) -> Result<Claims, String> {
     // Try JWT first (id_token)
     if let Ok(header) = decode_header(token) {
-        if let Ok(jwks) = fetch_jwks().await {
+        if let Ok(jwks) = fetch_jwks(env).await {
             let kid = header.kid.clone();
             let jwk = if let Some(kid) = kid {
                 jwks.keys
@@ -110,15 +105,15 @@ pub async fn verify_token(token: &str) -> Result<Claims, String> {
             };
             if let Some(jwk) = jwk {
                 let mut validation = Validation::new(Algorithm::RS256);
-                validation.set_audience(&[client_id()]);
-                validation.set_issuer(&[issuer()]);
+                validation.set_audience(&[&env.oidc_client_id]);
+                validation.set_issuer(&[&env.oidc_issuer_url]);
                 if let Ok(key) = DecodingKey::from_rsa_components(&jwk.n, &jwk.e) {
                     if let Ok(data) = jsonwebtoken::decode::<Claims>(token, &key, &validation) {
                         // si le JWT contient déjà les groups, on l'utilise, sinon on enrichit via userinfo
                         if !data.claims.groups.is_empty() {
                             return Ok(data.claims);
                         }
-                        if let Ok(uinfo) = fetch_userinfo(token).await {
+                        if let Ok(uinfo) = fetch_userinfo(env, token).await {
                             if !uinfo.groups.is_empty() {
                                 return Ok(uinfo);
                             }
@@ -130,13 +125,17 @@ pub async fn verify_token(token: &str) -> Result<Claims, String> {
         }
     }
     // Fallback opaque access_token via userinfo
-    fetch_userinfo(token).await
+    fetch_userinfo(env, token).await
 }
 
 #[derive(Debug, Clone)]
 pub struct AuthUser(pub Claims);
 
-pub async fn require_auth(mut req: Request, next: Next) -> Result<Response, StatusCode> {
+pub async fn require_auth(
+    State(env): State<Env>,
+    mut req: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
     if req.extensions().get::<AuthUser>().is_some() {
         tracing::info!("auth bypass via injected AuthUser for {}", req.uri());
         return Ok(next.run(req).await);
@@ -152,7 +151,7 @@ pub async fn require_auth(mut req: Request, next: Next) -> Result<Response, Stat
         return Err(StatusCode::UNAUTHORIZED);
     }
     tracing::info!("verifying token for {} {}", req.method(), req.uri());
-    match verify_token(token).await {
+    match verify_token(&env, token).await {
         Ok(claims) => {
             tracing::info!(
                 "auth ok sub={} groups={:?} for {}",

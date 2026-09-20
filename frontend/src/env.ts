@@ -1,37 +1,55 @@
-function requireEnv(name: string, value: string | undefined): string {
-  if (!value)
-    throw new Error(
-      `${name} missing: set ${name} in devenv.nix env (VITE_${name})`,
-    );
-  return value;
+export interface Env {
+  appUrl: string;
+  backendUrl: string;
+  oidcIssuerUrl: string;
+  oidcRedirectUri: string;
 }
 
-export const APP_URL = requireEnv(
-  "APP_URL",
-  import.meta.env.VITE_APP_URL as string | undefined,
-);
-export const BACKEND_URL = requireEnv(
-  "BACKEND_URL",
-  import.meta.env.VITE_BACKEND_URL as string | undefined,
-);
-export const OIDC_ISSUER_URL = requireEnv(
-  "OIDC_ISSUER_URL",
-  import.meta.env.VITE_OIDC_ISSUER_URL as string | undefined,
-);
-export const OIDC_REDIRECT_URI = requireEnv(
-  "OIDC_REDIRECT_URI",
-  import.meta.env.VITE_OIDC_REDIRECT_URI as string | undefined,
-);
+export function createEnv(
+  get: (name: string) => string | undefined = (name) =>
+    import.meta.env[`VITE_${name}`] as string | undefined,
+): Env {
+  const missing: string[] = [];
+  const take = (name: string): string => {
+    const v = get(name);
+    if (!v || !v.trim()) {
+      missing.push(name);
+      return "";
+    }
+    return v;
+  };
+
+  const appUrl = take("APP_URL");
+  const backendUrl = take("BACKEND_URL");
+  const oidcIssuerUrl = take("OIDC_ISSUER_URL");
+  const oidcRedirectUri = take("OIDC_REDIRECT_URI");
+
+  if (missing.length) {
+    throw new Error(
+      `missing or empty env vars: ${missing.join(", ")} — set them in devenv.nix env (VITE_...)`,
+    );
+  }
+
+  return { appUrl, backendUrl, oidcIssuerUrl, oidcRedirectUri };
+}
+
+export const env: Env = createEnv();
+
+// Backward-compatible named exports — single source is `env`.
+export const APP_URL = env.appUrl;
+export const BACKEND_URL = env.backendUrl;
+export const OIDC_ISSUER_URL = env.oidcIssuerUrl;
+export const OIDC_REDIRECT_URI = env.oidcRedirectUri;
 
 export function appUrl(): string {
-  return APP_URL;
+  return env.appUrl;
 }
 export function backendUrl(): string {
-  return BACKEND_URL;
+  return env.backendUrl;
 }
 export function oidcIssuerUrl(): string {
-  return OIDC_ISSUER_URL;
+  return env.oidcIssuerUrl;
 }
 export function oidcRedirectUri(): string {
-  return OIDC_REDIRECT_URI;
+  return env.oidcRedirectUri;
 }
