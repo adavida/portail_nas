@@ -29,14 +29,14 @@ frontend/src/
 `vite.config.ts:12` `environment jsdom` + `globals true` + `@testing-library/react` + `test/setup.ts` — `vi.fn()` pour mock fetch. Pattern:
 
 ```tsx
-import { render, screen } from '@testing-library/react'
-import { HealthBadge } from './HealthBadge'
+import { render, screen } from "@testing-library/react";
+import { HealthBadge } from "./HealthBadge";
 
-test('renders health badge', () => {
-  render(<HealthBadge status="ok" />)
+test("renders health badge", () => {
+  render(<HealthBadge status="ok" />);
 
-  expect(screen.getByTestId('health')).toHaveTextContent('backend: ok')
-})
+  expect(screen.getByTestId("health")).toHaveTextContent("backend: ok");
+});
 ```
 
 ### Verification

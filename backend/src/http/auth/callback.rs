@@ -1,39 +1,8 @@
-use axum::{
-    Extension, Json, Router,
-    extract::State,
-    http::StatusCode,
-    routing::{get, post},
-};
+use axum::{Json, extract::State};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
 
-use crate::{auth::middleware::AuthUser, env::Env, error::AppError};
-
-pub fn auth_router(env: Env) -> Router<Env> {
-    Router::new()
-        .route("/config", get(config))
-        .route("/callback", post(callback))
-        .with_state(env)
-}
-
-pub fn protected_auth_router() -> Router<Env> {
-    Router::new().route("/me", get(me))
-}
-
-#[derive(Serialize)]
-pub struct AuthConfig {
-    issuer: String,
-    client_id: String,
-    redirect_uri: String,
-}
-
-pub async fn config(State(env): State<Env>) -> Json<AuthConfig> {
-    Json(AuthConfig {
-        issuer: env.oidc_issuer_url.clone(),
-        client_id: env.oidc_client_id.clone(),
-        redirect_uri: env.oidc_redirect_uri.clone(),
-    })
-}
+use crate::{env::Env, error::AppError};
 
 #[derive(Deserialize)]
 pub struct CallbackRequest {
@@ -101,17 +70,4 @@ pub async fn callback(
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(token))
-}
-
-pub async fn me(Extension(AuthUser(claims)): Extension<AuthUser>) -> Json<serde_json::Value> {
-    Json(serde_json::json!({
-        "sub": claims.sub,
-        "groups": claims.groups,
-        "email": claims.email,
-        "preferred_username": claims.preferred_username,
-    }))
-}
-
-pub async fn _health_auth() -> StatusCode {
-    StatusCode::OK
 }
