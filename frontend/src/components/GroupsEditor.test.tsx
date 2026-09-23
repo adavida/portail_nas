@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { GroupsEditor } from "./GroupsEditor";
 
@@ -159,7 +159,7 @@ test("save passes draft and cancel signals parent", async () => {
   fireEvent.click(screen.getByTestId("groups-remove-alice-devs"));
   fireEvent.click(screen.getByTestId("groups-save-alice"));
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(onSave).toHaveBeenCalledWith([]);
   });
   expect(onCancel).not.toHaveBeenCalled();
@@ -170,7 +170,7 @@ test("save passes draft and cancel signals parent", async () => {
   fireEvent.click(screen.getByTestId("groups-suggest-alice-devs"));
   fireEvent.click(screen.getByTestId("groups-save-alice"));
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(onSave).toHaveBeenCalledWith(["devs"]);
     expect(onCancel).toHaveBeenCalled();
   });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { GroupsTable } from "./GroupsTable";
 import { Toaster } from "./Toaster";
@@ -35,14 +35,14 @@ test("delete calls api and refreshes", async () => {
 
   fireEvent.click(screen.getByTestId("group-delete-button-devs"));
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/groups/devs",
       expect.objectContaining({ method: "DELETE" }),
     );
   });
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(onDeleted).toHaveBeenCalled();
   });
 });
@@ -101,7 +101,7 @@ test("edit name sends PUT with name and current description", async () => {
     key: "Enter",
   });
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/groups/devs",
       expect.objectContaining({
@@ -132,7 +132,7 @@ test("edit description sends PUT with description and current name", async () =>
     key: "Enter",
   });
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/groups/devs",
       expect.objectContaining({

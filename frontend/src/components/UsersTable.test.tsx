@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { UsersTable } from "./UsersTable";
 import { Toaster } from "./Toaster";
@@ -55,14 +55,14 @@ test("delete user calls api and refreshes", async () => {
 
   fireEvent.click(screen.getByTestId("delete-button-alice"));
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/users/alice",
       expect.objectContaining({ method: "DELETE" }),
     );
   });
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(onDeleted).toHaveBeenCalled();
   });
 });
@@ -109,7 +109,7 @@ test("double-click name opens editor then saves", async () => {
   fireEvent.change(input, { target: { value: "Alice Dupont" } });
   fireEvent.keyDown(input, { key: "Enter" });
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/users/alice",
       expect.objectContaining({
@@ -119,7 +119,7 @@ test("double-click name opens editor then saves", async () => {
     );
   });
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(onUpdated).toHaveBeenCalled();
   });
 });
@@ -203,7 +203,7 @@ test("groups cell edit proposes groups and diffs membership", async () => {
   fireEvent.click(screen.getByTestId("groups-remove-alice-devs"));
   fireEvent.click(screen.getByTestId("groups-save-alice"));
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/groups/ops/members",
       expect.objectContaining({
@@ -218,7 +218,7 @@ test("groups cell edit proposes groups and diffs membership", async () => {
     );
   });
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(onUpdated).toHaveBeenCalled();
   });
 });
@@ -274,7 +274,7 @@ test("create group from groups cell with user as member", async () => {
     key: "Enter",
   });
 
-  await vi.waitFor(() => {
+  await waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/groups",
       expect.objectContaining({
