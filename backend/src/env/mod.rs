@@ -15,6 +15,7 @@ pub struct Env {
     pub ldap_base_dn: String,
     pub ldap_people_ou: String,
     pub ldap_groups_ou: String,
+    pub ldap_admin_pw: String,
 }
 
 static ENV: OnceLock<Env> = OnceLock::new();
@@ -55,6 +56,7 @@ impl Env {
         let ldap_base_dn = take("LDAP_BASE_DN", &mut missing);
         let ldap_people_ou = take_opt("LDAP_PEOPLE_OU", "people");
         let ldap_groups_ou = take_opt("LDAP_GROUPS_OU", "groups");
+        let ldap_admin_pw = take_opt("LDAP_ADMIN_PW", "admin");
 
         if !missing.is_empty() {
             return Err(EnvError(format!(
@@ -74,6 +76,7 @@ impl Env {
             ldap_base_dn,
             ldap_people_ou,
             ldap_groups_ou,
+            ldap_admin_pw,
         })
     }
 
@@ -134,6 +137,7 @@ impl Env {
             ldap_groups_ou: option_env!("LDAP_GROUPS_OU")
                 .unwrap_or("groups")
                 .to_string(),
+            ldap_admin_pw: option_env!("LDAP_ADMIN_PW").unwrap_or("admin").to_string(),
         }
     }
 }
@@ -215,16 +219,17 @@ mod tests {
         let saved = (
             std::env::var("LDAP_PEOPLE_OU").ok(),
             std::env::var("LDAP_GROUPS_OU").ok(),
-            std::env::var("APP_URL").ok(),
+            std::env::var("LDAP_ADMIN_PW").ok(),
         );
         unsafe { std::env::remove_var("LDAP_PEOPLE_OU") };
         unsafe { std::env::remove_var("LDAP_GROUPS_OU") };
-        unsafe { std::env::remove_var("APP_URL") };
+        unsafe { std::env::remove_var("LDAP_ADMIN_PW") };
 
         let env = super::Env::create().unwrap();
 
         assert_eq!(env.ldap_people_ou, "people", "default people OU expected");
         assert_eq!(env.ldap_groups_ou, "groups", "default groups OU expected");
+        assert_eq!(env.ldap_admin_pw, "admin", "default admin pw expected");
 
         if let Some(v) = saved.0 {
             unsafe { std::env::set_var("LDAP_PEOPLE_OU", v) };
@@ -233,7 +238,7 @@ mod tests {
             unsafe { std::env::set_var("LDAP_GROUPS_OU", v) };
         }
         if let Some(v) = saved.2 {
-            unsafe { std::env::set_var("APP_URL", v) };
+            unsafe { std::env::set_var("LDAP_ADMIN_PW", v) };
         }
     }
 
@@ -243,11 +248,9 @@ mod tests {
         let saved = (
             std::env::var("LDAP_PEOPLE_OU").ok(),
             std::env::var("LDAP_GROUPS_OU").ok(),
-            std::env::var("APP_URL").ok(),
         );
         unsafe { std::env::set_var("LDAP_PEOPLE_OU", "humains") };
         unsafe { std::env::set_var("LDAP_GROUPS_OU", "") };
-        unsafe { std::env::remove_var("APP_URL") };
 
         let env = super::Env::create().unwrap();
 
@@ -263,9 +266,6 @@ mod tests {
             unsafe { std::env::set_var("LDAP_GROUPS_OU", v) };
         } else {
             unsafe { std::env::remove_var("LDAP_GROUPS_OU") };
-        }
-        if let Some(v) = saved.2 {
-            unsafe { std::env::set_var("APP_URL", v) };
         }
     }
 }

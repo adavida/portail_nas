@@ -7,7 +7,6 @@ use crate::error::AppError;
 
 use super::{
     MapLdap, connect_admin, group_dn_from, groups_search_base, ldap_base, ldap_url, user_dn,
-    user_dn_from,
 };
 
 pub async fn list_groups() -> Result<Vec<Group>, AppError> {

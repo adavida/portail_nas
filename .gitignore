@@ -20,3 +20,7 @@ frontend/dist/
 
 # Env
 .env
+
+# Flake vm
+result
+nixos.qcow2

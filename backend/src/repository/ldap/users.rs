@@ -152,6 +152,10 @@ mod tests {
     use crate::domain::users::{Email, Name};
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    // user_dn_from is for tests only — the general import would create an
+    // unused_imports warning in non-test builds.
+    use crate::repository::ldap::user_dn_from;
+
     fn gen_uid(prefix: &str) -> String {
         let n = SystemTime::now()
             .duration_since(UNIX_EPOCH)

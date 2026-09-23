@@ -106,9 +106,9 @@ export async function handleCallback(code: string): Promise<void> {
 
 export async function logout() {
   const { OIDC_ISSUER_URL, APP_URL } = await import("../env");
-  // A: rester sur portail. On vide le storage immédiatement (feedback instantané)
-  // puis on détruit la session Authelia en silencieux via iframe POST
-  // (GET /api/logout = 405, fetch bloqué CORS).
+  // A: stay on the portal. Clear the storage immediately (instant feedback)
+  // then silently destroy the Authelia session via iframe POST
+  // (GET /api/logout = 405, fetch blocked by CORS).
   clearTokens();
   sessionStorage.setItem("logged_out", "1");
   try {

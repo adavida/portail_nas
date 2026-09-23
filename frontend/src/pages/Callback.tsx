@@ -21,11 +21,11 @@ export default function Callback() {
       setError(err ? `${err}: ${desc ?? ""}` : "code missing");
       return;
     }
-    // StrictMode double-mount guard + code déjà échangé
+    // StrictMode double-mount guard + code already exchanged
     const key = `handled_${code}`;
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
-    // si on a déjà un token, ne pas rééchanger
+    // if we already have a token, don't exchange again
     if (localStorage.getItem("access_token")) {
       sessionStorage.removeItem("login_in_progress");
       navigate("/", { replace: true });

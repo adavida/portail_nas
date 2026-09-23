@@ -18,7 +18,7 @@ struct Jwk {
     n: String,
     e: String,
     kid: Option<String>,
-    // alg renvoyé par Authelia JWKS (RS256), non vérifié — Validation fixe RS256
+    // alg returned by Authelia JWKS (RS256), unverified — Validation fixed to RS256
     #[serde(default, rename = "alg")]
     _alg: Option<String>,
 }
@@ -109,7 +109,7 @@ pub async fn verify_token(env: &Env, token: &str) -> Result<Claims, String> {
                 validation.set_issuer(&[&env.oidc_issuer_url]);
                 if let Ok(key) = DecodingKey::from_rsa_components(&jwk.n, &jwk.e) {
                     if let Ok(data) = jsonwebtoken::decode::<Claims>(token, &key, &validation) {
-                        // si le JWT contient déjà les groups, on l'utilise, sinon on enrichit via userinfo
+                        // if the JWT already contains groups, use it as-is, otherwise enrich via userinfo
                         if !data.claims.groups.is_empty() {
                             return Ok(data.claims);
                         }

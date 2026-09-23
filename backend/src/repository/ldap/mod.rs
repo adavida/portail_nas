@@ -28,8 +28,9 @@ pub(crate) async fn connect_admin(base: &str) -> Result<ldap3::Ldap, AppError> {
 
 pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap, base: &str) -> Result<(), AppError> {
     let bind_dn = format!("cn=admin,{base}");
+    let pw = crate::env::Env::global().ldap_admin_pw.clone();
 
-    ldap.simple_bind(&bind_dn, "admin")
+    ldap.simple_bind(&bind_dn, &pw)
         .await
         .map_ldap()?
         .success()
@@ -60,19 +61,11 @@ pub(crate) fn group_dn_from(gid: &str, base: &str) -> String {
 }
 
 pub(crate) fn people_search_base(base: &str) -> String {
-    format!(
-        "ou={},{}",
-        crate::env::Env::global().ldap_people_ou,
-        base
-    )
+    format!("ou={},{}", crate::env::Env::global().ldap_people_ou, base)
 }
 
 pub(crate) fn groups_search_base(base: &str) -> String {
-    format!(
-        "ou={},{}",
-        crate::env::Env::global().ldap_groups_ou,
-        base
-    )
+    format!("ou={},{}", crate::env::Env::global().ldap_groups_ou, base)
 }
 
 pub(crate) trait MapLdap<T> {

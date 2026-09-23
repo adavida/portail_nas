@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components -- toast() et Toaster() couplés par design */
+/* eslint-disable react-refresh/only-export-components -- toast() and Toaster() coupled by design */
 import { useEffect, useState } from "react";
 
 export type Toast = { id: number; message: string; isError: boolean };
