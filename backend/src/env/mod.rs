@@ -140,6 +140,25 @@ impl Env {
         })
     }
 
+    /// Logs every value at startup for production debugging. The secret vars
+    /// hold file paths (never the secret itself), so the full readout is safe.
+    pub fn log_summary(&self) {
+        tracing::info!(
+            oidc_issuer_url = %self.oidc_issuer_url,
+            oidc_client_id = %self.oidc_client_id,
+            oidc_client_secret = %self.oidc_client_secret,
+            oidc_redirect_uri = %self.oidc_redirect_uri,
+            app_url = %self.app_url,
+            bind_addr = %self.bind_addr,
+            ldap_url = %self.ldap_url,
+            ldap_base_dn = %self.ldap_base_dn,
+            ldap_people_ou = %self.ldap_people_ou,
+            ldap_groups_ou = %self.ldap_groups_ou,
+            ldap_admin_pw = %self.ldap_admin_pw,
+            "backend env loaded"
+        );
+    }
+
     /// Stores the Env created once in `main`; second call is ignored.
     pub fn set(env: Env) -> &'static Env {
         let _ = ENV.set(env);

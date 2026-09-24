@@ -10,6 +10,7 @@ async fn main() {
         .init();
     // Validate env once at startup — aggregated error if any var missing/empty.
     let env = Env::create().unwrap_or_else(|e| panic!("{e}"));
+    env.log_summary();
     let bind = env.bind_addr.clone();
     Env::set(env);
     let app = app();

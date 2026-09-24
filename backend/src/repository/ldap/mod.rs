@@ -30,6 +30,7 @@ pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap, base: &str) -> Result<(),
     let bind_dn = format!("cn=admin,{base}");
     let pw = crate::env::Env::global().ldap_admin_pw.clone();
 
+    tracing::info!(bind_dn = %bind_dn, url = %ldap_url(), "ldap admin bind");
     ldap.simple_bind(&bind_dn, &pw)
         .await
         .map_ldap()?
