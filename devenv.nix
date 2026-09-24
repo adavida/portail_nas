@@ -90,6 +90,7 @@ let
           - client_id: portail-dev
             client_name: Portail Dev
             client_secret: "\$pbkdf2-sha512\$310000\$YudH3UkHfJ.RW5a8z2zTqw\$.cKmbS5jKBVNHGZo3g1B9AHBPfzKufixtQ4MFP57FN7n07FU5srD35VtG6u0lJEjg9XAoXiyJuyclai33XDjOw"
+            pkce_challenge_method: S256
             public: false
             authorization_policy: one_factor
             consent_mode: implicit #need ?

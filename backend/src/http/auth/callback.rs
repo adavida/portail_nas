@@ -8,6 +8,9 @@ use crate::{env::Env, error::AppError};
 pub struct CallbackRequest {
     pub code: String,
     pub redirect_uri: Option<String>,
+    // PKCE verifier generated at `login()` (frontend) — required by Authelia
+    // for the authorization_code flow.
+    pub code_verifier: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,11 +45,14 @@ pub async fn callback(
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let credentials = STANDARD.encode(format!("{client_id}:{client_secret}"));
-    let params = [
+    let mut params = vec![
         ("grant_type", "authorization_code"),
         ("code", payload.code.as_str()),
         ("redirect_uri", redirect_uri.as_str()),
     ];
+    if let Some(v) = &payload.code_verifier {
+        params.push(("code_verifier", v.as_str()));
+    }
 
     let resp = client
         .post(&token_url)

@@ -36,6 +36,7 @@ export default function Callback() {
         sessionStorage.removeItem("login_in_progress");
         sessionStorage.removeItem("logged_out");
         sessionStorage.removeItem("oidc_state");
+        sessionStorage.removeItem("oidc_verifier");
         navigate("/", { replace: true });
       })
       .catch((e) => {

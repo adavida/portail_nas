@@ -72,6 +72,26 @@ export async function fetchAuthConfig(): Promise<{
   return r.json();
 }
 
+function b64url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+// PKCE S256: Authelia exige un code_challenge pour l'authorization_code flow.
+// Sauve le verifier en sessionStorage — `login()` le crée, `handleCallback()`
+// l'envoie au backend qui le passe à l'endpoint token.
+async function savePkce(): Promise<string> {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(verifier),
+  );
+  sessionStorage.setItem("oidc_verifier", verifier);
+  return b64url(new Uint8Array(digest));
+}
+
 export async function login() {
   const cfg = await fetchAuthConfig();
   const state =
@@ -80,21 +100,29 @@ export async function login() {
   // Authelia exige state >= 8 chars
   const safeState = state.replace(/-/g, "").slice(0, 32).padEnd(16, "0");
   sessionStorage.setItem("oidc_state", safeState);
+  const challenge = await savePkce();
   const url = new URL(`${cfg.issuer}/api/oidc/authorization`);
   url.searchParams.set("client_id", cfg.client_id);
   url.searchParams.set("redirect_uri", cfg.redirect_uri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", "openid groups email profile");
   url.searchParams.set("state", safeState);
+  url.searchParams.set("code_challenge", challenge);
+  url.searchParams.set("code_challenge_method", "S256");
   window.location.href = url.toString();
 }
 
 export async function handleCallback(code: string): Promise<void> {
   const cfg = await fetchAuthConfig();
+  const verifier = sessionStorage.getItem("oidc_verifier");
   const r = await fetch("/api/auth/callback", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, redirect_uri: cfg.redirect_uri }),
+    body: JSON.stringify({
+      code,
+      redirect_uri: cfg.redirect_uri,
+      ...(verifier ? { code_verifier: verifier } : {}),
+    }),
   });
   if (!r.ok) {
     const txt = await r.text();
