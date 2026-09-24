@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 
@@ -69,6 +70,36 @@ in
       };
     };
 
+    vhost = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Create an nginx virtualhost serving the frontend build and proxying `/api` to the backend.";
+      };
+
+      hostName = lib.mkOption {
+        type = lib.types.str;
+        description = "nginx server_name (and TLS certificate CN).";
+        example = "portail.nas.local";
+      };
+
+      forceSSL = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Redirect HTTP to HTTPS and serve TLS (does not impact ACME conflicts).";
+      };
+
+      sslCertificate = lib.mkOption {
+        type = lib.types.path;
+        description = "TLS full-chain certificate file (required when `forceSSL = true`).";
+      };
+
+      sslCertificateKey = lib.mkOption {
+        type = lib.types.path;
+        description = "TLS private key file (required when `forceSSL = true`).";
+      };
+    };
+
     extraBackendEnvironment = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = { };
@@ -76,31 +107,55 @@ in
     };
   };
   config = lib.mkIf cfg.enable {
-    systemd.services.portail-backend = {
-      description = "Portail backend (Rust axum)";
-      wantedBy = [ "multi-user.target" ];
-      after = [ "network.target" ];
-      # Secret vars hold the path of a file whose content is the secret — the
-      # backend reads and trims the file at startup. The service user must have
-      # read access (e.g. agenix/sops-nix `owner`/`group` on the secret files).
-      environment = {
-        APP_URL = cfg.appUrl;
-        BIND_ADDR = cfg.bindAddress;
-        LDAP_URL = cfg.ldap.url;
-        LDAP_BASE_DN = cfg.ldap.baseDn;
-        LDAP_ADMIN_PW = toString cfg.ldap.adminPasswordFile;
-        OIDC_CLIENT_ID = cfg.oidcClientId;
-        OIDC_ISSUER_URL = cfg.issuerUrl;
-        OIDC_CLIENT_SECRET = toString cfg.oidc.clientSecretFile;
-        OIDC_REDIRECT_URI = "${cfg.appUrl}/callback";
+    systemd.services.portail-backend = lib.mkMerge [
+      {
+        description = "Portail backend (Rust axum)";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "network.target" ];
+        # Secret vars hold the path of a file whose content is the secret — the
+        # backend reads and trims the file at startup. The service user must have
+        # read access (e.g. agenix/sops-nix `owner`/`group` on the secret files).
+        environment = {
+          APP_URL = cfg.appUrl;
+          BIND_ADDR = cfg.bindAddress;
+          LDAP_URL = cfg.ldap.url;
+          LDAP_BASE_DN = cfg.ldap.baseDn;
+          LDAP_ADMIN_PW = toString cfg.ldap.adminPasswordFile;
+          OIDC_CLIENT_ID = cfg.oidcClientId;
+          OIDC_ISSUER_URL = cfg.issuerUrl;
+          OIDC_CLIENT_SECRET = toString cfg.oidc.clientSecretFile;
+          OIDC_REDIRECT_URI = "${cfg.appUrl}/callback";
+        }
+        // cfg.extraBackendEnvironment;
+        serviceConfig = {
+          ExecStart = "${cfg.package}/bin/portail-backend";
+          DynamicUser = true;
+          Restart = "on-failure";
+          RestartSec = "60s";
+        };
       }
-      // cfg.extraBackendEnvironment;
-      serviceConfig = {
-        ExecStart = "${cfg.package}/bin/portail-backend";
-        DynamicUser = true;
-        Restart = "on-failure";
-        RestartSec = "60s";
-      };
+    ];
+
+    services.nginx = lib.mkIf cfg.vhost.enable {
+      enable = true;
+      recommendedProxySettings = true;
+      virtualHosts.${cfg.vhost.hostName} = lib.mkMerge [
+        {
+          root = (pkgs.callPackage ../nix/frontend.nix { }) {
+            appUrl = cfg.appUrl;
+            oidcIssuerUrl = cfg.issuerUrl;
+            oidcRedirectUri = "${cfg.appUrl}/callback";
+          };
+          locations."/".index = "index.html";
+          locations."/".tryFiles = "$uri /index.html";
+          locations."/api".proxyPass = "http://${cfg.bindAddress}";
+        }
+        (lib.mkIf cfg.vhost.forceSSL {
+          forceSSL = true;
+          sslCertificate = cfg.vhost.sslCertificate;
+          sslCertificateKey = cfg.vhost.sslCertificateKey;
+        })
+      ];
     };
   };
 }

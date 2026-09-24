@@ -9,38 +9,14 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
     in
-    {
-      # Frontend with OIDC URLs baked at build time (import.meta.env) — overridden
-      # by the NixOS module via overrideAttrs.
-      lib.mkFrontend =
-        {
-          appUrl ? "http://localhost:5173",
-          oidcIssuerUrl ? "https://127.0.0.1:9091",
-          oidcRedirectUri ? "http://localhost:5173/callback",
-        }:
-        pkgs.buildNpmPackage {
-          pname = "portail-frontend";
-          version = "0.1.0";
-          src = ./frontend;
-          npmDepsHash = "sha256-m7ZXnXFBVNeVI4jlhAjr5hRznOoHdMMTT5xugrkDZVI=";
-          VITE_APP_URL = appUrl;
-          VITE_BACKEND_URL = appUrl;
-          VITE_OIDC_ISSUER_URL = oidcIssuerUrl;
-          VITE_OIDC_REDIRECT_URI = oidcRedirectUri;
-        };
+    rec {
+      # Frontend with OIDC URLs baked at build time — overridden by the NixOS
+      # module via overrideAttrs.
+      mkFrontend = pkgs.callPackage ./nix/frontend.nix { };
 
       packages.${system} = {
-        portail-backend = pkgs.rustPlatform.buildRustPackage {
-          pname = "portail-backend";
-          version = "0.1.0";
-          src = ./.;
-          cargoLock.lockFile = ./Cargo.lock;
-          # Integration tests = test LDAP (3891) — outside the nix sandbox.
-          doCheck = false;
-        };
-
-        portail-frontend = self.lib.mkFrontend { };
-
+        portail-backend = pkgs.callPackage ./nix/backend.nix { };
+        portail-frontend = mkFrontend { };
         default = self.packages.${system}.portail-backend;
       };
 

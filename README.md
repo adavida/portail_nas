@@ -5,7 +5,7 @@
 Stack : Rust Axum (`backend`) + React Vite (`frontend`) + OpenLDAP + Authelia (OIDC).
 
 - **Dev** : piloté par devenv (`devenv.nix`) — backend 3000, frontend 5173, LDAP 3890/3891, Authelia 9091.
-- **Prod / déploiement** : piloté par le flake (`flake.nix`) — packages buildables + module NixOS `services.portail` qui exécute uniquement le backend (service systemd + secrets). OpenLDAP, Authelia et les vhosts nginx sont provisionnés par la config hôte — examples ci-dessous.
+- **Prod / déploiement** : piloté par le flake (`flake.nix`) — packages buildables + module NixOS `services.portail` qui exécute le backend (service systemd + secrets) et le vhost nginx du frontend. OpenLDAP et Authelia sont provisionnés par la config hôte — examples ci-dessous.
 
 Toutes les commandes de dev passent par `devenv shell -- <cmd>` (cargo/node fournis par devenv).
 
@@ -16,10 +16,11 @@ Le flake expose :
 - `packages.portail-backend` — binaire Rust (buildRustPackage, `Cargo.lock` du workspace).
 - `packages.portail-frontend` — build statique Vite (`buildNpmPackage`), URLs OIDC cuites à la volée.
 - `lib.mkFrontend { appUrl; oidcIssuerUrl; oidcRedirectUri; }` — frontend reconstruit avec les URLs de prod (à passer au `root` du vhost).
-- `nixosModules.default` — module `services.portail`, limité au backend :
+- `nixosModules.default` — module `services.portail` :
   - `portail-backend.service` (DynamicUser, `OIDC_CLIENT_SECRET`/`LDAP_ADMIN_PW` = chemins des fichiers de secrets, lus au démarrage par le backend).
+  - vhost nginx optionnel (`vhost.enable`, défaut `true`) : frontend en `root`, `/api` proxy vers le backend, `forceSSL` (défaut `true`) avec certificat fourni (`vhost.sslCertificate{,Key}`).
 
-Le reste (nginx, OpenLDAP, Authelia) se configure dans la config hôte.
+OpenLDAP, Authelia (et leur vhost) se configurent dans la config hôte.
 
 ### Utilisation sur une machine NixOS
 
@@ -39,35 +40,25 @@ Dans la config hôte — module backend + examples de provisionnement :
 
   imports = [ inputs.portail.nixosModules.default ];
 
-  # --- backend (module) ---
+  # --- module backend + vhost portail ---
   services.portail = {
     enable = true;
     package = inputs.portail.packages.x86_64-linux.portail-backend;
     appUrl = "http://portail.example.com";                       # baked dans le front, APP_URL backend
     issuerUrl = "http://auth.portail.example.com";               # OIDC_ISSUER_URL
+    vhost.hostName = "portail.example.com";
+    vhost.forceSSL = true;                                       # défaut true — HTTPS + redirection 80
+    vhost.sslCertificate = "/etc/portail/ssl/fullchain.pem";        # requis si forceSSL
+    vhost.sslCertificateKey = "/etc/portail/ssl/key.pem";
     ldap.baseDn = "dc=example,dc=com";
     ldap.adminPasswordFile = "/etc/portail/ldap-admin-pw";       # sans newline finale
     oidc.clientSecretFile = "/etc/portail/oidc-client-secret";   # sans newline finale
   };
 
-  # --- example de vhost (frontend + proxy /api + Authelia) ---
-  services.nginx = {
-    enable = true;
-    virtualHosts = {
-      "portail.example.com" = {
-        root = inputs.portail.lib.mkFrontend {
-          appUrl = "http://portail.example.com";
-          oidcIssuerUrl = "http://auth.portail.example.com";
-          oidcRedirectUri = "http://portail.example.com/callback";
-        };
-        locations."/".tryFiles = "$uri /index.html";
-        locations."/api".proxyPass = "http://127.0.0.1:3000";
-      };
-      "auth.portail.example.com" = {
-        locations."/".proxyPass = "http://127.0.0.1:9091";
-        locations."/".proxyWebsockets = true;
-      };
-    };
+  # --- vhost Authelia (provisionné hors module) ---
+  services.nginx.virtualHosts."auth.portail.example.com" = {
+    locations."/".proxyPass = "http://127.0.0.1:9091";
+    locations."/".proxyWebsockets = true;
   };
 }
 ```
@@ -133,23 +124,25 @@ openssl rand -hex 32 | tr -d '\n' | sudo tee /etc/portail/authelia/oidc-hmac-sec
 openssl genrsa 2048 2>/dev/null | sudo tee /etc/portail/authelia/jwks-key.pem
 ```
 
-Puis `nixos-rebuild switch`. Le portail est sur `http://portail.example.com`, Authelia sur `http://auth.portail.example.com`.
-
-Pour HTTPS : configurer TLS/ACME sur les vhosts (`services.nginx.virtualHosts."portail.example.com".enableACME = true;` …) et repasser les URLs en `https://` via `appUrl`/`issuerUrl`.
+Puis `nixos-rebuild switch`. Le portail est sur `http://portail.example.com`, Authelia sur `http://auth.portail.example.com` (les vhost nginx `forceSSL = false` servent en HTTP ; passez les URLs en `https://` via `appUrl`/`issuerUrl`).
 
 ### Options principales (`services.portail`)
 
-| Option                    | Défaut              | Rôle                                                      |
-| ------------------------- | ------------------- | --------------------------------------------------------- |
-| `appUrl`                  | (requis)            | URL publique du portail (APP_URL backend + redirect OIDC) |
-| `issuerUrl`               | (requis)            | URL publique Authelia (OIDC_ISSUER_URL)                   |
-| `bindAddress`             | `127.0.0.1:3000`    | BIND_ADDR du backend                                      |
-| `oidcClientId`            | `portail`           | client_id OIDC                                            |
-| `ldap.url`                | `ldap://127.0.0.1`  | URL du serveur LDAP existant (LDAP_URL)                   |
-| `ldap.baseDn`             | `dc=example,dc=com` | suffixe LDAP                                              |
-| `ldap.adminPasswordFile`  | (requis)            | mot de passe `cn=admin,<baseDn>` (backend + Authelia)     |
-| `oidc.clientSecretFile`   | (requis)            | client_secret partagé backend/Authelia                    |
-| `extraBackendEnvironment` | `{}`                | env backend additionnelle (non secrète)                   |
+| Option                       | Défaut              | Rôle                                                      |
+| ---------------------------- | ------------------- | --------------------------------------------------------- |
+| `appUrl`                     | (requis)            | URL publique du portail (APP_URL backend + redirect OIDC) |
+| `issuerUrl`                  | (requis)            | URL publique Authelia (OIDC_ISSUER_URL)                   |
+| `bindAddress`                | `127.0.0.1:3000`    | BIND_ADDR du backend                                      |
+| `oidcClientId`               | `portail`           | client_id OIDC                                            |
+| `ldap.url`                   | `ldap://127.0.0.1`  | URL du serveur LDAP existant (LDAP_URL)                   |
+| `ldap.baseDn`                | `dc=example,dc=com` | suffixe LDAP                                              |
+| `ldap.adminPasswordFile`     | (requis)            | mot de passe `cn=admin,<baseDn>` (backend + Authelia)     |
+| `oidc.clientSecretFile`      | (requis)            | client_secret partagé backend/Authelia                    |
+| `vhost.enable`               | `true`              | vhost nginx backend (frontend + proxy `/api`)             |
+| `vhost.hostName`             | (si vhost)          | server_name nginx + CN du certificat                      |
+| `vhost.forceSSL`             | `true`              | HTTPS + redirection 80→443                                |
+| `vhost.sslCertificate{,Key}` | (si forceSSL)       | certificat/clé TLS fournis par l'hôte (agenix/sops)       |
+| `extraBackendEnvironment`    | `{}`                | env backend additionnelle (non secrète)                   |
 
 Secrets sur prod : fichiers agenix/sops-nix — rien de secret en clair dans la config Nix.
 
@@ -199,7 +192,7 @@ frontend/{vite.config.ts,package.json,src/}
 Stack: Rust Axum (`backend`) + React Vite (`frontend`) + OpenLDAP + Authelia (OIDC).
 
 - **Dev**: driven by devenv (`devenv.nix`) — backend 3000, frontend 5173, LDAP 3890/3891, Authelia 9091.
-- **Prod / deployment**: driven by the flake (`flake.nix`) — buildable packages + the NixOS module `services.portail` which only runs the backend (systemd service + secrets). OpenLDAP, Authelia and the nginx vhosts are provisioned by the host config — examples below.
+- **Prod / deployment**: driven by the flake (`flake.nix`) — buildable packages + the NixOS module `services.portail` which runs the backend (systemd service + secrets) and the frontend nginx vhost. OpenLDAP and Authelia are provisioned by the host config — examples below.
 
 All dev commands go through `devenv shell -- <cmd>` (cargo/node provided by devenv).
 
@@ -210,10 +203,11 @@ The flake exposes:
 - `packages.portail-backend` — Rust binary (buildRustPackage, workspace `Cargo.lock`).
 - `packages.portail-frontend` — static Vite build (`buildNpmPackage`), OIDC URLs baked at build time.
 - `lib.mkFrontend { appUrl; oidcIssuerUrl; oidcRedirectUri; }` — frontend rebuilt with the prod URLs (pass it to the vhost `root`).
-- `nixosModules.default` — the `services.portail` module, backend only:
+- `nixosModules.default` — the `services.portail` module:
   - `portail-backend.service` (DynamicUser, `OIDC_CLIENT_SECRET`/`LDAP_ADMIN_PW` set to secret file paths, read at startup by the backend).
+  - optional nginx vhost (`vhost.enable`, default `true`): frontend as `root`, `/api` proxies to the backend, `forceSSL` (default `true`) with a host-provided certificate (`vhost.sslCertificate{,Key}`).
 
-The rest (nginx, OpenLDAP, Authelia) is configured in the host config.
+OpenLDAP and Authelia (and their vhost) are configured in the host config.
 
 #### Using it on a NixOS machine
 
@@ -233,35 +227,25 @@ In the host config — backend module + provisioning examples:
 
   imports = [ inputs.portail.nixosModules.default ];
 
-  # --- backend (module) ---
+  # --- backend module + portail vhost ---
   services.portail = {
     enable = true;
     package = inputs.portail.packages.x86_64-linux.portail-backend;
     appUrl = "http://portail.example.com";                       # baked into the frontend, backend APP_URL
     issuerUrl = "http://auth.portail.example.com";               # OIDC_ISSUER_URL
+    vhost.hostName = "portail.example.com";
+    vhost.forceSSL = true;                                       # default true — HTTPS + port 80 redirect
+    vhost.sslCertificate = "/etc/portail/ssl/fullchain.pem";     # required with forceSSL
+    vhost.sslCertificateKey = "/etc/portail/ssl/key.pem";
     ldap.baseDn = "dc=example,dc=com";
     ldap.adminPasswordFile = "/etc/portail/ldap-admin-pw";       # no trailing newline
     oidc.clientSecretFile = "/etc/portail/oidc-client-secret";   # no trailing newline
   };
 
-  # --- vhost example (frontend + /api proxy + Authelia) ---
-  services.nginx = {
-    enable = true;
-    virtualHosts = {
-      "portail.example.com" = {
-        root = inputs.portail.lib.mkFrontend {
-          appUrl = "http://portail.example.com";
-          oidcIssuerUrl = "http://auth.portail.example.com";
-          oidcRedirectUri = "http://portail.example.com/callback";
-        };
-        locations."/".tryFiles = "$uri /index.html";
-        locations."/api".proxyPass = "http://127.0.0.1:3000";
-      };
-      "auth.portail.example.com" = {
-        locations."/".proxyPass = "http://127.0.0.1:9091";
-        locations."/".proxyWebsockets = true;
-      };
-    };
+  # --- Authelia vhost (provisioned outside the module) ---
+  services.nginx.virtualHosts."auth.portail.example.com" = {
+    locations."/".proxyPass = "http://127.0.0.1:9091";
+    locations."/".proxyWebsockets = true;
   };
 }
 ```
@@ -327,23 +311,25 @@ openssl rand -hex 32 | tr -d '\n' | sudo tee /etc/portail/authelia/oidc-hmac-sec
 openssl genrsa 2048 2>/dev/null | sudo tee /etc/portail/authelia/jwks-key.pem
 ```
 
-Then `nixos-rebuild switch`. The portal is at `http://portail.example.com`, Authelia at `http://auth.portail.example.com`.
-
-For HTTPS: configure TLS/ACME on the vhosts (`services.nginx.virtualHosts."portail.example.com".enableACME = true;` …) and switch the URLs to `https://` via `appUrl`/`issuerUrl`.
+Then `nixos-rebuild switch`. The portal is at `http://portail.example.com`, Authelia at `http://auth.portail.example.com` (with `forceSSL = false` the nginx vhost serves plain HTTP; switch the URLs to `https://` via `appUrl`/`issuerUrl`).
 
 #### Main options (`services.portail`)
 
-| Option                    | Default             | Purpose                                              |
-| ------------------------- | ------------------- | ---------------------------------------------------- |
-| `appUrl`                  | (required)          | public portal URL (backend APP_URL + OIDC redirect)  |
-| `issuerUrl`               | (required)          | public Authelia URL (OIDC_ISSUER_URL)                |
-| `bindAddress`             | `127.0.0.1:3000`    | backend BIND_ADDR                                    |
-| `oidcClientId`            | `portail`           | OIDC client_id                                       |
-| `ldap.url`                | `ldap://127.0.0.1`  | existing LDAP server URL (LDAP_URL)                  |
-| `ldap.baseDn`             | `dc=example,dc=com` | LDAP suffix                                          |
-| `ldap.adminPasswordFile`  | (required)          | password of `cn=admin,<baseDn>` (backend + Authelia) |
-| `oidc.clientSecretFile`   | (required)          | client_secret shared by backend/Authelia             |
-| `extraBackendEnvironment` | `{}`                | additional backend env (non-secret)                  |
+| Option                       | Default             | Purpose                                                |
+| ---------------------------- | ------------------- | ------------------------------------------------------ |
+| `appUrl`                     | (required)          | public portal URL (backend APP_URL + OIDC redirect)    |
+| `issuerUrl`                  | (required)          | public Authelia URL (OIDC_ISSUER_URL)                  |
+| `bindAddress`                | `127.0.0.1:3000`    | backend BIND_ADDR                                      |
+| `oidcClientId`               | `portail`           | OIDC client_id                                         |
+| `ldap.url`                   | `ldap://127.0.0.1`  | existing LDAP server URL (LDAP_URL)                    |
+| `ldap.baseDn`                | `dc=example,dc=com` | LDAP suffix                                            |
+| `ldap.adminPasswordFile`     | (required)          | password of `cn=admin,<baseDn>` (backend + Authelia)   |
+| `oidc.clientSecretFile`      | (required)          | client_secret shared by backend/Authelia               |
+| `vhost.enable`               | `true`              | backend module nginx vhost (frontend + `/api` proxy)   |
+| `vhost.hostName`             | (with vhost)        | nginx server_name + certificate CN                     |
+| `vhost.forceSSL`             | `true`              | HTTPS + 80→443 redirect                                |
+| `vhost.sslCertificate{,Key}` | (with forceSSL)     | TLS certificate/key provided by the host (agenix/sops) |
+| `extraBackendEnvironment`    | `{}`                | additional backend env (non-secret)                    |
 
 Secrets in prod: agenix/sops-nix files — no secrets in plain text inside the Nix config.
 
