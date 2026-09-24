@@ -63,7 +63,7 @@ Dans la config hôte — module backend + examples de provisionnement :
 }
 ```
 
-Sur LDAP : serveur existant (`ldap.url`) ou `services.openldap` sur la même machine (config OLC + seed `ou=people`/`ou=groups`).
+Sur LDAP : serveur existant (`ldap.url` — `ldap://` ou `ldaps://`, certificat signé attendu) ou `services.openldap` sur la même machine (config OLC + seed `ou=people`/`ou=groups`).
 
 Sur Authelia : `services.authelia.instances.portail` avec le backend LDAP pointé vers la même base :
 
@@ -250,7 +250,7 @@ In the host config — backend module + provisioning examples:
 }
 ```
 
-LDAP: an existing server (`ldap.url`) or `services.openldap` on the same machine (OLC config + `ou=people`/`ou=groups` seed).
+LDAP: an existing server (`ldap.url` — `ldap://` or `ldaps://`, signed certificate expected) or `services.openldap` on the same machine (OLC config + `ou=people`/`ou=groups` seed).
 
 Authelia: `services.authelia.instances.portail` with the LDAP backend pointed at the same database:
 
