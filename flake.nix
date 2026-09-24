@@ -1,8 +1,7 @@
 {
-  description = "Portail — backend Rust axum + frontend React Vite, module NixOS (openldap, authelia, nginx)";
+  description = "Portail — backend Rust axum + frontend React Vite, NixOS module (backend service only — nginx/OpenLDAP/Authelia provisioned by the host)";
 
-  # Pinned to the nixpkgs from devenv.lock (nixpkgs-unstable @ c7def04).
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/c7def046b9a883d46974757852106483d741586f";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
   outputs =
     { self, nixpkgs }:
@@ -47,19 +46,7 @@
 
       nixosModules.default = ./nixos/portail.nix;
 
-      nixosConfigurations.test = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [
-          self.nixosModules.default
-          ./nixos/test-vm.nix
-          {
-            services.portail = {
-              package = self.packages.${system}.portail-backend;
-              frontendPackage = self.packages.${system}.portail-frontend;
-            };
-          }
-        ];
-      };
+      formatter.${system} = nixpkgs.legacyPackages.${system}.nixfmt-tree;
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [

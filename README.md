@@ -5,7 +5,7 @@
 Stack : Rust Axum (`backend`) + React Vite (`frontend`) + OpenLDAP + Authelia (OIDC).
 
 - **Dev** : piloté par devenv (`devenv.nix`) — backend 3000, frontend 5173, LDAP 3890/3891, Authelia 9091.
-- **Prod / déploiement** : piloté par le flake (`flake.nix`) — packages buildables + module NixOS `services.portail` qui installe backend, frontend (nginx), OpenLDAP et Authelia.
+- **Prod / déploiement** : piloté par le flake (`flake.nix`) — packages buildables + module NixOS `services.portail` qui exécute uniquement le backend (service systemd + secrets). OpenLDAP, Authelia et les vhosts nginx sont provisionnés par la config hôte — examples ci-dessous.
 
 Toutes les commandes de dev passent par `devenv shell -- <cmd>` (cargo/node fournis par devenv).
 
@@ -14,12 +14,12 @@ Toutes les commandes de dev passent par `devenv shell -- <cmd>` (cargo/node four
 Le flake expose :
 
 - `packages.portail-backend` — binaire Rust (buildRustPackage, `Cargo.lock` du workspace).
-- `packages.portail-frontend` — build statique Vite (`buildNpmPackage`), adossé au vhost nginx.
-- `nixosModules.default` — module `services.portail` qui configure **tout** :
-  - `portail-backend.service` (DynamicUser, secrets via EnvironmentFile),
-  - nginx (vhost qui sert le front, `tryFiles`→`index.html`, proxifie `/api` vers le backend),
-  - `services.openldap` (base `ou=people`/`ou=groups` semée au premier boot, DB persistante),
-  - `services.authelia` (backend LDAP, client OIDC `portail`, redirect URI du vhost).
+- `packages.portail-frontend` — build statique Vite (`buildNpmPackage`), URLs OIDC cuites à la volée.
+- `lib.mkFrontend { appUrl; oidcIssuerUrl; oidcRedirectUri; }` — frontend reconstruit avec les URLs de prod (à passer au `root` du vhost).
+- `nixosModules.default` — module `services.portail`, limité au backend :
+  - `portail-backend.service` (DynamicUser, secrets via EnvironmentFile, `OIDC_CLIENT_SECRET`/`LDAP_ADMIN_PW` injectés depuis les fichiers).
+
+Le reste (nginx, OpenLDAP, Authelia) se configure dans la config hôte.
 
 ### Utilisation sur une machine NixOS
 
@@ -30,7 +30,7 @@ git clone https://github.com/adavida/portail_nas.git   # ou même référence di
 cd portail_nas
 ```
 
-Dans la config hôte :
+Dans la config hôte — module backend + examples de provisionnement :
 
 ```nix
 {
@@ -39,19 +39,91 @@ Dans la config hôte :
 
   imports = [ inputs.portail.nixosModules.default ];
 
+  # --- backend (module) ---
   services.portail = {
     enable = true;
     package = inputs.portail.packages.x86_64-linux.portail-backend;
-    frontendPackage = inputs.portail.packages.x86_64-linux.portail-frontend;
-    vhost = "portail.example.com";                     # sert le frontend + /api
+    appUrl = "http://portail.example.com";                       # baked dans le front, APP_URL backend
+    issuerUrl = "http://auth.portail.example.com";               # OIDC_ISSUER_URL
     ldap.baseDn = "dc=example,dc=com";
     ldap.adminPasswordFile = "/etc/portail/ldap-admin-pw";       # sans newline finale
     oidc.clientSecretFile = "/etc/portail/oidc-client-secret";   # sans newline finale
   };
+
+  # --- example de vhost (frontend + proxy /api + Authelia) ---
+  services.nginx = {
+    enable = true;
+    virtualHosts = {
+      "portail.example.com" = {
+        root = inputs.portail.lib.mkFrontend {
+          appUrl = "http://portail.example.com";
+          oidcIssuerUrl = "http://auth.portail.example.com";
+          oidcRedirectUri = "http://portail.example.com/callback";
+        };
+        locations."/".tryFiles = "$uri /index.html";
+        locations."/api".proxyPass = "http://127.0.0.1:3000";
+      };
+      "auth.portail.example.com" = {
+        locations."/".proxyPass = "http://127.0.0.1:9091";
+        locations."/".proxyWebsockets = true;
+      };
+    };
+  };
 }
 ```
 
-Les 4 secrets Authelia attendus (générer des valeurs aléatoires, non committées) :
+Sur LDAP : serveur existant (`ldap.url`) ou `services.openldap` sur la même machine (config OLC + seed `ou=people`/`ou=groups`).
+
+Sur Authelia : `services.authelia.instances.portail` avec le backend LDAP pointé vers la même base :
+
+```nix
+services.authelia.instances.portail = {
+  enable = true;
+  secrets = {
+    jwtSecretFile = "/etc/portail/authelia/jwt-secret";
+    storageEncryptionKeyFile = "/etc/portail/authelia/storage-encryption-key";
+    oidcHmacSecretFile = "/etc/portail/authelia/oidc-hmac-secret";
+    oidcIssuerPrivateKeyFile = "/etc/portail/authelia/jwks-key.pem";
+  };
+  environmentVariables = {
+    X_AUTHELIA_CONFIG_FILTERS = "template";
+    AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE = "/etc/portail/ldap-admin-pw";
+  };
+  settings = {
+    server.address = "tcp://127.0.0.1:9091";
+    authentication_backend.ldap = {
+      address = "ldap://127.0.0.1";
+      base_dn = "dc=example,dc=com";
+      user = "cn=admin,dc=example,dc=com";
+      additional_users_dn = "ou=people";
+      users_filter = "(&({username_attribute}={input}))";
+      additional_groups_dn = "ou=groups";
+      groups_filter = "(member={dn})";
+    };
+    access_control.default_policy = "one_factor";
+    session.cookies = [ {
+      domain = "auth.portail.example.com";
+      authelia_url = "http://auth.portail.example.com";
+    } ];
+    storage.local.path = "/var/lib/authelia-portail/db.sqlite3";
+    notifier.filesystem.filename = "/var/lib/authelia-portail/notifications.txt";
+    identity_providers.oidc.clients = [ {
+      client_id = "portail";
+      # lu par le template filter via X_AUTHELIA_CONFIG_FILTERS
+      client_secret = "{{ secret \"/etc/portail/oidc-client-secret\" }}";
+      authorization_policy = "one_factor";
+      consent_mode = "implicit";
+      redirect_uris = [ "http://portail.example.com/callback" ];
+      scopes = [ "openid" "groups" "email" "profile" "offline_access" ];
+      grant_types = [ "authorization_code" "refresh_token" ];
+      response_types = [ "code" ];
+      token_endpoint_auth_method = "client_secret_basic";
+    } ];
+  };
+};
+```
+
+Les secrets attendus (générer des valeurs aléatoires, non committées) :
 
 ```bash
 sudo mkdir -p /etc/portail/authelia
@@ -67,18 +139,17 @@ Pour HTTPS : configurer TLS/ACME sur les vhosts (`services.nginx.virtualHosts."p
 
 ### Options principales (`services.portail`)
 
-| Option                    | Défaut               | Rôle                                               |
-| ------------------------- | -------------------- | -------------------------------------------------- |
-| `vhost`                   | (requis)             | hôte nginx du portail (front + `/api`)             |
-| `authVhost`               | `auth.<vhost>`       | hôte nginx d'Authelia                              |
-| `appUrl`                  | `http://<vhost>`     | URL publique du portail (bake dans le front)       |
-| `issuerUrl`               | `http://<authVhost>` | URL publique Authelia (bake dans le front)         |
-| `bindAddress`             | `127.0.0.1:3000`     | BIND_ADDR du backend                               |
-| `oidcClientId`            | `portail`            | client_id OIDC                                     |
-| `ldap.baseDn`             | `dc=example,dc=com`  | suffixe LDAP                                       |
-| `ldap.adminPasswordFile`  | (requis)             | mot de passe `cn=admin,<baseDn>` (slapd + backend) |
-| `oidc.clientSecretFile`   | (requis)             | client_secret partagé backend/Authelia             |
-| `extraBackendEnvironment` | `{}`                 | env backend additionnelle (non secrète)            |
+| Option                    | Défaut              | Rôle                                                      |
+| ------------------------- | ------------------- | --------------------------------------------------------- |
+| `appUrl`                  | (requis)            | URL publique du portail (APP_URL backend + redirect OIDC) |
+| `issuerUrl`               | (requis)            | URL publique Authelia (OIDC_ISSUER_URL)                   |
+| `bindAddress`             | `127.0.0.1:3000`    | BIND_ADDR du backend                                      |
+| `oidcClientId`            | `portail`           | client_id OIDC                                            |
+| `ldap.url`                | `ldap://127.0.0.1`  | URL du serveur LDAP existant (LDAP_URL)                   |
+| `ldap.baseDn`             | `dc=example,dc=com` | suffixe LDAP                                              |
+| `ldap.adminPasswordFile`  | (requis)            | mot de passe `cn=admin,<baseDn>` (backend + Authelia)     |
+| `oidc.clientSecretFile`   | (requis)            | client_secret partagé backend/Authelia                    |
+| `extraBackendEnvironment` | `{}`                | env backend additionnelle (non secrète)                   |
 
 Secrets sur prod : fichiers agenix/sops-nix — rien de secret en clair dans la config Nix.
 
@@ -86,8 +157,7 @@ Secrets sur prod : fichiers agenix/sops-nix — rien de secret en clair dans la 
 
 ```bash
 nix build .#portail-backend .#portail-frontend     # les deux packages
-nix flake check                                     # module + config de test
-nix run .#nixosConfigurations.test.config.system.build.vm   # VM de démo (portail.test, forward 80→8080)
+nix flake check                                     # module
 ```
 
 ## Développement
@@ -115,10 +185,9 @@ devenv shell -- treefmt                              # nixfmt + rustfmt + pretti
 ## Layout
 
 ```
-flake.nix / flake.lock            packages + module NixOS + VM de test
+flake.nix / flake.lock            packages + module NixOS
 devenv.nix / devenv.yaml          environnement de dev (devenv up)
 nixos/portail.nix                 module services.portail
-nixos/test-vm.nix                 VM de test (build-vm .#test)
 backend/Cargo.toml → backend/src/{main,lib}.rs, domain/, http/, controllers/, repository/
 frontend/{vite.config.ts,package.json,src/}
 ```
@@ -130,7 +199,7 @@ frontend/{vite.config.ts,package.json,src/}
 Stack: Rust Axum (`backend`) + React Vite (`frontend`) + OpenLDAP + Authelia (OIDC).
 
 - **Dev**: driven by devenv (`devenv.nix`) — backend 3000, frontend 5173, LDAP 3890/3891, Authelia 9091.
-- **Prod / deployment**: driven by the flake (`flake.nix`) — buildable packages + the NixOS module `services.portail` which installs backend, frontend (nginx), OpenLDAP and Authelia.
+- **Prod / deployment**: driven by the flake (`flake.nix`) — buildable packages + the NixOS module `services.portail` which only runs the backend (systemd service + secrets). OpenLDAP, Authelia and the nginx vhosts are provisioned by the host config — examples below.
 
 All dev commands go through `devenv shell -- <cmd>` (cargo/node provided by devenv).
 
@@ -139,12 +208,12 @@ All dev commands go through `devenv shell -- <cmd>` (cargo/node provided by deve
 The flake exposes:
 
 - `packages.portail-backend` — Rust binary (buildRustPackage, workspace `Cargo.lock`).
-- `packages.portail-frontend` — static Vite build (`buildNpmPackage`), served by the nginx vhost.
-- `nixosModules.default` — the `services.portail` module, which configures **everything**:
-  - `portail-backend.service` (DynamicUser, secrets via EnvironmentFile),
-  - nginx (vhost serving the frontend, `tryFiles`→`index.html`, proxying `/api` to the backend),
-  - `services.openldap` (`ou=people`/`ou=groups` seeded on first boot, persistent DB),
-  - `services.authelia` (LDAP backend, OIDC client `portail`, vhost redirect URI).
+- `packages.portail-frontend` — static Vite build (`buildNpmPackage`), OIDC URLs baked at build time.
+- `lib.mkFrontend { appUrl; oidcIssuerUrl; oidcRedirectUri; }` — frontend rebuilt with the prod URLs (pass it to the vhost `root`).
+- `nixosModules.default` — the `services.portail` module, backend only:
+  - `portail-backend.service` (DynamicUser, secrets via EnvironmentFile, `OIDC_CLIENT_SECRET`/`LDAP_ADMIN_PW` injected from files).
+
+The rest (nginx, OpenLDAP, Authelia) is configured in the host config.
 
 #### Using it on a NixOS machine
 
@@ -155,7 +224,7 @@ git clone https://github.com/adavida/portail_nas.git   # or reference it directl
 cd portail_nas
 ```
 
-In the host config:
+In the host config — backend module + provisioning examples:
 
 ```nix
 {
@@ -164,19 +233,91 @@ In the host config:
 
   imports = [ inputs.portail.nixosModules.default ];
 
+  # --- backend (module) ---
   services.portail = {
     enable = true;
     package = inputs.portail.packages.x86_64-linux.portail-backend;
-    frontendPackage = inputs.portail.packages.x86_64-linux.portail-frontend;
-    vhost = "portail.example.com";                     # serves frontend + /api
+    appUrl = "http://portail.example.com";                       # baked into the frontend, backend APP_URL
+    issuerUrl = "http://auth.portail.example.com";               # OIDC_ISSUER_URL
     ldap.baseDn = "dc=example,dc=com";
     ldap.adminPasswordFile = "/etc/portail/ldap-admin-pw";       # no trailing newline
     oidc.clientSecretFile = "/etc/portail/oidc-client-secret";   # no trailing newline
   };
+
+  # --- vhost example (frontend + /api proxy + Authelia) ---
+  services.nginx = {
+    enable = true;
+    virtualHosts = {
+      "portail.example.com" = {
+        root = inputs.portail.lib.mkFrontend {
+          appUrl = "http://portail.example.com";
+          oidcIssuerUrl = "http://auth.portail.example.com";
+          oidcRedirectUri = "http://portail.example.com/callback";
+        };
+        locations."/".tryFiles = "$uri /index.html";
+        locations."/api".proxyPass = "http://127.0.0.1:3000";
+      };
+      "auth.portail.example.com" = {
+        locations."/".proxyPass = "http://127.0.0.1:9091";
+        locations."/".proxyWebsockets = true;
+      };
+    };
+  };
 }
 ```
 
-The 4 expected Authelia secrets (generate random values, do not commit):
+LDAP: an existing server (`ldap.url`) or `services.openldap` on the same machine (OLC config + `ou=people`/`ou=groups` seed).
+
+Authelia: `services.authelia.instances.portail` with the LDAP backend pointed at the same database:
+
+```nix
+services.authelia.instances.portail = {
+  enable = true;
+  secrets = {
+    jwtSecretFile = "/etc/portail/authelia/jwt-secret";
+    storageEncryptionKeyFile = "/etc/portail/authelia/storage-encryption-key";
+    oidcHmacSecretFile = "/etc/portail/authelia/oidc-hmac-secret";
+    oidcIssuerPrivateKeyFile = "/etc/portail/authelia/jwks-key.pem";
+  };
+  environmentVariables = {
+    X_AUTHELIA_CONFIG_FILTERS = "template";
+    AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE = "/etc/portail/ldap-admin-pw";
+  };
+  settings = {
+    server.address = "tcp://127.0.0.1:9091";
+    authentication_backend.ldap = {
+      address = "ldap://127.0.0.1";
+      base_dn = "dc=example,dc=com";
+      user = "cn=admin,dc=example,dc=com";
+      additional_users_dn = "ou=people";
+      users_filter = "(&({username_attribute}={input}))";
+      additional_groups_dn = "ou=groups";
+      groups_filter = "(member={dn})";
+    };
+    access_control.default_policy = "one_factor";
+    session.cookies = [ {
+      domain = "auth.portail.example.com";
+      authelia_url = "http://auth.portail.example.com";
+    } ];
+    storage.local.path = "/var/lib/authelia-portail/db.sqlite3";
+    notifier.filesystem.filename = "/var/lib/authelia-portail/notifications.txt";
+    identity_providers.oidc.clients = [ {
+      client_id = "portail";
+      # read by the template filter via X_AUTHELIA_CONFIG_FILTERS
+      client_secret = "{{ secret \"/etc/portail/oidc-client-secret\" }}";
+      authorization_policy = "one_factor";
+      consent_mode = "implicit";
+      redirect_uris = [ "http://portail.example.com/callback" ];
+      scopes = [ "openid" "groups" "email" "profile" "offline_access" ];
+      grant_types = [ "authorization_code" "refresh_token" ];
+      response_types = [ "code" ];
+      token_endpoint_auth_method = "client_secret_basic";
+    } ];
+  };
+};
+```
+
+Expected secrets (generate random values, do not commit):
 
 ```bash
 sudo mkdir -p /etc/portail/authelia
@@ -192,18 +333,17 @@ For HTTPS: configure TLS/ACME on the vhosts (`services.nginx.virtualHosts."porta
 
 #### Main options (`services.portail`)
 
-| Option                    | Default              | Purpose                                           |
-| ------------------------- | -------------------- | ------------------------------------------------- |
-| `vhost`                   | (required)           | nginx host serving the portal (frontend + `/api`) |
-| `authVhost`               | `auth.<vhost>`       | nginx host serving Authelia                       |
-| `appUrl`                  | `http://<vhost>`     | public portal URL (baked into the frontend)       |
-| `issuerUrl`               | `http://<authVhost>` | public Authelia URL (baked into the frontend)     |
-| `bindAddress`             | `127.0.0.1:3000`     | backend BIND_ADDR                                 |
-| `oidcClientId`            | `portail`            | OIDC client_id                                    |
-| `ldap.baseDn`             | `dc=example,dc=com`  | LDAP suffix                                       |
-| `ldap.adminPasswordFile`  | (required)           | password of `cn=admin,<baseDn>` (slapd + backend) |
-| `oidc.clientSecretFile`   | (required)           | client_secret shared by backend/Authelia          |
-| `extraBackendEnvironment` | `{}`                 | additional backend env (non-secret)               |
+| Option                    | Default             | Purpose                                              |
+| ------------------------- | ------------------- | ---------------------------------------------------- |
+| `appUrl`                  | (required)          | public portal URL (backend APP_URL + OIDC redirect)  |
+| `issuerUrl`               | (required)          | public Authelia URL (OIDC_ISSUER_URL)                |
+| `bindAddress`             | `127.0.0.1:3000`    | backend BIND_ADDR                                    |
+| `oidcClientId`            | `portail`           | OIDC client_id                                       |
+| `ldap.url`                | `ldap://127.0.0.1`  | existing LDAP server URL (LDAP_URL)                  |
+| `ldap.baseDn`             | `dc=example,dc=com` | LDAP suffix                                          |
+| `ldap.adminPasswordFile`  | (required)          | password of `cn=admin,<baseDn>` (backend + Authelia) |
+| `oidc.clientSecretFile`   | (required)          | client_secret shared by backend/Authelia             |
+| `extraBackendEnvironment` | `{}`                | additional backend env (non-secret)                  |
 
 Secrets in prod: agenix/sops-nix files — no secrets in plain text inside the Nix config.
 
@@ -211,8 +351,7 @@ Secrets in prod: agenix/sops-nix files — no secrets in plain text inside the N
 
 ```bash
 nix build .#portail-backend .#portail-frontend     # both packages
-nix flake check                                     # module + test config
-nix run .#nixosConfigurations.test.config.system.build.vm   # demo VM (portail.test, forward 80→8080)
+nix flake check                                     # module
 ```
 
 #### Development
@@ -240,10 +379,9 @@ devenv shell -- treefmt                              # nixfmt + rustfmt + pretti
 #### Layout
 
 ```
-flake.nix / flake.lock            packages + NixOS module + test VM
+flake.nix / flake.lock            packages + NixOS module
 devenv.nix / devenv.yaml          dev environment (devenv up)
 nixos/portail.nix                 services.portail module
-nixos/test-vm.nix                 test VM (build-vm .#test)
 backend/Cargo.toml → backend/src/{main,lib}.rs, domain/, http/, controllers/, repository/
 frontend/{vite.config.ts,package.json,src/}
 ```
