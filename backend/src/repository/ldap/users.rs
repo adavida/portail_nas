@@ -181,7 +181,7 @@ mod tests {
             ldap3::drive!(conn);
             let bind_dn = format!("cn=admin,{base}");
             if ldap.simple_bind(&bind_dn, "admin").await.is_ok() {
-                let dn = user_dn_from(&uid, &base);
+                let dn = user_dn_from(uid, &base);
                 let _ = ldap.delete(&dn).await;
                 let _ = ldap.unbind().await;
             }

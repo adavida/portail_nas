@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }:
 
@@ -57,8 +56,8 @@ in
       adminPasswordFile = lib.mkOption {
         type = lib.types.path;
         description = ''
-          File (without trailing newline) containing the `cn=admin,<baseDn>` password.
-          Used by slapd (olcRootPW) and the backend (LDAP_ADMIN_PW). Secrets: agenix/sops-nix.
+          File containing the `cn=admin,<baseDn>` password.
+          Used by slapd (olcRootPW) and by the backend via `LDAP_ADMIN_PW` = path (read at startup). Secrets: agenix/sops-nix.
         '';
       };
     };
@@ -66,7 +65,7 @@ in
     oidc = {
       clientSecretFile = lib.mkOption {
         type = lib.types.path;
-        description = "File (without trailing newline) with the OIDC client_secret shared backend/Authelia.";
+        description = "File with the OIDC client_secret shared backend/Authelia — passed to the backend as `OIDC_CLIENT_SECRET` = path (read at startup, trailing newline trimmed).";
       };
     };
 
@@ -81,34 +80,26 @@ in
       description = "Portail backend (Rust axum)";
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
+      # Secret vars hold the path of a file whose content is the secret — the
+      # backend reads and trims the file at startup. The service user must have
+      # read access (e.g. agenix/sops-nix `owner`/`group` on the secret files).
       environment = {
         APP_URL = cfg.appUrl;
         BIND_ADDR = cfg.bindAddress;
         LDAP_URL = cfg.ldap.url;
         LDAP_BASE_DN = cfg.ldap.baseDn;
+        LDAP_ADMIN_PW = toString cfg.ldap.adminPasswordFile;
         OIDC_CLIENT_ID = cfg.oidcClientId;
         OIDC_ISSUER_URL = cfg.issuerUrl;
+        OIDC_CLIENT_SECRET = toString cfg.oidc.clientSecretFile;
         OIDC_REDIRECT_URI = "${cfg.appUrl}/callback";
       }
       // cfg.extraBackendEnvironment;
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/portail-backend";
-        ExecStartPre = lib.getExe (
-          pkgs.writeShellApplication {
-            name = "portail-backend-env";
-            text = ''
-              printf 'OIDC_CLIENT_SECRET=%s\nLDAP_ADMIN_PW=%s\n' \
-                "$(cat ${cfg.oidc.clientSecretFile})" \
-                "$(cat ${cfg.ldap.adminPasswordFile})" \
-                > /run/portail-backend/env
-              chmod 600 /run/portail-backend/env
-            '';
-          }
-        );
-        RuntimeDirectory = "portail-backend";
         DynamicUser = true;
         Restart = "on-failure";
-        RestartSec = "2s";
+        RestartSec = "60s";
       };
     };
   };

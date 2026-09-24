@@ -172,6 +172,13 @@ let
       fi
       exec ${pkgs.openldap}/libexec/slapd -h "ldap://127.0.0.1:${toString port}/" -f "$DEVENV_STATE/${dir}/slapd.conf" -d 0
     '';
+  # Secret vars hold the path of a file whose content is the secret value.
+  # OIDC client secret must match Authelia dev client_secret (pbkdf2 hash of
+  # `portail-dev-secret`). LDAP_ADMIN_PW stays unset in dev (default `admin`).
+  mkDevSecrets = ''
+    mkdir -p "$DEVENV_STATE/secrets"
+    printf 'portail-dev-secret' > "$DEVENV_STATE/secrets/oidc-client-secret"
+  '';
 in
 {
   env = {
@@ -183,7 +190,7 @@ in
     LDAP_TEST_URL = "ldap://127.0.0.1:3891";
     LDAP_URL = "ldap://127.0.0.1:3890";
     OIDC_CLIENT_ID = "portail-dev";
-    OIDC_CLIENT_SECRET = "portail-dev-secret";
+    OIDC_CLIENT_SECRET = "${config.env.DEVENV_STATE}/secrets/oidc-client-secret";
     OIDC_ISSUER_URL = "https://127.0.0.1:9091";
     OIDC_REDIRECT_URI = "http://localhost:5173/callback";
     VITE_APP_URL = "http://localhost:5173";
@@ -192,7 +199,7 @@ in
     VITE_OIDC_REDIRECT_URI = "http://localhost:5173/callback";
   };
 
-  enterShell = ''
+  enterShell = mkDevSecrets + ''
     echo "portail LDAP — rust $(rustc --version) | node $(node --version)"
     echo "LDAP dev:  $LDAP_URL/$LDAP_BASE_DN"
     echo "LDAP test: $LDAP_TEST_URL/$LDAP_TEST_BASE_DN"
@@ -226,8 +233,9 @@ in
 
   processes = {
     authelia.exec = mkAuthelia;
-    backend.exec = "cargo watch -w backend -x 'run -p portail-backend'";
-    "backend-test".exec = "cargo watch -w backend -x 'test --features test-api --quiet'";
+    backend.exec = mkDevSecrets + "\ncargo watch -w backend -x 'run -p portail-backend'";
+    "backend-test".exec =
+      mkDevSecrets + "\ncargo watch -w backend -x 'test --features test-api --quiet'";
     frontend.exec = "npm --prefix frontend run dev";
     "frontend-test".exec = "npm --prefix frontend run test:watch";
     openldap.exec = mkSlapd {

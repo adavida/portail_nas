@@ -17,7 +17,7 @@ Le flake expose :
 - `packages.portail-frontend` — build statique Vite (`buildNpmPackage`), URLs OIDC cuites à la volée.
 - `lib.mkFrontend { appUrl; oidcIssuerUrl; oidcRedirectUri; }` — frontend reconstruit avec les URLs de prod (à passer au `root` du vhost).
 - `nixosModules.default` — module `services.portail`, limité au backend :
-  - `portail-backend.service` (DynamicUser, secrets via EnvironmentFile, `OIDC_CLIENT_SECRET`/`LDAP_ADMIN_PW` injectés depuis les fichiers).
+  - `portail-backend.service` (DynamicUser, `OIDC_CLIENT_SECRET`/`LDAP_ADMIN_PW` = chemins des fichiers de secrets, lus au démarrage par le backend).
 
 Le reste (nginx, OpenLDAP, Authelia) se configure dans la config hôte.
 
@@ -211,7 +211,7 @@ The flake exposes:
 - `packages.portail-frontend` — static Vite build (`buildNpmPackage`), OIDC URLs baked at build time.
 - `lib.mkFrontend { appUrl; oidcIssuerUrl; oidcRedirectUri; }` — frontend rebuilt with the prod URLs (pass it to the vhost `root`).
 - `nixosModules.default` — the `services.portail` module, backend only:
-  - `portail-backend.service` (DynamicUser, secrets via EnvironmentFile, `OIDC_CLIENT_SECRET`/`LDAP_ADMIN_PW` injected from files).
+  - `portail-backend.service` (DynamicUser, `OIDC_CLIENT_SECRET`/`LDAP_ADMIN_PW` set to secret file paths, read at startup by the backend).
 
 The rest (nginx, OpenLDAP, Authelia) is configured in the host config.
 

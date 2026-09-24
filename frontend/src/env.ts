@@ -25,9 +25,7 @@ export function createEnv(
   const oidcRedirectUri = take("OIDC_REDIRECT_URI");
 
   if (missing.length) {
-    throw new Error(
-      `missing or empty env vars: ${missing.join(", ")} — set them in devenv.nix env (VITE_...)`,
-    );
+    throw new Error(`missing or empty env vars: ${missing.join(", ")}`);
   }
 
   return { appUrl, backendUrl, oidcIssuerUrl, oidcRedirectUri };
