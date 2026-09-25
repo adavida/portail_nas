@@ -125,8 +125,8 @@ in
         wantedBy = [ "multi-user.target" ];
         after = [ "network.target" ];
         # Secret vars hold the path of a file whose content is the secret — the
-        # backend reads and trims the file at startup. The service user must have
-        # read access (e.g. agenix/sops-nix `owner`/`group` on the secret files).
+        # backend reads and trims the file at startup. The `portail` user must
+        # have read access (e.g. agenix/sops-nix `owner`/`group` on secrets).
         environment = {
           APP_URL = cfg.appUrl;
           BIND_ADDR = cfg.bindAddress;
@@ -143,12 +143,20 @@ in
         // cfg.extraBackendEnvironment;
         serviceConfig = {
           ExecStart = "${cfg.package}/bin/portail-backend";
-          DynamicUser = true;
+          User = "portail";
+          Group = "portail";
           Restart = "on-failure";
           RestartSec = "60s";
         };
       }
     ];
+
+    users.users.portail = {
+      description = "Portail backend service user";
+      group = "portail";
+      isSystemUser = true;
+    };
+    users.groups.portail = { };
 
     services.nginx = lib.mkIf cfg.vhost.enable {
       enable = true;
