@@ -66,6 +66,16 @@ in
         description = "OU holding group entries (LDAP_GROUPS_OU).";
       };
 
+      caCertificateFile = lib.mkOption {
+        type = with lib.types; nullOr path;
+        default = null;
+        description = ''
+          PEM CA bundle (e.g. `homeCA.crt`) validating the `ldaps://` endpoint.
+          Passed to the backend as `SSL_CERT_FILE` — leave null when the
+          serving certificate is publicly trusted.
+        '';
+      };
+
       adminPasswordFile = lib.mkOption {
         type = lib.types.path;
         description = ''
@@ -140,7 +150,10 @@ in
           OIDC_CLIENT_SECRET = toString cfg.oidc.clientSecretFile;
           OIDC_REDIRECT_URI = "${cfg.appUrl}/callback";
         }
-        // cfg.extraBackendEnvironment;
+        // cfg.extraBackendEnvironment
+        // (lib.optionalAttrs (cfg.ldap.caCertificateFile != null) {
+          SSL_CERT_FILE = toString cfg.ldap.caCertificateFile;
+        });
         serviceConfig = {
           ExecStart = "${cfg.package}/bin/portail-backend";
           User = "portail";
