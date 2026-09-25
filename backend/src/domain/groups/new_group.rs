@@ -11,11 +11,9 @@ pub struct NewGroup {
 }
 
 impl NewGroup {
-    pub fn dn(&self, base: &str) -> String {
-        format!("cn={},ou=groups,{base}", self.gid.as_str())
-    }
-
-    pub fn to_attrs(&self, base: &str) -> Vec<(String, std::collections::HashSet<String>)> {
+    /// LDAP attrs minus `member`: DNs are repository concern (env-driven OUs),
+    /// `create_group` appends them.
+    pub fn to_attrs(&self) -> Vec<(String, std::collections::HashSet<String>)> {
         let mut attrs = vec![
             (
                 "objectClass".to_string(),
@@ -28,14 +26,6 @@ impl NewGroup {
             (
                 "o".to_string(),
                 [self.name.as_str().to_string()].into_iter().collect(),
-            ),
-            (
-                "member".to_string(),
-                self.members
-                    .as_slice()
-                    .iter()
-                    .map(|uid| format!("uid={},ou=people,{base}", uid.as_str()))
-                    .collect(),
             ),
         ];
         let desc = self.description.as_str();
@@ -68,31 +58,23 @@ mod tests {
     }
 
     #[test]
-    fn dn_and_member_dns() {
+    fn attrs_basic_shape() {
         let g = test_group();
 
-        assert_eq!(
-            g.dn("dc=dev,dc=example,dc=com"),
-            "cn=devs,ou=groups,dc=dev,dc=example,dc=com",
-            "dn should be cn + ou=groups + base"
-        );
-
-        let attrs = g.to_attrs("dc=dev,dc=example,dc=com");
-        let member = attrs
-            .iter()
-            .find(|(k, _)| k == "member")
-            .map(|(_, v)| v.clone())
-            .unwrap();
+        let attrs = g.to_attrs();
 
         assert!(
-            member.contains("uid=alice,ou=people,dc=dev,dc=example,dc=com"),
-            "member should be user DN, got {member:?}"
+            attrs.iter().all(|(k, _)| k != "member"),
+            "member DNs belong to the repository, not to_attrs"
         );
         assert!(
-            member.contains("uid=bob,ou=people,dc=dev,dc=example,dc=com"),
-            "all initial members should be DNs, got {member:?}"
+            attrs.iter().any(|(k, _)| k == "cn"),
+            "attrs should contain cn"
         );
-        assert!(!member.contains("cn=devs"), "no placeholder self-DN");
+        assert!(
+            attrs.iter().any(|(k, _)| k == "o"),
+            "attrs should contain o"
+        );
     }
 
     #[test]
@@ -100,7 +82,7 @@ mod tests {
         let mut g = test_group();
         g.description = Description::try_new("".into());
 
-        let attrs = g.to_attrs("dc=dev,dc=example,dc=com");
+        let attrs = g.to_attrs();
 
         assert!(
             attrs.iter().all(|(k, _)| k != "description"),
