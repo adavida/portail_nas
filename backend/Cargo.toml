@@ -19,6 +19,7 @@ tower-http = { version = "0.7.1", features = ["trace"] }
 
 [dev-dependencies]
 ctor = "1.0.13"
+dtor = "1"
 tower = "0.5"
 http-body-util = "0.1"
 

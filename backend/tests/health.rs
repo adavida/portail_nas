@@ -1,23 +1,8 @@
-use axum::{
-    body::Body,
-    http::{Request, StatusCode},
-};
-use http_body_util::BodyExt;
-use serde_json::json;
-use tower::ServiceExt;
+use axum::http::StatusCode;
 
+#[allow(dead_code)]
 mod common;
-
-async fn oneshot(uri: &str) -> (StatusCode, serde_json::Value) {
-    let app = common::test_app();
-    let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
-
-    let resp = app.oneshot(req).await.unwrap();
-    let status = resp.status();
-    let body = resp.into_body().collect().await.unwrap().to_bytes();
-
-    (status, serde_json::from_slice(&body).unwrap_or(json!({})))
-}
+use common::http::oneshot::oneshot;
 
 #[tokio::test]
 async fn health_returns_ok() {

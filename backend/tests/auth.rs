@@ -1,40 +1,9 @@
-use axum::{
-    body::Body,
-    http::{Method, Request, StatusCode},
-};
-use http_body_util::BodyExt;
-use portail_backend::app;
+use axum::http::{Method, StatusCode};
 use serde_json::json;
-use tower::ServiceExt;
 
+#[allow(dead_code)]
 mod common;
-
-async fn req(method: Method, uri: &str, body: Option<serde_json::Value>) -> StatusCode {
-    req_with_app(app(), method, uri, body).await
-}
-
-async fn req_with_app(
-    app: axum::Router,
-    method: Method,
-    uri: &str,
-    body: Option<serde_json::Value>,
-) -> StatusCode {
-    let mut builder = Request::builder().method(method).uri(uri);
-    let resp = if let Some(b) = body {
-        builder = builder.header("content-type", "application/json");
-        let bytes = serde_json::to_vec(&b).unwrap();
-        app.oneshot(builder.body(Body::from(bytes)).unwrap())
-            .await
-            .unwrap()
-    } else {
-        app.oneshot(builder.body(Body::empty()).unwrap())
-            .await
-            .unwrap()
-    };
-    let status = resp.status();
-    let _ = resp.into_body().collect().await.unwrap().to_bytes();
-    status
-}
+use common::http::{req::req, req_with_app::req_with_app};
 
 #[tokio::test]
 async fn protected_endpoints_return_401_without_token() {
@@ -144,7 +113,7 @@ async fn authenticate_endpoint_is_protected() {
 
 #[tokio::test]
 async fn admin_can_access_protected_endpoints() {
-    let admin_app = common::test_app();
+    let admin_app = common::http::test_app::test_app();
     let protected = vec![
         (Method::GET, "/api/users"),
         (Method::GET, "/api/groups"),
@@ -171,7 +140,7 @@ async fn admin_can_access_protected_endpoints() {
 
 #[tokio::test]
 async fn user_gets_403_on_admin_endpoints() {
-    let user_app = common::test_app_as_user();
+    let user_app = common::http::test_app_as_user::test_app_as_user();
     let admin_endpoints = vec![
         (Method::GET, "/api/users", None),
         (Method::GET, "/api/groups", None),

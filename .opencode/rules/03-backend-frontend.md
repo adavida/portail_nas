@@ -10,9 +10,9 @@
 
 - **1 endpoint = au moins 1 test d'intégration** — nouvelle route sans test = pas finie.
 - 1 fichier = 1 ressource (`health.rs`, `users.rs`); nouvelle ressource ⇒ nouveau fichier `tests/<ressource>.rs`.
-- Router via `portail_backend::app()` + `tower::ServiceExt::oneshot` (pas de vrai serveur); helper par fichier `send(method, uri, Option<json>) -> (StatusCode, Value)`.
+- Router via `portail_backend::app()` + `tower::ServiceExt::oneshot` (pas de vrai serveur); helper partagé `send(method, uri, Option<json>) -> (StatusCode, Value)` dans `tests/common/send.rs` (règle `10-test-helpers.md`).
 - LDAP test uniquement (`LDAP_TEST_*`, 3891) — jamais `dev` (3890).
-- Auto-clean: `mod common;` + `tests/common/mod.rs` (`#[ctor] fn purge_test_ldap`, dev-dep `ctor`) purge `ou=people` de la base test au démarrage; LDAP down ⇒ no-op silencieux.
+- Auto-clean: `mod common;` + `tests/common/purge.rs` (`#[ctor] fn purge_test_ldap`, dev-dep `ctor`) purge `ou=people` de la base test au démarrage; LDAP down ⇒ no-op silencieux.
 - Données uniques: uid timestamp (`TestUser::new`) — prefix `^[a-z0-9._-]+$` (pénètre dans l'URL). Pas de cleanup par test — la purge `ctor` suffit (sauf tests dont le DELETE est le sujet).
 - Corps 204 vide ⇒ parse JSON avec fallback `unwrap_or(json!({}))`. LDAP inatteignable ⇒ skip via guard (`500`/`Err(AppError::Ldap)`), CI sans LDAP reste verte.
 - **Routes test-only** (ex: `POST /api/users/:uid/authenticate`): feature flag `test-api` (`backend/Cargo.toml` `[features]`, `#[cfg(feature = "test-api")]` dans `users_router`) — absentes du build prod. **Piège**: `#[cfg(test)]` est ignoré dans la lib quand `backend/tests/*.rs` la compilent comme dépendance — dans `tests/`, seul le feature flag filtre (`#[cfg(feature = "test-api")]` au-dessus de `#[tokio::test]`); `#[cfg(test)]` réservé aux unit tests collocalisés.

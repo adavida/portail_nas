@@ -6,36 +6,18 @@ pub mod error;
 pub mod http;
 pub mod repository;
 
+#[cfg(test)]
+pub(crate) mod test_helpers;
+
 pub use http::router as app;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{
-        body::Body, extract::Request, http::StatusCode, middleware::Next, response::Response,
-    };
+    use crate::test_helpers::app::test_app;
+    use axum::{body::Body, extract::Request, http::StatusCode};
     use http_body_util::BodyExt;
     use tower::ServiceExt;
-
-    async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCode> {
-        crate::env::Env::ensure_init();
-        let claims = crate::auth::Claims {
-            sub: "admin".into(),
-            aud: serde_json::json!(crate::env::Env::global().oidc_client_id.clone()),
-            iss: crate::env::Env::global().oidc_issuer_url.clone(),
-            exp: 9999999999,
-            groups: vec!["admin".into()],
-            email: Some("admin@example.com".into()),
-            preferred_username: Some("admin".into()),
-        };
-        req.extensions_mut()
-            .insert(crate::auth::middleware::AuthUser(claims));
-        Ok(next.run(req).await)
-    }
-
-    fn test_app() -> axum::Router {
-        crate::app().layer(axum::middleware::from_fn(inject_admin))
-    }
 
     #[tokio::test]
     async fn health_returns_ok() {
@@ -179,6 +161,17 @@ mod tests {
 
             assert_eq!(apitest1["name"], "Api Test1");
             assert_eq!(apitest1["email"], "apitest1@example.com");
+
+            // Cleanup: la base test reste propre après la run
+            // (les seeds ne passeront pas par la purge du binaire lib).
+            if let Ok((conn, mut l2)) = ldap3::LdapConnAsync::new(&url).await {
+                ldap3::drive!(conn);
+                let _ = l2.simple_bind(&format!("cn=admin,{base}"), "admin").await;
+                for uid in ["apitest1", "apitest2"] {
+                    let _ = l2.delete(&format!("uid={uid},ou=people,{base}")).await;
+                }
+                let _ = l2.unbind().await;
+            }
         }
     }
 }

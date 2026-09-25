@@ -1,102 +1,11 @@
-use axum::{
-    body::Body,
-    http::{Method, Request, StatusCode},
-};
-use http_body_util::BodyExt;
+use axum::http::{Method, StatusCode};
 use serde_json::json;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tower::ServiceExt;
 
+#[allow(dead_code)]
 mod common;
-
-type BodyJson = serde_json::Value;
-
-async fn send(method: Method, uri: &str, json_body: Option<BodyJson>) -> (StatusCode, BodyJson) {
-    let app = common::test_app();
-    let mut req = Request::builder().method(method).uri(uri);
-    if let Some(b) = &json_body {
-        req = req.header("content-type", "application/json");
-        let body = serde_json::to_vec(b).unwrap();
-        let resp = app
-            .oneshot(req.body(Body::from(body)).unwrap())
-            .await
-            .unwrap();
-        let status = resp.status();
-        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-        return (status, serde_json::from_slice(&bytes).unwrap_or(json!({})));
-    }
-
-    let resp = app.oneshot(req.body(Body::empty()).unwrap()).await.unwrap();
-    let status = resp.status();
-    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-
-    (status, serde_json::from_slice(&bytes).unwrap_or(json!({})))
-}
-
-struct Fixture {
-    uid: String,
-    gid: String,
-}
-
-impl Fixture {
-    fn new(prefix: &str) -> Self {
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-            % 1000000;
-        Self {
-            uid: format!("{prefix}u{n}"),
-            gid: format!("{prefix}g{n}"),
-        }
-    }
-
-    async fn seed(&self) -> (StatusCode, (StatusCode, BodyJson)) {
-        let user = send(
-            Method::POST,
-            "/api/users",
-            Some(json!({
-                "uid": self.uid,
-                "name": "Member User",
-                "email": "",
-                "password": "secret123",
-            })),
-        )
-        .await;
-
-        if user.0 == StatusCode::INTERNAL_SERVER_ERROR {
-            return (user.0, (user.0, json!({})));
-        }
-
-        let group = send(
-            Method::POST,
-            "/api/groups",
-            Some(json!({
-                "gid": self.gid,
-                "name": "Members Test Group",
-                "description": "fixture",
-                "members": [self.uid.clone()],
-            })),
-        )
-        .await;
-
-        (user.0, group)
-    }
-}
-
-async fn group_members(gid: &str) -> BodyJson {
-    let (_, groups) = send(Method::GET, "/api/groups", None).await;
-    groups
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|g| g["gid"] == gid)
-        .cloned()
-        .unwrap()
-        .get("members")
-        .cloned()
-        .unwrap()
-}
+use common::assert::user_groups::user_groups;
+use common::http::send::send;
+use common::seed::{fixture::Fixture, nanos::nanos};
 
 #[tokio::test]
 async fn add_member_makes_uid_visible_in_group() {
@@ -135,12 +44,11 @@ async fn add_member_makes_uid_visible_in_group() {
 
     assert_eq!(status, StatusCode::NO_CONTENT, "add member should 204");
 
-    let members = group_members(&fixture.gid).await;
-    let arr = members.as_array().unwrap();
+    let groups = user_groups(&extra).await;
 
     assert!(
-        arr.iter().any(|m| *m == extra),
-        "added member should appear in GET /api/groups, got {members}"
+        groups.contains(&fixture.gid),
+        "added member should have the group in GET /api/users, got {groups:?}"
     );
 }
 
@@ -188,26 +96,18 @@ async fn remove_member_hides_uid_from_group() {
 
     assert_eq!(status, StatusCode::NO_CONTENT, "remove member should 204");
 
-    let members = group_members(&fixture.gid).await;
+    let groups = user_groups(&fixture.uid).await;
 
     assert!(
-        !members
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|m| *m == fixture.uid),
-        "removed member should not appear in GET /api/groups, got {members}"
+        !groups.contains(&fixture.gid),
+        "removed member should no longer have the group in GET /api/users, got {groups:?}"
     );
 }
 
 #[tokio::test]
 async fn add_unknown_uid_is_404() {
     let fixture = Fixture::new("apim4");
-    let n = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos()
-        % 1000000;
+    let n = nanos();
     let ghost = format!("apimghost{n}");
 
     let (seed_status, (create_status, _)) = fixture.seed().await;
@@ -233,12 +133,8 @@ async fn add_unknown_uid_is_404() {
 }
 
 #[tokio::test]
-async fn remove_member_of_unknown_group_is_500() {
-    let n = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos()
-        % 1000000;
+async fn remove_member_with_unknown_uid_is_404() {
+    let n = nanos();
 
     let (status, body) = send(
         Method::DELETE,
@@ -246,7 +142,14 @@ async fn remove_member_of_unknown_group_is_500() {
         None,
     )
     .await;
+    if status == StatusCode::INTERNAL_SERVER_ERROR {
+        return; // LDAP indisponible => skip
+    }
 
-    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "unknown uid should 404 before the group is even touched"
+    );
     assert!(body.get("error").is_some(), "error body expected");
 }

@@ -2,20 +2,25 @@ pub mod groups;
 pub mod users;
 
 pub use groups::{
-    add_member, create_group, delete_group, list_groups, remove_member, update_group,
+    add_member, create_group, delete_group, find_group_dn, list_groups, list_uids, remove_member,
+    update_group,
 };
 pub use users::{
-    authenticate_user, create_user, delete_user, list_users, update_user, update_user_password,
+    authenticate_user, create_user, delete_user, find_user_dn, list_users, update_user,
+    update_user_password,
 };
 
-use crate::error::AppError;
+use crate::{
+    domain::{groups::Gid, users::Uid},
+    error::AppError,
+};
 
-pub(crate) fn ldap_url() -> String {
-    crate::env::Env::global().ldap_url.clone()
+pub(crate) fn ldap_url() -> &'static String {
+    &crate::env::Env::global().ldap_url
 }
 
-pub(crate) fn ldap_base() -> String {
-    crate::env::Env::global().ldap_base_dn.clone()
+pub(crate) fn ldap_base() -> &'static String {
+    &crate::env::Env::global().ldap_base_dn
 }
 
 /// Adds a trusted root certificate to the connection settings when
@@ -44,7 +49,7 @@ pub(crate) fn with_tls_ca(
 pub(crate) async fn connect() -> Result<ldap3::Ldap, AppError> {
     let env = crate::env::Env::global();
     let settings = with_tls_ca(ldap3::LdapConnSettings::new(), &env.ldap_tls_ca)?;
-    let (conn, mut ldap) = ldap3::LdapConnAsync::with_settings(settings, &ldap_url())
+    let (conn, mut ldap) = ldap3::LdapConnAsync::with_settings(settings, ldap_url())
         .await
         .map_ldap()?;
     ldap3::drive!(conn);
@@ -66,23 +71,19 @@ pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap) -> Result<(), AppError> {
     Ok(())
 }
 
-pub(crate) fn user_dn(uid: &crate::domain::users::Uid) -> String {
-    user_dn_from(uid.as_str())
-}
-
-pub(crate) fn user_dn_from(uid: &str) -> String {
+pub(crate) fn user_dn(uid: &Uid) -> String {
     format!(
         "uid={},ou={},{}",
-        uid,
+        uid.as_str(),
         crate::env::Env::global().ldap_people_ou,
         ldap_base()
     )
 }
 
-pub(crate) fn group_dn_from(gid: &str) -> String {
+pub(crate) fn group_dn_from(gid: &Gid) -> String {
     format!(
         "cn={},ou={},{}",
-        gid,
+        gid.as_str(),
         crate::env::Env::global().ldap_groups_ou,
         ldap_base()
     )
@@ -116,13 +117,6 @@ impl<T> MapLdap<T> for Result<T, ldap3::LdapError> {
 
 #[cfg(test)]
 mod tests {
-    #[ctor::ctor(unsafe)]
-    fn redirect_ldap_to_test() {
-        crate::env::Env::ensure_init();
-        std::env::set_var("LDAP_URL", crate::env::ldap_test_url());
-        std::env::set_var("LDAP_BASE_DN", crate::env::ldap_test_base_dn());
-    }
-
     #[test]
     fn ldap_url_reads_env() {
         // Env::create is called once; ldap_url reflects the global Env, not a

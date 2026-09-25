@@ -8,7 +8,14 @@ use crate::{
 const DEFAULT_GROUP: &str = "user";
 
 pub async fn list() -> Result<Vec<User>, AppError> {
-    ldap_repo::list_users().await
+    let mut users = ldap_repo::list_users().await?;
+    let uids = ldap_repo::list_uids().await?;
+
+    users
+        .iter_mut()
+        .for_each(|user| user.groups = uids.iter().filter_map(|g| g.group_of(user)).collect());
+
+    Ok(users)
 }
 
 pub async fn create(new: NewUser) -> Result<User, AppError> {
@@ -37,17 +44,17 @@ async fn ensure_user_group(uid: &Uid) -> Result<(), AppError> {
 }
 
 pub async fn update_password(uid: Uid, password: Password) -> Result<(), AppError> {
-    ldap_repo::update_user_password(uid, password).await
+    ldap_repo::update_user_password(&uid, password).await
 }
 
 pub async fn delete(uid: Uid) -> Result<(), AppError> {
-    ldap_repo::delete_user(uid).await
+    ldap_repo::delete_user(&uid).await
 }
 
 pub async fn update(uid: Uid, data: UpdateUser) -> Result<(), AppError> {
-    ldap_repo::update_user(uid, data).await
+    ldap_repo::update_user(&uid, data).await
 }
 
 pub async fn authenticate(uid: Uid, password: Password) -> Result<bool, AppError> {
-    ldap_repo::authenticate_user(uid, password).await
+    ldap_repo::authenticate_user(&uid, password).await
 }

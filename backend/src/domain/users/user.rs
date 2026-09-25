@@ -3,12 +3,14 @@ use serde::Serialize;
 use super::Name;
 use super::user_error::UserError;
 use super::{Email, Uid};
+use crate::domain::groups::Gid;
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct User {
     pub uid: Uid,
     pub name: Name,
     pub email: Email,
+    pub groups: Vec<Gid>,
 }
 
 impl User {
@@ -27,22 +29,22 @@ impl User {
         let name = Name::try_new(raw_name).map_err(|_| UserError::InvalidName)?;
         let email =
             Email::try_new(mail.unwrap_or_default()).map_err(|_| UserError::InvalidEmail)?;
-        Ok(Self { uid, name, email })
+        Ok(Self {
+            uid,
+            name,
+            email,
+            groups: Vec::new(),
+        })
     }
 
-    pub fn from_search(entries: Vec<std::collections::HashMap<String, Vec<String>>>) -> Vec<Self> {
-        let mut users: Vec<Self> = entries
-            .into_iter()
-            .filter_map(|attrs| {
-                let uid = attrs.get("uid").and_then(|v| v.first().cloned());
-                let cn = attrs.get("cn").and_then(|v| v.first().cloned());
-                let display_name = attrs.get("displayName").and_then(|v| v.first().cloned());
-                let mail = attrs.get("mail").and_then(|v| v.first().cloned());
-                Self::from_attrs(uid, cn, display_name, mail).ok()
-            })
-            .collect();
-        users.sort_by(|a, b| a.uid.as_str().cmp(b.uid.as_str()));
-        users
+    pub fn from_search(
+        entry: std::collections::HashMap<String, Vec<String>>,
+    ) -> Result<Self, UserError> {
+        let uid = entry.get("uid").and_then(|v| v.first().cloned());
+        let cn = entry.get("cn").and_then(|v| v.first().cloned());
+        let display_name = entry.get("displayName").and_then(|v| v.first().cloned());
+        let mail = entry.get("mail").and_then(|v| v.first().cloned());
+        Self::from_attrs(uid, cn, display_name, mail)
     }
 }
 

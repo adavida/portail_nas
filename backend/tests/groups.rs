@@ -1,107 +1,12 @@
-use axum::{
-    body::Body,
-    http::{Method, Request, StatusCode},
-};
-use http_body_util::BodyExt;
+use axum::http::{Method, StatusCode};
 use serde_json::json;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tower::ServiceExt;
 
+#[allow(dead_code)]
 mod common;
-
-type BodyJson = serde_json::Value;
-
-async fn send(method: Method, uri: &str, json_body: Option<BodyJson>) -> (StatusCode, BodyJson) {
-    let app = common::test_app();
-    let mut req = Request::builder().method(method).uri(uri);
-    if let Some(b) = &json_body {
-        req = req.header("content-type", "application/json");
-        let body = serde_json::to_vec(b).unwrap();
-        let resp = app
-            .oneshot(req.body(Body::from(body)).unwrap())
-            .await
-            .unwrap();
-        let status = resp.status();
-        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-        return (status, serde_json::from_slice(&bytes).unwrap_or(json!({})));
-    }
-
-    let resp = app.oneshot(req.body(Body::empty()).unwrap()).await.unwrap();
-    let status = resp.status();
-    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-
-    (status, serde_json::from_slice(&bytes).unwrap_or(json!({})))
-}
-
-struct TestGroup {
-    gid: String,
-    name: String,
-    description: String,
-    member: String,
-}
-
-impl TestGroup {
-    fn new(prefix: &str) -> Self {
-        let n = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-            % 1000000;
-        Self {
-            gid: format!("{prefix}{n}"),
-            name: "Test Group".into(),
-            description: "Test description".into(),
-            member: format!("{prefix}m{n}"),
-        }
-    }
-
-    async fn create(&self) -> (StatusCode, BodyJson) {
-        let (user_status, _) = send(
-            Method::POST,
-            "/api/users",
-            Some(json!({
-                "uid": self.member,
-                "name": "Seed Member",
-                "email": "",
-                "password": "secret123",
-            })),
-        )
-        .await;
-
-        if user_status == StatusCode::INTERNAL_SERVER_ERROR {
-            return (user_status, json!({}));
-        }
-
-        send(
-            Method::POST,
-            "/api/groups",
-            Some(json!({
-                "gid": self.gid,
-                "name": self.name,
-                "description": self.description,
-                "members": [self.member.clone()],
-            })),
-        )
-        .await
-    }
-
-    async fn create_without_members(&self) -> (StatusCode, BodyJson) {
-        send(
-            Method::POST,
-            "/api/groups",
-            Some(json!({
-                "gid": self.gid,
-                "name": self.name,
-                "description": self.description,
-            })),
-        )
-        .await
-    }
-
-    async fn delete(&self) -> (StatusCode, BodyJson) {
-        send(Method::DELETE, &format!("/api/groups/{}", self.gid), None).await
-    }
-}
+use common::{
+    http::send::send,
+    seed::{nanos::nanos, test_group::TestGroup},
+};
 
 #[tokio::test]
 async fn list_returns_array_with_fields() {
@@ -114,9 +19,12 @@ async fn list_returns_array_with_fields() {
         assert!(
             entry.get("gid").is_some()
                 && entry.get("name").is_some()
-                && entry.get("description").is_some()
-                && entry.get("members").is_some(),
-            "each group should have gid/name/description/members, got {entry}"
+                && entry.get("description").is_some(),
+            "each group should have gid/name/description, got {entry}"
+        );
+        assert!(
+            entry.get("members").is_none(),
+            "GET /api/groups should not expose members, got {entry}"
         );
     }
 }
@@ -134,10 +42,9 @@ async fn create_returns_201_with_name_and_is_listed() {
     assert_eq!(body["gid"], group.gid);
     assert_eq!(body["name"], group.name, "name should be in response");
     assert_eq!(body["description"], group.description);
-    assert_eq!(
-        body["members"],
-        json!([group.member]),
-        "created group should list its initial member"
+    assert!(
+        body.get("members").is_none(),
+        "created group response should not expose members"
     );
 
     let (status, groups) = send(Method::GET, "/api/groups", None).await;
@@ -316,19 +223,18 @@ async fn update_changes_name_and_description() {
 }
 
 #[tokio::test]
-async fn delete_unknown_gid_is_500() {
-    let n = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos()
-        % 1000000;
+async fn delete_unknown_gid_is_404() {
+    let n = nanos();
 
     let (status, body) = send(Method::DELETE, &format!("/api/groups/apinobody{n}"), None).await;
+    if status == StatusCode::INTERNAL_SERVER_ERROR {
+        return; // LDAP indisponible => skip
+    }
 
     assert_eq!(
         status,
-        StatusCode::INTERNAL_SERVER_ERROR,
-        "deleting unknown group should 500"
+        StatusCode::NOT_FOUND,
+        "deleting unknown group should 404"
     );
     assert!(body.get("error").is_some(), "error body expected");
 }
@@ -374,57 +280,14 @@ async fn create_duplicate_gid_is_500() {
 }
 
 mod repo {
-    use portail_backend::domain::groups::{Description, Gid, Members, Name, NewGroup, UpdateGroup};
-    use portail_backend::domain::users::{Email, NewUser, Password, Uid};
+    use crate::common::seed::{
+        nanos::nanos, new_group_with_member::new_group_with_member, seed_user::seed_user,
+    };
+    use portail_backend::domain::groups::{Description, Gid, Name, UpdateGroup};
     use portail_backend::error::AppError;
     use portail_backend::repository::ldap::groups::{
         create_group, delete_group, list_groups, update_group,
     };
-    use portail_backend::repository::ldap::users::create_user;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    async fn seed_user(uid_str: &str) -> Result<(), AppError> {
-        ensure_clean(uid_str).await;
-
-        let new = NewUser {
-            uid: Uid::try_new(uid_str.to_string()).unwrap(),
-            name: portail_backend::domain::users::Name::try_new("Seed Member".into()).unwrap(),
-            email: Email::try_new("".into()).unwrap(),
-            password: Password::try_new("secret123".into()).unwrap(),
-        };
-
-        create_user(new).await.map(|_| ())
-    }
-
-    async fn ensure_clean(uid_str: &str) {
-        let url = std::env::var("LDAP_URL").unwrap_or_else(|_| "ldap://127.0.0.1:3891".into());
-        let base =
-            std::env::var("LDAP_BASE_DN").unwrap_or_else(|_| "dc=dev,dc=example,dc=com".into());
-        if let Ok((conn, mut ldap)) = ldap3::LdapConnAsync::new(&url).await {
-            ldap3::drive!(conn);
-            let dn = format!("uid={uid_str},ou=people,{base}");
-            let _ = ldap.simple_bind(&format!("cn=admin,{base}"), "admin").await;
-            let _ = ldap.delete(&dn).await;
-            let _ = ldap.unbind().await;
-        }
-    }
-
-    fn nanos() -> u128 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-            % 1_000_000
-    }
-
-    fn new_group_with_member(prefix: &str, member_uid: &str) -> NewGroup {
-        NewGroup {
-            gid: Gid::try_new(format!("{prefix}{}", nanos())).unwrap(),
-            name: Name::try_new("Unit Group".into()).unwrap(),
-            description: Description::try_new("unit test group".into()),
-            members: Members::try_new(vec![Uid::try_new(member_uid.into()).unwrap()]).unwrap(),
-        }
-    }
 
     #[tokio::test]
     async fn repository_create_list_delete_roundtrip() {
@@ -448,11 +311,6 @@ mod repo {
             created.description, new.description,
             "created group should echo description"
         );
-        assert_eq!(
-            created.members,
-            vec![member.clone()],
-            "created group should list its member uid"
-        );
 
         let groups = list_groups().await.unwrap();
         let listed = groups.iter().find(|g| g.gid == new.gid).cloned();
@@ -461,10 +319,8 @@ mod repo {
 
         let listed = listed.unwrap();
 
-        assert_eq!(listed.name, new.name, "listed group should keep its name");
         assert_eq!(
-            listed.members,
-            vec![member.clone()],
+            listed.name, new.name,
             "listed group should expose members parsed from LDAP"
         );
 

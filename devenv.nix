@@ -264,7 +264,7 @@ in
       ldapsPort = 6361;
       suffix = "dc=test,dc=example,dc=com";
     };
-    vscode.exec = "${codiumWithExt}/bin/codium . 2>/dev/null || code . 2>/dev/null || echo 'vscode/codium non installé — ouvrez manuellement code .'; sleep infinity";
+    vscode.exec = "${codiumWithExt}/bin/codium . 2>/dev/null -w --profile devenv_portail";
   };
 
   scripts.openfrontend.exec = "xdg-open $APP_URL/ 2>/dev/null || echo \"Ouvrez manuellement $APP_URL/\"";

@@ -22,14 +22,7 @@ export default function Users() {
       }),
     ])
       .then(([usersList, groupsList]) => {
-        setUsers(
-          usersList.map((u) => ({
-            ...u,
-            groups: groupsList
-              .filter((g) => g.members.includes(u.uid))
-              .map((g) => g.gid),
-          })),
-        );
+        setUsers(usersList);
         setGroups(groupsList);
       })
       .catch(() => {

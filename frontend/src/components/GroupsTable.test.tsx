@@ -10,9 +10,7 @@ test("empty", () => {
 });
 
 test("renders rows with gid, name, description and delete", () => {
-  const groups = [
-    { gid: "devs", name: "Devs", description: "Devs team", members: [] },
-  ];
+  const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
   render(<GroupsTable groups={groups} />);
 
@@ -27,9 +25,7 @@ test("delete calls api and refreshes", async () => {
     Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
   );
 
-  const groups = [
-    { gid: "devs", name: "Devs", description: "Devs team", members: [] },
-  ];
+  const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
   render(<GroupsTable groups={groups} onDeleted={onDeleted} />);
 
@@ -56,9 +52,7 @@ test("delete shows error on failure", async () => {
     } as Response),
   );
 
-  const groups = [
-    { gid: "devs", name: "Devs", description: "Devs team", members: [] },
-  ];
+  const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
   render(
     <>
@@ -87,9 +81,7 @@ test("edit name sends PUT with name and current description", async () => {
   );
   globalThis.fetch = fetchMock;
 
-  const groups = [
-    { gid: "devs", name: "Devs", description: "Devs team", members: [] },
-  ];
+  const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
   render(<GroupsTable groups={groups} onUpdated={() => {}} />);
 
@@ -118,9 +110,7 @@ test("edit description sends PUT with description and current name", async () =>
   );
   globalThis.fetch = fetchMock;
 
-  const groups = [
-    { gid: "devs", name: "Devs", description: "Devs team", members: [] },
-  ];
+  const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
   render(<GroupsTable groups={groups} onUpdated={() => {}} />);
 

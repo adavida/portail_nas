@@ -1,25 +1,23 @@
 import { render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
+import { mockFetchByUrl } from "../test/mock_fetch_by_url";
 import Users from "./Users";
-
-function mockFetchByUrl(byUrl: Record<string, unknown>) {
-  return vi.fn((_url: RequestInfo | URL) =>
-    Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve(byUrl[String(_url)] ?? []),
-    } as unknown as Response),
-  );
-}
 
 test("loading then data", async () => {
   globalThis.fetch = mockFetchByUrl({
-    "/api/users": [{ uid: "alice", name: "Alice", email: "alice@example.com" }],
+    "/api/users": [
+      {
+        uid: "alice",
+        name: "Alice",
+        email: "alice@example.com",
+        groups: ["devs"],
+      },
+    ],
     "/api/groups": [
       {
         gid: "devs",
         name: "Devs",
         description: "",
-        members: ["alice"],
       },
     ],
   });

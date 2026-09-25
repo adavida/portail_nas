@@ -310,6 +310,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dtor"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd3f6c362b2bbd7063090886afd78978f5dbf1f11da7efcc40f81d32c943fac1"
+dependencies = [
+ "linktime-proc-macro",
+]
+
+[[package]]
 name = "ecdsa"
 version = "0.16.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -375,7 +384,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1210,6 +1219,7 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "ctor",
+ "dtor",
  "http-body-util",
  "jsonwebtoken",
  "ldap3",
@@ -1517,7 +1527,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1835,7 +1845,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

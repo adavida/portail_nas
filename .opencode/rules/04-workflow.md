@@ -11,6 +11,7 @@
 - `just test` (`justfile:9`) = `cargo test` + `npm --prefix frontend test -- --run` (raccourci local).
 - Nouvelle route LDAP → trait `LdapClient` mockable, pas de vrai LDAP en unit test (intégration seulement via `LDAP_TEST_*`).
 - Tests AAA : tout `#[test]` / `test(` suit Arrange, Act, Assert avec **ligne vide entre les 3** + **assertions faciles à lire** (`assert_eq!` avec message, variable intermédiaire, `assert_auth_*` helpers) — skill `.opencode/skills/test-aaa/SKILL.md` trigger `*.rs` `*.test.tsx`.
+- **1 fonction publique = au moins 1 test** : toute `pub fn`/`pub async fn` (domain, repository, controllers, http) a un test collocalisé `#[cfg(test)]` (repo/domain) ou d'intégration `backend/tests/*.rs` (routes). Une fonction publique sans test = pas finie.
 - Après toute modif Rust (`backend/src/**/*.rs`, `Cargo.toml`) → `devenv shell -- cargo fmt` obligatoire en fin de modif, puis `devenv shell -- treefmt --fail-on-change` avant `git add` — skill `.opencode/skills/backend-format/SKILL.md`.
 
 ## VSCode

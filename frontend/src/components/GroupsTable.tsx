@@ -2,7 +2,6 @@ export type Group = {
   gid: string;
   name: string;
   description: string;
-  members: string[];
 };
 
 import EditableCell from "./EditableCell";
