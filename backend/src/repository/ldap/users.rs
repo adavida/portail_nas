@@ -1,4 +1,4 @@
-use ldap3::{LdapConnAsync, Mod, Scope, SearchEntry};
+use ldap3::{Mod, Scope, SearchEntry};
 use std::collections::HashSet;
 
 use crate::{
@@ -6,18 +6,18 @@ use crate::{
     error::AppError,
 };
 
-use super::{MapLdap, connect_admin, ldap_base, ldap_url, people_search_base, user_dn};
+use super::{MapLdap, connect, ldap_base, people_search_base, user_dn};
 
 fn one_set(v: String) -> HashSet<String> {
     [v].into_iter().collect()
 }
 
+#[tracing::instrument(level = "debug", skip_all)]
 pub async fn list_users() -> Result<Vec<User>, AppError> {
     let base = ldap_base();
     let search_base = people_search_base(&base);
 
-    let (conn, mut ldap) = LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
-    ldap3::drive!(conn);
+    let mut ldap = connect(&base).await?;
 
     let (rs, _res) = ldap_conn_search(&mut ldap, &search_base).await?;
     let entries: Vec<SearchEntry> = rs.into_iter().map(SearchEntry::construct).collect();
@@ -28,6 +28,7 @@ pub async fn list_users() -> Result<Vec<User>, AppError> {
     Ok(users)
 }
 
+#[tracing::instrument(level = "debug", skip_all)]
 async fn ldap_conn_search(
     ldap: &mut ldap3::Ldap,
     base: &str,
@@ -44,10 +45,11 @@ async fn ldap_conn_search(
     .map_ldap()
 }
 
+#[tracing::instrument(level = "debug", skip_all)]
 pub async fn create_user(new: NewUser) -> Result<User, AppError> {
     let base = ldap_base();
     let dn = user_dn(&new.uid, &base);
-    let mut ldap = connect_admin(&base).await?;
+    let mut ldap = connect(&base).await?;
 
     ldap.add(&dn, new.to_attrs())
         .await
@@ -63,10 +65,11 @@ pub async fn create_user(new: NewUser) -> Result<User, AppError> {
     })
 }
 
+#[tracing::instrument(level = "debug", skip_all)]
 pub async fn update_user_password(uid: Uid, password: Password) -> Result<(), AppError> {
     let base = ldap_base();
     let dn = user_dn(&uid, &base);
-    let mut ldap = connect_admin(&base).await?;
+    let mut ldap = connect(&base).await?;
 
     ldap.modify(
         &dn,
@@ -83,10 +86,11 @@ pub async fn update_user_password(uid: Uid, password: Password) -> Result<(), Ap
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all)]
 pub async fn update_user(uid: Uid, data: UpdateUser) -> Result<(), AppError> {
     let base = ldap_base();
     let dn = user_dn(&uid, &base);
-    let mut ldap = connect_admin(&base).await?;
+    let mut ldap = connect(&base).await?;
 
     let sn = data
         .name
@@ -119,22 +123,23 @@ pub async fn update_user(uid: Uid, data: UpdateUser) -> Result<(), AppError> {
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all)]
 pub async fn delete_user(uid: Uid) -> Result<(), AppError> {
     let base = ldap_base();
     let dn = user_dn(&uid, &base);
-    let mut ldap = connect_admin(&base).await?;
+    let mut ldap = connect(&base).await?;
 
     ldap.delete(&dn).await.map_ldap()?.success().map_ldap()?;
     let _ = ldap.unbind().await;
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all)]
 pub async fn authenticate_user(uid: Uid, password: Password) -> Result<bool, AppError> {
     let base = ldap_base();
     let dn = user_dn(&uid, &base);
 
-    let (conn, mut ldap) = LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
-    ldap3::drive!(conn);
+    let mut ldap = connect(&base).await?;
 
     let res = ldap.simple_bind(&dn, password.as_str()).await.map_ldap()?;
     let rc = res.rc;
@@ -150,6 +155,8 @@ pub async fn authenticate_user(uid: Uid, password: Password) -> Result<bool, App
 mod tests {
     use super::*;
     use crate::domain::users::{Email, Name};
+    use crate::repository::ldap::ldap_url;
+    use ldap3::LdapConnAsync;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     // user_dn_from is for tests only — the general import would create an

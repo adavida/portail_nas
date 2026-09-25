@@ -8,6 +8,7 @@ async fn main() {
                 .add_directive("info".parse().unwrap()),
         )
         .init();
+    tracing::info!("start ... ... portail");
     // Validate env once at startup — aggregated error if any var missing/empty.
     let env = Env::create().unwrap_or_else(|e| panic!("{e}"));
     env.log_summary();

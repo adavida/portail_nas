@@ -18,19 +18,20 @@ pub(crate) fn ldap_base() -> String {
     crate::env::Env::global().ldap_base_dn.clone()
 }
 
-pub(crate) async fn connect_admin(base: &str) -> Result<ldap3::Ldap, AppError> {
+#[tracing::instrument(level = "debug", skip_all)]
+pub(crate) async fn connect(base: &str) -> Result<ldap3::Ldap, AppError> {
     let (conn, mut ldap) = ldap3::LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
-
     ldap3::drive!(conn);
     bind_admin(&mut ldap, base).await?;
     Ok(ldap)
 }
 
+#[tracing::instrument(level = "debug", skip_all)]
 pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap, base: &str) -> Result<(), AppError> {
     let bind_dn = format!("cn=admin,{base}");
+    tracing::info!(bind_dn = %bind_dn, url = %ldap_url(), "ldap admin bind");
     let pw = crate::env::Env::global().ldap_admin_pw.clone();
 
-    tracing::info!(bind_dn = %bind_dn, url = %ldap_url(), "ldap admin bind");
     ldap.simple_bind(&bind_dn, &pw)
         .await
         .map_ldap()?
