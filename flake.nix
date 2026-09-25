@@ -28,6 +28,8 @@
         packages = with pkgs; [
           cargo
           clippy
+          openssl
+          pkg-config
           rustc
           rustfmt
         ];

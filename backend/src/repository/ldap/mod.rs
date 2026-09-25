@@ -18,9 +18,35 @@ pub(crate) fn ldap_base() -> String {
     crate::env::Env::global().ldap_base_dn.clone()
 }
 
+/// Adds a trusted root certificate to the connection settings when
+/// `LDAP_TLS_CA` points to a PEM file (self-signed server cert or CA).
+/// Empty path = system trust store only.
+pub(crate) fn with_tls_ca(
+    settings: ldap3::LdapConnSettings,
+    ca_path: &str,
+) -> Result<ldap3::LdapConnSettings, AppError> {
+    let path = ca_path.trim();
+    if path.is_empty() {
+        return Ok(settings);
+    }
+    let pem = std::fs::read(path)
+        .map_err(|e| AppError::Ldap(format!("cannot read LDAP_TLS_CA {path}: {e}")))?;
+    let cert = native_tls::Certificate::from_pem(&pem)
+        .map_err(|e| AppError::Ldap(format!("invalid LDAP_TLS_CA PEM {path}: {e}")))?;
+    let connector = native_tls::TlsConnector::builder()
+        .add_root_certificate(cert)
+        .build()
+        .map_err(|e| AppError::Ldap(format!("tls connector error: {e}")))?;
+    Ok(settings.set_connector(connector))
+}
+
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) async fn connect() -> Result<ldap3::Ldap, AppError> {
-    let (conn, mut ldap) = ldap3::LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
+    let env = crate::env::Env::global();
+    let settings = with_tls_ca(ldap3::LdapConnSettings::new(), &env.ldap_tls_ca)?;
+    let (conn, mut ldap) = ldap3::LdapConnAsync::with_settings(settings, &ldap_url())
+        .await
+        .map_ldap()?;
     ldap3::drive!(conn);
     bind_admin(&mut ldap).await?;
     Ok(ldap)
@@ -104,8 +130,48 @@ mod tests {
         let url = super::ldap_url();
         assert!(!url.is_empty(), "ldap_url should be non-empty");
         assert!(
-            url.starts_with("ldap://"),
-            "ldap_url should be ldap://..., got {url}"
+            url.starts_with("ldap"),
+            "ldap_url should be ldap:// or ldaps://..., got {url}"
+        );
+    }
+
+    #[test]
+    fn tls_ca_empty_is_noop() {
+        let settings = ldap3::LdapConnSettings::new();
+
+        let result = super::with_tls_ca(settings, "");
+
+        assert!(result.is_ok(), "empty CA path should be a no-op");
+    }
+
+    #[test]
+    fn tls_ca_missing_file_fails() {
+        let settings = ldap3::LdapConnSettings::new();
+
+        let err = match super::with_tls_ca(settings, "/tmp/portail-no-such-ca.crt") {
+            Err(err) => err,
+            Ok(_) => panic!("missing CA file should fail"),
+        };
+
+        assert!(
+            err.to_string().contains("cannot read LDAP_TLS_CA"),
+            "missing CA file should be reported: {err}"
+        );
+    }
+
+    #[test]
+    fn tls_ca_invalid_pem_fails() {
+        let path = std::env::temp_dir().join(format!("portail-bogus-ca-{}", std::process::id()));
+        std::fs::write(&path, "not a pem").unwrap();
+
+        let err = match super::with_tls_ca(ldap3::LdapConnSettings::new(), path.to_str().unwrap()) {
+            Err(err) => err,
+            Ok(_) => panic!("garbage PEM should fail"),
+        };
+
+        assert!(
+            err.to_string().contains("invalid LDAP_TLS_CA PEM"),
+            "garbage PEM should be reported: {err}"
         );
     }
 }

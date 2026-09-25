@@ -5,7 +5,7 @@ use crate::domain::groups::{Gid, Group, NewGroup, UpdateGroup};
 use crate::domain::users::Uid;
 use crate::error::AppError;
 
-use super::{MapLdap, connect, group_dn_from, groups_search_base, ldap_base, ldap_url, user_dn};
+use super::{MapLdap, connect, group_dn_from, groups_search_base, ldap_url, user_dn};
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn list_groups() -> Result<Vec<Group>, AppError> {
@@ -40,7 +40,6 @@ pub async fn list_groups() -> Result<Vec<Group>, AppError> {
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn create_group(new: NewGroup) -> Result<Group, AppError> {
-    let base = ldap_base();
     let dn = group_dn_from(new.gid.as_str());
     let mut ldap = connect().await?;
 
@@ -48,13 +47,20 @@ pub async fn create_group(new: NewGroup) -> Result<Group, AppError> {
         if !user_exists(&mut ldap, uid).await {
             let _ = ldap.unbind().await;
             return Err(AppError::NotFound(format!(
-                "uid={} not found in ou=people",
-                uid.as_str()
+                "uid={} not found in ou={}",
+                uid.as_str(),
+                crate::env::Env::global().ldap_people_ou
             )));
         }
     }
 
-    ldap.add(&dn, new.to_attrs(&base))
+    let mut attrs = new.to_attrs();
+    attrs.push((
+        "member".to_string(),
+        new.members.as_slice().iter().map(user_dn).collect(),
+    ));
+
+    ldap.add(&dn, attrs)
         .await
         .map_ldap()?
         .success()

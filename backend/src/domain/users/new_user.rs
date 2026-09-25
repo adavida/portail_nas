@@ -12,10 +12,6 @@ pub struct NewUser {
 }
 
 impl NewUser {
-    pub fn dn(&self, base: &str) -> String {
-        format!("uid={},ou=people,{base}", self.uid.as_str())
-    }
-
     pub fn to_attrs(&self) -> Vec<(String, std::collections::HashSet<String>)> {
         let sn = self
             .name
@@ -59,20 +55,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_user_dn_and_attrs() {
+    fn new_user_attrs() {
         let u = NewUser {
             uid: Uid::try_new("bob".into()).unwrap(),
             name: Name::try_new("Bob Dupont".into()).unwrap(),
             email: Email::try_new("bob@example.com".into()).unwrap(),
             password: Password::try_new("secret".into()).unwrap(),
         };
-
-        let dn = u.dn("dc=dev,dc=example,dc=com");
-
-        assert_eq!(
-            dn, "uid=bob,ou=people,dc=dev,dc=example,dc=com",
-            "dn should be uid + ou=people + base"
-        );
 
         let attrs = u.to_attrs();
         let find = |k: &str| attrs.iter().find(|(kk, _)| kk == k).unwrap().1.clone();

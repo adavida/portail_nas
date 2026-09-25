@@ -16,6 +16,9 @@ pub struct Env {
     pub ldap_people_ou: String,
     pub ldap_groups_ou: String,
     pub ldap_admin_pw: String,
+    /// Optional TLS trust for LDAPS: PEM file path of the CA / self-signed
+    /// server cert. Empty (default) = system trust store only.
+    pub ldap_tls_ca: String,
 }
 
 static ENV: OnceLock<Env> = OnceLock::new();
@@ -111,6 +114,7 @@ impl Env {
         let ldap_people_ou = take_opt("LDAP_PEOPLE_OU", "people");
         let ldap_groups_ou = take_opt("LDAP_GROUPS_OU", "groups");
         let ldap_admin_pw = take_secret_opt("LDAP_ADMIN_PW", "admin", &mut file_errors);
+        let ldap_tls_ca = take_opt("LDAP_TLS_CA", "");
 
         if !missing.is_empty() {
             return Err(EnvError(format!(
@@ -137,6 +141,7 @@ impl Env {
             ldap_people_ou,
             ldap_groups_ou,
             ldap_admin_pw,
+            ldap_tls_ca,
         })
     }
 
@@ -155,6 +160,7 @@ impl Env {
             ldap_people_ou = %self.ldap_people_ou,
             ldap_groups_ou = %self.ldap_groups_ou,
             ldap_admin_pw = %self.ldap_admin_pw,
+            ldap_tls_ca = %self.ldap_tls_ca,
             "backend env loaded"
         );
     }
@@ -220,6 +226,7 @@ impl Env {
                 .unwrap_or("groups")
                 .to_string(),
             ldap_admin_pw: option_env!("LDAP_ADMIN_PW").unwrap_or("admin").to_string(),
+            ldap_tls_ca: option_env!("LDAP_TLS_CA").unwrap_or("").to_string(),
         }
     }
 }
@@ -346,16 +353,19 @@ mod tests {
             std::env::var("LDAP_PEOPLE_OU").ok(),
             std::env::var("LDAP_GROUPS_OU").ok(),
             std::env::var("LDAP_ADMIN_PW").ok(),
+            std::env::var("LDAP_TLS_CA").ok(),
         );
         unsafe { std::env::remove_var("LDAP_PEOPLE_OU") };
         unsafe { std::env::remove_var("LDAP_GROUPS_OU") };
         unsafe { std::env::remove_var("LDAP_ADMIN_PW") };
+        unsafe { std::env::remove_var("LDAP_TLS_CA") };
 
         let env = super::Env::create().unwrap();
 
         assert_eq!(env.ldap_people_ou, "people", "default people OU expected");
         assert_eq!(env.ldap_groups_ou, "groups", "default groups OU expected");
         assert_eq!(env.ldap_admin_pw, "admin", "default admin pw expected");
+        assert_eq!(env.ldap_tls_ca, "", "default empty TLS CA expected");
 
         if let Some(v) = saved.0 {
             unsafe { std::env::set_var("LDAP_PEOPLE_OU", v) };
@@ -366,6 +376,9 @@ mod tests {
         if let Some(v) = saved.2 {
             unsafe { std::env::set_var("LDAP_ADMIN_PW", v) };
         }
+        if let Some(v) = saved.3 {
+            unsafe { std::env::set_var("LDAP_TLS_CA", v) };
+        }
     }
 
     #[test]
@@ -374,24 +387,31 @@ mod tests {
         let saved = (
             std::env::var("LDAP_PEOPLE_OU").ok(),
             std::env::var("LDAP_GROUPS_OU").ok(),
+            std::env::var("LDAP_TLS_CA").ok(),
         );
         unsafe { std::env::set_var("LDAP_PEOPLE_OU", "humains") };
         unsafe { std::env::set_var("LDAP_GROUPS_OU", "") };
+        unsafe { std::env::set_var("LDAP_TLS_CA", "/tmp/fake-ca.crt") };
 
         let env = super::Env::create().unwrap();
 
         assert_eq!(env.ldap_people_ou, "humains", "custom OU expected");
         assert_eq!(env.ldap_groups_ou, "groups", "empty should fall back");
+        assert_eq!(
+            env.ldap_tls_ca, "/tmp/fake-ca.crt",
+            "custom TLS CA path expected"
+        );
 
         if let Some(v) = saved.0 {
             unsafe { std::env::set_var("LDAP_PEOPLE_OU", v) };
-        } else {
-            unsafe { std::env::remove_var("LDAP_PEOPLE_OU") };
         }
         if let Some(v) = saved.1 {
             unsafe { std::env::set_var("LDAP_GROUPS_OU", v) };
         } else {
             unsafe { std::env::remove_var("LDAP_GROUPS_OU") };
+        }
+        if let Some(v) = saved.2 {
+            unsafe { std::env::set_var("LDAP_TLS_CA", v) };
         }
     }
 
