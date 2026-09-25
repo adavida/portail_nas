@@ -54,6 +54,18 @@ in
         description = "LDAP suffix (LDAP_BASE_DN).";
       };
 
+      peopleOu = lib.mkOption {
+        type = lib.types.str;
+        default = "people";
+        description = "OU holding user entries (LDAP_PEOPLE_OU).";
+      };
+
+      groupsOu = lib.mkOption {
+        type = lib.types.str;
+        default = "groups";
+        description = "OU holding group entries (LDAP_GROUPS_OU).";
+      };
+
       adminPasswordFile = lib.mkOption {
         type = lib.types.path;
         description = ''
@@ -120,6 +132,8 @@ in
           BIND_ADDR = cfg.bindAddress;
           LDAP_URL = cfg.ldap.url;
           LDAP_BASE_DN = cfg.ldap.baseDn;
+          LDAP_PEOPLE_OU = cfg.ldap.peopleOu;
+          LDAP_GROUPS_OU = cfg.ldap.groupsOu;
           LDAP_ADMIN_PW = toString cfg.ldap.adminPasswordFile;
           OIDC_CLIENT_ID = cfg.oidcClientId;
           OIDC_ISSUER_URL = cfg.issuerUrl;
