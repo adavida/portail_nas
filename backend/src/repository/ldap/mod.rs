@@ -19,16 +19,16 @@ pub(crate) fn ldap_base() -> String {
 }
 
 #[tracing::instrument(level = "debug", skip_all)]
-pub(crate) async fn connect(base: &str) -> Result<ldap3::Ldap, AppError> {
+pub(crate) async fn connect() -> Result<ldap3::Ldap, AppError> {
     let (conn, mut ldap) = ldap3::LdapConnAsync::new(&ldap_url()).await.map_ldap()?;
     ldap3::drive!(conn);
-    bind_admin(&mut ldap, base).await?;
+    bind_admin(&mut ldap).await?;
     Ok(ldap)
 }
 
 #[tracing::instrument(level = "debug", skip_all)]
-pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap, base: &str) -> Result<(), AppError> {
-    let bind_dn = format!("cn=admin,{base}");
+pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap) -> Result<(), AppError> {
+    let bind_dn = format!("cn=admin,{}", ldap_base());
     tracing::info!(bind_dn = %bind_dn, url = %ldap_url(), "ldap admin bind");
     let pw = crate::env::Env::global().ldap_admin_pw.clone();
 
@@ -40,34 +40,42 @@ pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap, base: &str) -> Result<(),
     Ok(())
 }
 
-pub(crate) fn user_dn(uid: &crate::domain::users::Uid, base: &str) -> String {
-    user_dn_from(uid.as_str(), base)
+pub(crate) fn user_dn(uid: &crate::domain::users::Uid) -> String {
+    user_dn_from(uid.as_str())
 }
 
-pub(crate) fn user_dn_from(uid: &str, base: &str) -> String {
+pub(crate) fn user_dn_from(uid: &str) -> String {
     format!(
         "uid={},ou={},{}",
         uid,
         crate::env::Env::global().ldap_people_ou,
-        base
+        ldap_base()
     )
 }
 
-pub(crate) fn group_dn_from(gid: &str, base: &str) -> String {
+pub(crate) fn group_dn_from(gid: &str) -> String {
     format!(
         "cn={},ou={},{}",
         gid,
         crate::env::Env::global().ldap_groups_ou,
-        base
+        ldap_base()
     )
 }
 
-pub(crate) fn people_search_base(base: &str) -> String {
-    format!("ou={},{}", crate::env::Env::global().ldap_people_ou, base)
+pub(crate) fn people_search_base() -> String {
+    format!(
+        "ou={},{}",
+        crate::env::Env::global().ldap_people_ou,
+        ldap_base()
+    )
 }
 
-pub(crate) fn groups_search_base(base: &str) -> String {
-    format!("ou={},{}", crate::env::Env::global().ldap_groups_ou, base)
+pub(crate) fn groups_search_base() -> String {
+    format!(
+        "ou={},{}",
+        crate::env::Env::global().ldap_groups_ou,
+        ldap_base()
+    )
 }
 
 pub(crate) trait MapLdap<T> {

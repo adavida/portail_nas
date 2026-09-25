@@ -9,10 +9,9 @@ use super::{MapLdap, connect, group_dn_from, groups_search_base, ldap_base, ldap
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn list_groups() -> Result<Vec<Group>, AppError> {
-    let base = ldap_base();
-    let search_base = groups_search_base(&base);
+    let search_base = groups_search_base();
 
-    let mut ldap = connect(&base).await?;
+    let mut ldap = connect().await?;
 
     tracing::info!(
         "list_groups url = {} search = {}",
@@ -42,11 +41,11 @@ pub async fn list_groups() -> Result<Vec<Group>, AppError> {
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn create_group(new: NewGroup) -> Result<Group, AppError> {
     let base = ldap_base();
-    let dn = group_dn_from(new.gid.as_str(), &base);
-    let mut ldap = connect(&base).await?;
+    let dn = group_dn_from(new.gid.as_str());
+    let mut ldap = connect().await?;
 
     for uid in new.members.as_slice() {
-        if !user_exists(&mut ldap, uid, &base).await {
+        if !user_exists(&mut ldap, uid).await {
             let _ = ldap.unbind().await;
             return Err(AppError::NotFound(format!(
                 "uid={} not found in ou=people",
@@ -76,8 +75,8 @@ pub async fn create_group(new: NewGroup) -> Result<Group, AppError> {
 }
 
 #[tracing::instrument(level = "debug", skip_all)]
-async fn user_exists(ldap: &mut ldap3::Ldap, uid: &Uid, base: &str) -> bool {
-    let dn = user_dn(uid, base);
+async fn user_exists(ldap: &mut ldap3::Ldap, uid: &Uid) -> bool {
+    let dn = user_dn(uid);
     let filter = format!("(uid={})", uid.as_str());
     match ldap.search(&dn, Scope::Base, &filter, vec!["uid"]).await {
         Ok(result) => result
@@ -90,12 +89,11 @@ async fn user_exists(ldap: &mut ldap3::Ldap, uid: &Uid, base: &str) -> bool {
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn add_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
-    let base = ldap_base();
-    let group_dn = group_dn_from(gid.as_str(), &base);
-    let member_dn = user_dn(&uid, &base);
-    let mut ldap = connect(&base).await?;
+    let group_dn = group_dn_from(gid.as_str());
+    let member_dn = user_dn(&uid);
+    let mut ldap = connect().await?;
 
-    if !user_exists(&mut ldap, &uid, &base).await {
+    if !user_exists(&mut ldap, &uid).await {
         let _ = ldap.unbind().await;
         return Err(AppError::NotFound(format!(
             "uid={} not found",
@@ -120,10 +118,9 @@ pub async fn add_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
-    let base = ldap_base();
-    let group_dn = group_dn_from(gid.as_str(), &base);
-    let member_dn = user_dn(&uid, &base);
-    let mut ldap = connect(&base).await?;
+    let group_dn = group_dn_from(gid.as_str());
+    let member_dn = user_dn(&uid);
+    let mut ldap = connect().await?;
 
     ldap.modify(
         &group_dn,
@@ -142,9 +139,8 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn update_group(gid: Gid, data: UpdateGroup) -> Result<(), AppError> {
-    let base = ldap_base();
-    let dn = group_dn_from(gid.as_str(), &base);
-    let mut ldap = connect(&base).await?;
+    let dn = group_dn_from(gid.as_str());
+    let mut ldap = connect().await?;
 
     let set_description = if data.description.as_str().is_empty() {
         HashSet::new()
@@ -174,9 +170,8 @@ pub async fn update_group(gid: Gid, data: UpdateGroup) -> Result<(), AppError> {
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn delete_group(gid: Gid) -> Result<(), AppError> {
-    let base = ldap_base();
-    let dn = group_dn_from(gid.as_str(), &base);
-    let mut ldap = connect(&base).await?;
+    let dn = group_dn_from(gid.as_str());
+    let mut ldap = connect().await?;
 
     ldap.delete(&dn).await.map_ldap()?.success().map_ldap()?;
     let _ = ldap.unbind().await;

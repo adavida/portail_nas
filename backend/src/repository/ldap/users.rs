@@ -6,7 +6,7 @@ use crate::{
     error::AppError,
 };
 
-use super::{MapLdap, connect, ldap_base, people_search_base, user_dn};
+use super::{MapLdap, connect, people_search_base, user_dn};
 
 fn one_set(v: String) -> HashSet<String> {
     [v].into_iter().collect()
@@ -14,10 +14,9 @@ fn one_set(v: String) -> HashSet<String> {
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn list_users() -> Result<Vec<User>, AppError> {
-    let base = ldap_base();
-    let search_base = people_search_base(&base);
+    let search_base = people_search_base();
 
-    let mut ldap = connect(&base).await?;
+    let mut ldap = connect().await?;
 
     let (rs, _res) = ldap_conn_search(&mut ldap, &search_base).await?;
     let entries: Vec<SearchEntry> = rs.into_iter().map(SearchEntry::construct).collect();
@@ -47,9 +46,8 @@ async fn ldap_conn_search(
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn create_user(new: NewUser) -> Result<User, AppError> {
-    let base = ldap_base();
-    let dn = user_dn(&new.uid, &base);
-    let mut ldap = connect(&base).await?;
+    let dn = user_dn(&new.uid);
+    let mut ldap = connect().await?;
 
     ldap.add(&dn, new.to_attrs())
         .await
@@ -67,9 +65,8 @@ pub async fn create_user(new: NewUser) -> Result<User, AppError> {
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn update_user_password(uid: Uid, password: Password) -> Result<(), AppError> {
-    let base = ldap_base();
-    let dn = user_dn(&uid, &base);
-    let mut ldap = connect(&base).await?;
+    let dn = user_dn(&uid);
+    let mut ldap = connect().await?;
 
     ldap.modify(
         &dn,
@@ -88,9 +85,8 @@ pub async fn update_user_password(uid: Uid, password: Password) -> Result<(), Ap
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn update_user(uid: Uid, data: UpdateUser) -> Result<(), AppError> {
-    let base = ldap_base();
-    let dn = user_dn(&uid, &base);
-    let mut ldap = connect(&base).await?;
+    let dn = user_dn(&uid);
+    let mut ldap = connect().await?;
 
     let sn = data
         .name
@@ -125,9 +121,8 @@ pub async fn update_user(uid: Uid, data: UpdateUser) -> Result<(), AppError> {
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn delete_user(uid: Uid) -> Result<(), AppError> {
-    let base = ldap_base();
-    let dn = user_dn(&uid, &base);
-    let mut ldap = connect(&base).await?;
+    let dn = user_dn(&uid);
+    let mut ldap = connect().await?;
 
     ldap.delete(&dn).await.map_ldap()?.success().map_ldap()?;
     let _ = ldap.unbind().await;
@@ -136,10 +131,9 @@ pub async fn delete_user(uid: Uid) -> Result<(), AppError> {
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn authenticate_user(uid: Uid, password: Password) -> Result<bool, AppError> {
-    let base = ldap_base();
-    let dn = user_dn(&uid, &base);
+    let dn = user_dn(&uid);
 
-    let mut ldap = connect(&base).await?;
+    let mut ldap = connect().await?;
 
     let res = ldap.simple_bind(&dn, password.as_str()).await.map_ldap()?;
     let rc = res.rc;
@@ -155,13 +149,9 @@ pub async fn authenticate_user(uid: Uid, password: Password) -> Result<bool, App
 mod tests {
     use super::*;
     use crate::domain::users::{Email, Name};
-    use crate::repository::ldap::ldap_url;
+    use crate::repository::ldap::{ldap_base, ldap_url, user_dn_from};
     use ldap3::LdapConnAsync;
     use std::time::{SystemTime, UNIX_EPOCH};
-
-    // user_dn_from is for tests only — the general import would create an
-    // unused_imports warning in non-test builds.
-    use crate::repository::ldap::user_dn_from;
 
     fn gen_uid(prefix: &str) -> String {
         let n = SystemTime::now()
@@ -188,7 +178,7 @@ mod tests {
             ldap3::drive!(conn);
             let bind_dn = format!("cn=admin,{base}");
             if ldap.simple_bind(&bind_dn, "admin").await.is_ok() {
-                let dn = user_dn_from(uid, &base);
+                let dn = user_dn_from(uid);
                 let _ = ldap.delete(&dn).await;
                 let _ = ldap.unbind().await;
             }
