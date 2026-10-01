@@ -4,10 +4,11 @@
   pkgs,
   ...
 }:
-
 let
   cfg = config.services.portail;
-  appsFile = pkgs.writeText "portail-apps.json" (builtins.toJSON cfg.apps);
+  appsFile = pkgs.writeText "portail-apps.json" (
+    builtins.toJSON (lib.sort (a: b: a.name < b.name) cfg.apps)
+  );
 in
 {
   options.services.portail = {
