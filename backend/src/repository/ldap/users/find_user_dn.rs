@@ -14,12 +14,7 @@ pub async fn find_user_dn(ldap: &mut ldap3::Ldap, uid: &Uid) -> Result<String, A
     let filter = format!("(uid={})", uid.as_str());
 
     let (rs, _res) = ldap
-        .search(
-            &people_search_base(),
-            Scope::Subtree,
-            &filter,
-            Vec::<String>::new(),
-        )
+        .search(&people_search_base(), Scope::Subtree, &filter, vec!["dn"])
         .await
         .map_ldap()?
         .success()

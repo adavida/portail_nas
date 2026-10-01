@@ -15,12 +15,7 @@ pub async fn find_group_dn(ldap: &mut ldap3::Ldap, gid: &Gid) -> Result<String, 
     let filter = format!("(cn={})", gid.as_str());
 
     let (rs, _res) = ldap
-        .search(
-            &groups_search_base(),
-            Scope::Subtree,
-            &filter,
-            Vec::<String>::new(),
-        )
+        .search(&groups_search_base(), Scope::Subtree, &filter, vec!["dn"])
         .await
         .map_ldap()?
         .success()
