@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Route, Routes } from "react-router-dom";
 import Groups from "./pages/Groups";
+import Home from "./pages/Home";
 import Users from "./pages/Users";
 import Callback from "./pages/Callback";
 import { Toaster } from "./components/Toaster";
@@ -8,7 +9,7 @@ import { whoami } from "./api/auth";
 import { clearTokens, getToken, login, logout } from "./auth/oidc";
 
 function Protected() {
-  const [tab, setTab] = useState<"users" | "groups">("users");
+  const [tab, setTab] = useState<"home" | "users" | "groups">("home");
   const [checked, setChecked] = useState(false);
   const [admin, setAdmin] = useState(false);
   const token = getToken();
@@ -21,13 +22,13 @@ function Protected() {
       return;
     }
     whoami().then((s) => {
-      if (s === "unauthorized") {
+      if (s === "relogin") {
         clearTokens();
         sessionStorage.setItem("login_in_progress", "1");
         login();
         return;
       }
-      setAdmin(s === "ok");
+      setAdmin(s === "admin");
       setChecked(true);
       sessionStorage.removeItem("login_in_progress");
     });
@@ -55,33 +56,27 @@ function Protected() {
 
   if (!checked) return <p data-testid="checking">Vérification...</p>;
 
-  if (!admin)
-    return (
-      <div>
-        <p data-testid="forbidden">
-          Accès réservé aux administrateurs — connectez-vous avec{" "}
-          <code>admin</code>
-        </p>
-        <button data-testid="logout" onClick={logout}>
-          Déconnexion
-        </button>
-      </div>
-    );
-
   return (
     <div>
       <nav style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <button data-testid="tab-users" onClick={() => setTab("users")}>
-          Utilisateurs
+        <button data-testid="tab-home" onClick={() => setTab("home")}>
+          Accueil
         </button>
-        <button data-testid="tab-groups" onClick={() => setTab("groups")}>
-          Groupes
-        </button>
+        {admin && (
+          <button data-testid="tab-users" onClick={() => setTab("users")}>
+            Utilisateurs
+          </button>
+        )}
+        {admin && (
+          <button data-testid="tab-groups" onClick={() => setTab("groups")}>
+            Groupes
+          </button>
+        )}
         <button data-testid="logout" onClick={logout}>
           Déconnexion
         </button>
       </nav>
-      {tab === "users" ? <Users /> : <Groups />}
+      {tab === "home" ? <Home /> : tab === "users" ? <Users /> : <Groups />}
       <Toaster />
     </div>
   );

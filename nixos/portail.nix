@@ -7,6 +7,7 @@
 
 let
   cfg = config.services.portail;
+  appsFile = pkgs.writeText "portail-apps.json" (builtins.toJSON cfg.apps);
 in
 {
   options.services.portail = {
@@ -122,6 +123,43 @@ in
       };
     };
 
+    apps = lib.mkOption {
+      type =
+        with lib.types;
+        listOf (submodule {
+          options = {
+            name = lib.mkOption {
+              type = lib.types.str;
+              description = "Display name of the application.";
+            };
+            url = lib.mkOption {
+              type = lib.types.str;
+              description = "Absolute application URL (http or https).";
+            };
+            description = lib.mkOption {
+              type = lib.types.str;
+              default = "";
+              description = "Short description shown under the link.";
+            };
+            icon = lib.mkOption {
+              type = with lib.types; nullOr str;
+              default = null;
+              description = "Icon URL, optional.";
+            };
+          };
+        });
+      default = [ ];
+      description = "Applications listed on the portal home page — rendered statically into apps.json served at /apps.json by the nginx vhost (no backend involved).";
+      example = [
+        {
+          name = "Authelia";
+          url = "http://auth.portail.nas.local";
+          description = "SSO";
+          icon = null;
+        }
+      ];
+    };
+
     extraBackendEnvironment = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = { };
@@ -183,6 +221,7 @@ in
           };
           locations."/".index = "index.html";
           locations."/".tryFiles = "$uri /index.html";
+          locations."= /apps.json".alias = toString appsFile;
           locations."/api".proxyPass = "http://${cfg.bindAddress}";
         }
         (lib.mkIf cfg.vhost.forceSSL {

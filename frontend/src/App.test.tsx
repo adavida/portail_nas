@@ -31,7 +31,7 @@ beforeEach(() => {
   });
 });
 
-test("renders users tab by default", async () => {
+test("renders home by default for admin", async () => {
   render(
     <BrowserRouter>
       <App />
@@ -39,10 +39,29 @@ test("renders users tab by default", async () => {
   );
 
   await waitFor(() => {
-    expect(screen.getByTestId("users-table")).toBeInTheDocument();
+    expect(screen.getByTestId("apps-empty")).toBeInTheDocument();
   });
 
-  expect(screen.queryByTestId("groups-table")).not.toBeInTheDocument();
+  expect(screen.getByTestId("tab-users")).toBeInTheDocument();
+  expect(screen.queryByTestId("users-table")).not.toBeInTheDocument();
+});
+
+test("switches to users tab", async () => {
+  render(
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>,
+  );
+
+  await waitFor(() => {
+    expect(screen.getByTestId("apps-empty")).toBeInTheDocument();
+  });
+
+  fireEvent.click(screen.getByTestId("tab-users"));
+
+  const table = await screen.findByTestId("users-table");
+
+  expect(table).toBeInTheDocument();
 });
 
 test("switches to groups tab", async () => {
@@ -53,15 +72,40 @@ test("switches to groups tab", async () => {
   );
 
   await waitFor(() => {
-    expect(screen.getByTestId("users-table")).toBeInTheDocument();
+    expect(screen.getByTestId("apps-empty")).toBeInTheDocument();
   });
 
-  const groupsTab = screen.getByTestId("tab-groups");
-  fireEvent.click(groupsTab);
+  fireEvent.click(screen.getByTestId("tab-groups"));
+
+  const table = await screen.findByTestId("groups-table");
+
+  expect(table).toBeInTheDocument();
+});
+
+test("non-admin sees home only", async () => {
+  globalThis.fetch = vi.fn((url: unknown) => {
+    const u = String(url);
+    if (u.includes("/api/auth/me"))
+      return Promise.resolve({
+        ok: false,
+        status: 403,
+      } as unknown as Response);
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve([]),
+    } as unknown as Response);
+  });
+
+  render(
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>,
+  );
 
   await waitFor(() => {
-    expect(screen.getByTestId("groups-table")).toBeInTheDocument();
+    expect(screen.getByTestId("apps-empty")).toBeInTheDocument();
   });
 
-  expect(screen.queryByTestId("users-table")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("tab-users")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("tab-groups")).not.toBeInTheDocument();
 });

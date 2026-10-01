@@ -1,0 +1,13 @@
+[
+  {
+    "name": "Authelia",
+    "url": "https://127.0.0.1:9091/",
+    "description": "Portail SSO et gestion des sessions",
+    "icon": null
+  },
+  {
+    "name": "Grafana",
+    "url": "http://127.0.0.1:3001/",
+    "description": "Dashboards et alerting"
+  }
+]
