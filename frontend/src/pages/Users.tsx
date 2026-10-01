@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { UsersTable, type User } from "../components/UsersTable";
-import type { Group } from "../components/GroupsTable";
+import { listGroups } from "../api/groups";
+import type { Group } from "../api/groups";
+import { listUsers } from "../api/users";
+import type { User } from "../api/users";
+import { UsersTable } from "../components/UsersTable";
 import { toast } from "../components/Toaster";
-import { authHeader } from "../auth/oidc";
 
 export default function Users() {
   const [users, setUsers] = useState<User[] | null>(null);
@@ -10,21 +12,11 @@ export default function Users() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchUsers = useCallback(() => {
-    const headers = authHeader();
-    Promise.all([
-      fetch("/api/users", { headers }).then(async (r) => {
-        if (!r.ok) throw new Error(String(r.status));
-        return (await r.json()) as User[];
-      }),
-      fetch("/api/groups", { headers }).then(async (r) => {
-        if (!r.ok) throw new Error(String(r.status));
-        return (await r.json()) as Group[];
-      }),
-    ])
-      .then(([usersList, groupsList]) => {
-        setUsers(usersList);
-        setGroups(groupsList);
-      })
+    listGroups()
+      .then(setGroups)
+      .catch(() => toast("Erreur: chargement des groupes impossible", true));
+    listUsers()
+      .then(setUsers)
       .catch(() => {
         setError("error");
         toast("Erreur: chargement des utilisateurs impossible", true);

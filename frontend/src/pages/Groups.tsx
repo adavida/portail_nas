@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { GroupsTable, type Group } from "../components/GroupsTable";
+import { listGroups } from "../api/groups";
+import type { Group } from "../api/groups";
+import { GroupsTable } from "../components/GroupsTable";
 import { toast } from "../components/Toaster";
-import { authHeader } from "../auth/oidc";
 
 export default function Groups() {
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchGroups = useCallback(() => {
-    fetch("/api/groups", { headers: authHeader() })
-      .then((r) => {
-        if (!r.ok) throw new Error(String(r.status));
-        return r.json();
-      })
-      .then((d) => setGroups(d as Group[]))
+    listGroups()
+      .then((d) => setGroups(d))
       .catch(() => {
         setError("error");
         toast("Erreur: chargement des groupes impossible", true);

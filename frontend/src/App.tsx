@@ -4,7 +4,8 @@ import Groups from "./pages/Groups";
 import Users from "./pages/Users";
 import Callback from "./pages/Callback";
 import { Toaster } from "./components/Toaster";
-import { authHeader, clearTokens, getToken, login, logout } from "./auth/oidc";
+import { whoami } from "./api/auth";
+import { clearTokens, getToken, login, logout } from "./auth/oidc";
 
 function Protected() {
   const [tab, setTab] = useState<"users" | "groups">("users");
@@ -19,22 +20,17 @@ function Protected() {
       login();
       return;
     }
-    fetch("/api/auth/me", { headers: authHeader() })
-      .then((r) => {
-        if (r.status === 401) {
-          clearTokens();
-          sessionStorage.setItem("login_in_progress", "1");
-          login();
-          return;
-        }
-        setAdmin(r.ok);
-        setChecked(true);
-        sessionStorage.removeItem("login_in_progress");
-      })
-      .catch(() => {
-        setChecked(true);
-        sessionStorage.removeItem("login_in_progress");
-      });
+    whoami().then((s) => {
+      if (s === "unauthorized") {
+        clearTokens();
+        sessionStorage.setItem("login_in_progress", "1");
+        login();
+        return;
+      }
+      setAdmin(s === "ok");
+      setChecked(true);
+      sessionStorage.removeItem("login_in_progress");
+    });
   }, [token]);
 
   if (!token) {

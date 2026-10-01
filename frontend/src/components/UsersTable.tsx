@@ -1,11 +1,12 @@
-export type User = {
-  uid: string;
-  name: string;
-  email: string;
-  groups?: string[];
-};
-
 import { useState } from "react";
+import {
+  createUser,
+  deleteUser,
+  updatePassword,
+  updateUser,
+} from "../api/users";
+import type { User } from "../api/users";
+import { addMember, createGroup, removeMember } from "../api/groups";
 import EditableCell from "./EditableCell";
 import { GroupsEditor } from "./GroupsEditor";
 import { toast } from "./Toaster";
@@ -71,34 +72,13 @@ function UserRow({
     const adds = next.filter((gid) => !groups.includes(gid));
     const removes = groups.filter((gid) => !next.includes(gid));
 
-    for (const gid of adds) {
-      const res = await fetch(
-        `/api/groups/${encodeURIComponent(gid)}/members`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uid: user.uid }),
-        },
-      );
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        const error = j.error || `error ${res.status}`;
-        toast(error, true);
-        return { ok: false, error };
-      }
-    }
-
-    for (const gid of removes) {
-      const res = await fetch(
-        `/api/groups/${encodeURIComponent(gid)}/members/${encodeURIComponent(user.uid)}`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        const error = j.error || `error ${res.status}`;
-        toast(error, true);
-        return { ok: false, error };
-      }
+    try {
+      for (const gid of adds) await addMember(gid, user.uid);
+      for (const gid of removes) await removeMember(gid, user.uid);
+    } catch (e) {
+      const error = (e as Error).message;
+      toast(error, true);
+      return { ok: false, error };
     }
 
     toast("Modifications enregistrées");
@@ -109,19 +89,15 @@ function UserRow({
   const createGroupWithMember = async (
     gid: string,
   ): Promise<{ ok: boolean; error?: string }> => {
-    const res = await fetch("/api/groups", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      await createGroup({
         gid,
         name: gid,
         description: "",
         members: [user.uid],
-      }),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      const error = j.error || `error ${res.status}`;
+      });
+    } catch (e) {
+      const error = (e as Error).message;
       toast(error, true);
       return { ok: false, error };
     }
@@ -135,17 +111,10 @@ function UserRow({
       toast("mot de passe requis", true);
       return;
     }
-    const res = await fetch(
-      `/api/users/${encodeURIComponent(user.uid)}/password`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      },
-    );
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast(j.error || `error ${res.status}`, true);
+    try {
+      await updatePassword(user.uid, password);
+    } catch (e) {
+      toast((e as Error).message, true);
       return;
     }
     setPassword("");
@@ -153,12 +122,10 @@ function UserRow({
   };
 
   const remove = async () => {
-    const res = await fetch(`/api/users/${encodeURIComponent(user.uid)}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast(j.error || `error ${res.status}`, true);
+    try {
+      await deleteUser(user.uid);
+    } catch (e) {
+      toast((e as Error).message, true);
       return;
     }
     onDeleted?.();
@@ -170,14 +137,10 @@ function UserRow({
       field === "name"
         ? { name: newValue, email: user.email }
         : { name: user.name, email: newValue };
-    const res = await fetch(`/api/users/${encodeURIComponent(user.uid)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast(j.error || `error ${res.status}`, true);
+    try {
+      await updateUser(user.uid, body);
+    } catch (e) {
+      toast((e as Error).message, true);
       return false;
     }
     onUpdated?.();
@@ -248,14 +211,10 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
       toast("uid, nom et mot de passe requis", true);
       return;
     }
-    const res = await fetch("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid, name, email, password }),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast(j.error || `error ${res.status}`, true);
+    try {
+      await createUser({ uid, name, email, password });
+    } catch (e) {
+      toast((e as Error).message, true);
       return;
     }
     setUid("");

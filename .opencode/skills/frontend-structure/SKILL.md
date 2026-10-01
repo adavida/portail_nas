@@ -5,13 +5,14 @@ description: Enforce frontend file layout main/pages/components + colocalized vi
 
 # frontend-structure
 
-## Rule — `main.tsx` minimal, `App.tsx` glue, `pages/` data, `components/` pure
+## Rule — `main.tsx` minimal, `App.tsx` glue, `pages/` data, `components/` pure, `api/` fetch seul
 
 ```
 frontend/src/
   main.tsx                 # boot seul: createRoot → <App />
   App.tsx                  # glue: import Home from './pages/Home' → <Home />
-  pages/<Name>.tsx         # page: useState/useEffect/fetch → compose components
+  api/<ressource>.ts       # seul endroit avec fetch("/api/...") (users, groups, auth) + request<T> via api/http.ts
+  pages/<Name>.tsx         # page: useState/useEffect → compose components
   components/<Name>.tsx    # pure: props → JSX, data-testid, no fetch
   pages/<Name>.test.tsx + components/<Name>.test.tsx   # colocalized vitest
   test/setup.ts            # jest-dom once
@@ -19,10 +20,11 @@ frontend/src/
 
 ### Adding a page/component
 
-1. `components/Foo.tsx`: `export function Foo({bar}:{bar:string}){return <div data-testid="foo">{bar}</div>}`
-2. `pages/FooPage.tsx`: `useState`/`useEffect`/`fetch("/api/foo")` → `<Foo bar={bar} />`
-3. `App.tsx` → `import FooPage from './pages/FooPage'` + route/compose
-4. Ne pas déplacer `/api/health` sans MAJ `backend/src/lib.rs` + `vite.config.ts` proxy
+1. `api/foo.ts`: `export function listFoos() { return request<Foo[]>("GET", "/api/foos"); }` (1 ressource = 1 fichier, fetch uniquement ici)
+2. `components/Foo.tsx`: `export function Foo({bar}:{bar:string}){return <div data-testid="foo">{bar}</div>}`
+3. `pages/FooPage.tsx`: `useState`/`useEffect` + `listFoos()` de `../api/foo` → `<Foo bar={bar} />`
+4. `App.tsx` → `import FooPage from './pages/FooPage'` + route/compose
+5. Ne pas déplacer `/api/health` sans MAJ `backend/src/lib.rs` + `vite.config.ts` proxy
 
 ### Tests collocalisés
 

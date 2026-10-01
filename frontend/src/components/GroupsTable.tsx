@@ -1,9 +1,5 @@
-export type Group = {
-  gid: string;
-  name: string;
-  description: string;
-};
-
+import { deleteGroup, updateGroup } from "../api/groups";
+import type { Group } from "../api/groups";
 import EditableCell from "./EditableCell";
 import { toast } from "./Toaster";
 
@@ -19,12 +15,10 @@ function GroupRow({
   onDeleted?: () => void;
 }) {
   const remove = async () => {
-    const res = await fetch(`/api/groups/${encodeURIComponent(group.gid)}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast(j.error || `error ${res.status}`, true);
+    try {
+      await deleteGroup(group.gid);
+    } catch (e) {
+      toast((e as Error).message, true);
       return;
     }
     onDeleted?.();
@@ -32,18 +26,14 @@ function GroupRow({
   };
 
   const saveField = async (field: string, newValue: string) => {
-    const res = await fetch(`/api/groups/${encodeURIComponent(group.gid)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        field === "name"
-          ? { name: newValue, description: group.description }
-          : { name: group.name, description: newValue },
-      ),
-    });
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      toast(j.error || `error ${res.status}`, true);
+    const body =
+      field === "name"
+        ? { name: newValue, description: group.description }
+        : { name: group.name, description: newValue };
+    try {
+      await updateGroup(group.gid, body);
+    } catch (e) {
+      toast((e as Error).message, true);
       return false;
     }
     toast("Modifications enregistrées");
