@@ -5,7 +5,6 @@
   inputs,
   ...
 }:
-
 let
   codiumWithExt = pkgs.vscode-with-extensions.override {
     vscode = pkgs.vscodium;
@@ -32,106 +31,155 @@ let
         }
       ];
   };
-  mkAuthelia = ''
-    mkdir -p "$DEVENV_STATE/authelia-dev" "$DEVENV_STATE/authelia"
-    if [ ! -f "$DEVENV_STATE/authelia-dev/authelia.key" ]; then
-      ${pkgs.openssl}/bin/openssl req -newkey rsa:4096 -nodes -x509 \
-        -keyout "$DEVENV_STATE/authelia-dev/authelia.key" \
-        -out "$DEVENV_STATE/authelia-dev/authelia.crt" \
-        -days 3550 -sha256 \
-        -subj "/CN=127.0.0.1" \
-        -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
-    fi
-    if [ ! -f "$DEVENV_STATE/authelia-dev/hmac_secret" ]; then
-      ${pkgs.openssl}/bin/openssl rand -hex 32 > "$DEVENV_STATE/authelia-dev/hmac_secret"
-    fi
-    if [ ! -f "$DEVENV_STATE/authelia-dev/jwks.pem" ]; then
-      ${pkgs.openssl}/bin/openssl genrsa 2048 > "$DEVENV_STATE/authelia-dev/jwks.pem"
-    fi
-    if [ ! -f "$DEVENV_STATE/authelia-dev/users.yml" ]; then
-      cat > "$DEVENV_STATE/authelia-dev/users.yml" <<'USERS'
-    users:
-      admin:
-        displayname: Admin
-        email: admin@example.com
-        groups:
-          - admin
-        password: "$argon2id$v=19$m=65536,t=3,p=4$I/IZNPA3vKfOQLuA2W/qpQ$nuM7fyyQH7YP8ZKzEbEr5/R5A6a6Ofl3m/mWtp14E6Y"
-      user:
-        displayname: User
-        email: user@example.com
-        groups: []
-        password: "$argon2id$v=19$m=65536,t=3,p=4$1tkN6rrJ0pDXaH4Hhod83g$Dfu+PQQHaun9+IGT4n/mTp4jeqQVZGgyyD/RL4l5KoM"
-    USERS
-    fi
-    HMAC=$(cat "$DEVENV_STATE/authelia-dev/hmac_secret")
-    JWKS=$(sed 's/^/              /' "$DEVENV_STATE/authelia-dev/jwks.pem")
-    cat > "$DEVENV_STATE/authelia-dev/config.yml" <<EOF
-    server:
-      address: tcp://127.0.0.1:9091
-      tls:
-        certificate: $DEVENV_STATE/authelia-dev/authelia.crt
-        key: $DEVENV_STATE/authelia-dev/authelia.key
-    authentication_backend:
-      file:
-        path: $DEVENV_STATE/authelia-dev/users.yml
-    access_control:
-      default_policy: one_factor
-    identity_validation:
-      reset_password:
-        jwt_secret: portail-dev-reset-password-jwt-secret
-    identity_providers:
-      oidc:
-        hmac_secret: $HMAC
-        jwks:
-          - key: |
-    $JWKS
-        clients:
-          - client_id: portail-dev
-            client_name: Portail Dev
-            client_secret: "\$pbkdf2-sha512\$310000\$YudH3UkHfJ.RW5a8z2zTqw\$.cKmbS5jKBVNHGZo3g1B9AHBPfzKufixtQ4MFP57FN7n07FU5srD35VtG6u0lJEjg9XAoXiyJuyclai33XDjOw"
-            pkce_challenge_method: S256
-            public: false
-            authorization_policy: one_factor
-            consent_mode: implicit #need ?
-            redirect_uris:
-              - $OIDC_REDIRECT_URI
-              - http://127.0.0.1:5173/callback
-              - http://localhost:3000/callback
-            scopes:
-              - openid
-              - groups
-              - email
-              - profile
-              - offline_access
-            grant_types:
-              - authorization_code
-              - refresh_token
-            response_types:
-              - code
-            token_endpoint_auth_method: client_secret_basic
-    session:
-      name: portail_session
-      secret: portail-dev-session-secret
-      cookies:
-        - domain: 127.0.0.1
-          authelia_url: $OIDC_ISSUER_URL
-    storage:
-      encryption_key: portail-dev-encryption-key
-      local:
-        path: $DEVENV_STATE/authelia/db.sqlite3
-    notifier:
-      filesystem:
-        filename: $DEVENV_STATE/authelia/notifications.txt
-    EOF
-    exec ${pkgs.authelia}/bin/authelia --config "$DEVENV_STATE/authelia-dev/config.yml"
+  mkAuthelia =
+    {
+      dir,
+      port,
+      session,
+    }:
+    let
+      bootstrap = ''
+        for i in $(seq 30); do
+          ${pkgs.openldap}/bin/ldapsearch -x -H ldap://127.0.0.1:3890 -b "" -s base >/dev/null 2>&1 && break
+          sleep 1
+        done
+      '';
+      backendConfig = ''
+        authentication_backend:
+          ldap:
+            address: ldap://127.0.0.1:3890
+            implementation: 'custom'
+            base_dn: $LDAP_BASE_DN
+            user: cn=admin,$LDAP_BASE_DN
+            password: admin
+            additional_users_dn: 'ou=people'
+            additional_groups_dn: 'ou=groups'
+            users_filter: '(&(|({username_attribute}={input})({mail_attribute}={input}))(objectClass=person))'
+            groups_filter: '(&(member={dn})(objectClass=groupOfNames))'
+            attributes:
+              username: uid
+              group_name: cn
+              mail: mail
+              distinguished_name: 'distinguishedName'
+              member_of: 'memberOf'
+              display_name: displayName
+      '';
+    in
+    ''
+      mkdir -p "$DEVENV_STATE/${dir}"
+      if [ ! -f "$DEVENV_STATE/${dir}/authelia.key" ]; then
+        ${pkgs.openssl}/bin/openssl req -newkey rsa:4096 -nodes -x509 \
+          -keyout "$DEVENV_STATE/${dir}/authelia.key" \
+          -out "$DEVENV_STATE/${dir}/authelia.crt" \
+          -days 3550 -sha256 \
+          -subj "/CN=127.0.0.1" \
+          -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+      fi
+      if [ ! -f "$DEVENV_STATE/${dir}/hmac_secret" ]; then
+        ${pkgs.openssl}/bin/openssl rand -hex 32 > "$DEVENV_STATE/${dir}/hmac_secret"
+      fi
+      if [ ! -f "$DEVENV_STATE/${dir}/jwks.pem" ]; then
+        ${pkgs.openssl}/bin/openssl genrsa 2048 > "$DEVENV_STATE/${dir}/jwks.pem"
+      fi
+      ${bootstrap}
+      HMAC=$(cat "$DEVENV_STATE/${dir}/hmac_secret")
+      JWKS=$(sed 's/^/              /' "$DEVENV_STATE/${dir}/jwks.pem")
+      cat > "$DEVENV_STATE/${dir}/config.yml" <<EOF
+      server:
+        address: tcp://127.0.0.1:${toString port}
+        tls:
+          certificate: $DEVENV_STATE/${dir}/authelia.crt
+          key: $DEVENV_STATE/${dir}/authelia.key
+      ${backendConfig}
+      access_control:
+        default_policy: one_factor
+      identity_validation:
+        reset_password:
+          jwt_secret: portail-dev-reset-password-jwt-secret
+      identity_providers:
+        oidc:
+          hmac_secret: $HMAC
+          jwks:
+            - key: |
+      $JWKS
+          clients:
+            - client_id: portail-dev
+              client_name: Portail Dev
+              client_secret: "\$pbkdf2-sha512\$310000\$YudH3UkHfJ.RW5a8z2zTqw\$.cKmbS5jKBVNHGZo3g1B9AHBPfzKufixtQ4MFP57FN7n07FU5srD35VtG6u0lJEjg9XAoXiyJuyclai33XDjOw"
+              pkce_challenge_method: S256
+              public: false
+              authorization_policy: one_factor
+              consent_mode: implicit #need ?
+              redirect_uris:
+                - $OIDC_REDIRECT_URI
+                - http://127.0.0.1:5173/callback
+                - http://localhost:3000/callback
+              scopes:
+                - openid
+                - groups
+                - email
+                - profile
+                - offline_access
+              grant_types:
+                - authorization_code
+                - refresh_token
+              response_types:
+                - code
+              token_endpoint_auth_method: client_secret_basic
+      session:
+        name: ${session}
+        secret: portail-dev-session-secret
+        cookies:
+          - domain: 127.0.0.1
+            authelia_url: https://127.0.0.1:${toString port}
+      storage:
+        encryption_key: portail-dev-encryption-key
+        local:
+          path: $DEVENV_STATE/${dir}/db.sqlite3
+      notifier:
+        filesystem:
+          filename: $DEVENV_STATE/${dir}/notifications.txt
+      EOF
+      exec ${pkgs.authelia}/bin/authelia --config "$DEVENV_STATE/${dir}/config.yml"
+    '';
+  devUsers = ''
+
+    dn: uid=admin,ou=people,$LDAP_BASE_DN
+    objectClass: inetOrgPerson
+    uid: admin
+    cn: Admin
+    sn: Admin
+    mail: admin@example.com
+    userPassword: $(slappasswd -s admin)
+
+    dn: uid=user,ou=people,$LDAP_BASE_DN
+    objectClass: inetOrgPerson
+    uid: user
+    cn: User
+    sn: User
+    mail: user@example.com
+    userPassword: $(slappasswd -s user)
+
+    dn: cn=user,ou=groups,$LDAP_BASE_DN
+    objectClass: groupOfNames
+    cn: user
+    description: Utilisateurs du portail
+    member: uid=admin,ou=people,$LDAP_BASE_DN
+    member: uid=user,ou=people,$LDAP_BASE_DN
+
+    dn: cn=admin,ou=groups,$LDAP_BASE_DN
+    objectClass: groupOfNames
+    cn: admin
+    description: Administrateurs du portail
+    member: uid=admin,ou=people,$LDAP_BASE_DN
   '';
   mkSlapd =
     {
-      port,
-      ldapsPort,
-      suffix,
       dir,
+      ldapsPort,
+      port,
+      suffix,
+      users ? "",
     }:
     ''
       mkdir -p "$DEVENV_STATE/${dir}/data" "$DEVENV_STATE/${dir}/run"
@@ -178,6 +226,7 @@ let
       dn: ou=groups,${suffix}
       objectClass: organizationalUnit
       ou: groups
+      ${users}
       SEED
         ${pkgs.openldap}/bin/slapadd -f "$DEVENV_STATE/${dir}/slapd.conf" -l /tmp/seed-${dir}.ldif
       fi
@@ -195,7 +244,6 @@ in
   env = {
     APP_URL = "http://localhost:5173";
     BIND_ADDR = "0.0.0.0:3000";
-    AUTHELIA_CONFIG = "${config.env.DEVENV_STATE}/authelia-dev/config.yml";
     LDAP_BASE_DN = "dc=dev,dc=example,dc=com";
     LDAP_TEST_BASE_DN = "dc=test,dc=example,dc=com";
     LDAP_TEST_URL = "ldap://127.0.0.1:3891";
@@ -215,7 +263,7 @@ in
     echo "portail LDAP — rust $(rustc --version) | node $(node --version)"
     echo "LDAP dev:  $LDAP_URL/$LDAP_BASE_DN (LDAPS, CA: $LDAP_TLS_CA)"
     echo "LDAP test: $LDAP_TEST_URL/$LDAP_TEST_BASE_DN"
-    echo "Authelia:  https://127.0.0.1:9091 (file: admin/admin, user/user — group admin)"
+    echo "Authelia: $OIDC_ISSUER_URL (openldap users admin|user, group admin — resetUsers to reseed)"
     echo "OIDC:      $OIDC_ISSUER_URL/.well-known/openid-configuration client=$OIDC_CLIENT_ID"
   '';
 
@@ -235,7 +283,7 @@ in
   packages = with pkgs; [
     authelia
     cargo-watch
-    codiumWithExt
+    # codiumWithExt
     git
     just
     openldap
@@ -246,7 +294,11 @@ in
   ];
 
   processes = {
-    authelia.exec = mkAuthelia;
+    authelia.exec = mkAuthelia {
+      dir = "authelia";
+      port = 9091;
+      session = "portail_session";
+    };
     backend.exec = mkDevSecrets + "\ncargo watch -w backend -x 'run -p portail-backend'";
     "backend-test".exec =
       mkDevSecrets + "\ncargo watch -w backend -x 'test --features test-api --quiet'";
@@ -257,6 +309,7 @@ in
       port = 3890;
       ldapsPort = 6360;
       suffix = "dc=dev,dc=example,dc=com";
+      users = devUsers;
     };
     "openldap-test".exec = mkSlapd {
       dir = "openldap-test";
@@ -264,10 +317,25 @@ in
       ldapsPort = 6361;
       suffix = "dc=test,dc=example,dc=com";
     };
-    vscode.exec = "${codiumWithExt}/bin/codium . 2>/dev/null -w --profile devenv_portail";
+    # vscode.exec = "${codiumWithExt}/bin/codium . 2>/dev/null -w --profile devenv_portail";
+    vscode.exec = "codium . --profile devenv_portail_d -w 2>/dev/null";
   };
 
-  scripts.openfrontend.exec = "xdg-open $APP_URL/ 2>/dev/null || echo \"Ouvrez manuellement $APP_URL/\"";
+  scripts = {
+    openfrontend.exec = "xdg-open $APP_URL/ 2>/dev/null || echo \"Ouvrez manuellement $APP_URL/\"";
+    resetUsers.exec = ''
+      BIND="-x -H ldap://127.0.0.1:3890 -D cn=admin,$LDAP_BASE_DN -w admin"
+      DNS="$(ldapsearch $BIND -s one -b "ou=people,$LDAP_BASE_DN" "(objectClass=inetOrgPerson)" dn | awk '/^dn: /{print $2}')
+      $(ldapsearch $BIND -s one -b "ou=groups,$LDAP_BASE_DN" "(objectClass=groupOfNames)" dn | awk '/^dn: /{print $2}')"
+      if [ -n "$(printf '%s' "$DNS" | tr -d '[:space:]')" ]; then
+        ldapdelete $BIND $DNS
+      fi
+      ldapadd $BIND <<LDIF
+      ${devUsers}
+      LDIF
+      echo "users reset: admin (group admin) / user"
+    '';
+  };
 
   treefmt = {
     enable = true;
