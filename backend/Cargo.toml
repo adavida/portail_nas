@@ -2,6 +2,7 @@
 name = "portail-backend"
 version = "0.1.0"
 edition = "2021"
+license = "GPL-2.0-or-later"
 
 [dependencies]
 axum = "0.8.9"
