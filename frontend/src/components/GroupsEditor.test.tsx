@@ -184,6 +184,43 @@ test("backspace with text in input keeps chips", () => {
   expect(screen.getByTestId("groups-chip-alice-devs")).toBeInTheDocument();
 });
 
+test("user chip has no remove button", () => {
+  const onSave = vi.fn(async () => true);
+
+  render(
+    <GroupsEditor
+      uid="alice"
+      groups={["user"]}
+      allGroups={["user"]}
+      onSave={onSave}
+      onCancel={() => {}}
+    />,
+  );
+
+  expect(screen.getByTestId("groups-chip-alice-user")).toBeInTheDocument();
+  expect(screen.queryByTestId("groups-remove-alice-user")).toBeNull();
+});
+
+test("backspace skips user master chip", () => {
+  const onSave = vi.fn(async () => true);
+
+  render(
+    <GroupsEditor
+      uid="alice"
+      groups={["devs", "user"]}
+      allGroups={["devs", "user"]}
+      onSave={onSave}
+      onCancel={() => {}}
+    />,
+  );
+
+  const input = screen.getByTestId("groups-new-input-alice");
+  fireEvent.keyDown(input, { key: "Backspace" });
+
+  expect(screen.getByTestId("groups-chip-alice-user")).toBeInTheDocument();
+  expect(screen.queryByTestId("groups-chip-alice-devs")).toBeNull();
+});
+
 test("save passes draft and cancel signals parent", async () => {
   const onSave = vi.fn(async (next: string[]) => next.length === 1);
   const onCancel = vi.fn();

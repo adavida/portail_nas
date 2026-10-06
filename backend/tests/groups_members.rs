@@ -105,6 +105,65 @@ async fn remove_member_hides_uid_from_group() {
 }
 
 #[tokio::test]
+async fn remove_last_member_deletes_group() {
+    let fixture = Fixture::new("apim5");
+    let (seed_status, (create_status, _)) = fixture.seed().await;
+
+    if seed_status == StatusCode::INTERNAL_SERVER_ERROR
+        || create_status == StatusCode::INTERNAL_SERVER_ERROR
+    {
+        return;
+    }
+
+    let (status, _) = send(
+        Method::DELETE,
+        &format!("/api/groups/{}/members/{}", fixture.gid, fixture.uid),
+        None,
+    )
+    .await;
+
+    assert_eq!(
+        status,
+        StatusCode::NO_CONTENT,
+        "removing last member should 204"
+    );
+
+    let (status, groups) = send(Method::GET, "/api/groups", None).await;
+
+    assert_eq!(status, StatusCode::OK);
+
+    let still_listed = groups
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|g| g["gid"] == fixture.gid);
+
+    assert!(
+        !still_listed,
+        "group emptied by last member removal should be deleted"
+    );
+}
+
+#[tokio::test]
+async fn remove_member_from_user_group_is_403() {
+    let n = nanos();
+
+    let (status, body) = send(
+        Method::DELETE,
+        &format!("/api/groups/user/members/apimghost{n}"),
+        None,
+    )
+    .await;
+
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "group user is mandatory, removing a member should 403"
+    );
+    assert!(body.get("error").is_some(), "error body expected");
+}
+
+#[tokio::test]
 async fn add_unknown_uid_is_404() {
     let fixture = Fixture::new("apim4");
     let n = nanos();

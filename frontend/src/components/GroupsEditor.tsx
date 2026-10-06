@@ -10,6 +10,8 @@ type Props = {
   onCancel: () => void;
 };
 
+const MASTER_GID = "user";
+
 export function GroupsEditor({
   uid,
   groups,
@@ -26,7 +28,10 @@ export function GroupsEditor({
     setDraft((d) => (d.includes(gid) ? d : [...d, gid]));
   };
 
-  const remove = (gid: string) => setDraft((d) => d.filter((x) => x !== gid));
+  const remove = (gid: string) => {
+    if (gid === MASTER_GID) return;
+    setDraft((d) => d.filter((x) => x !== gid));
+  };
 
   const q = newGid.trim().toLowerCase();
   const suggestions = q
@@ -63,8 +68,9 @@ export function GroupsEditor({
     if (e.key === "Enter") {
       e.preventDefault();
       void resolveAndAdd(suggestions[0] ?? newGid);
-    } else if (e.key === "Backspace" && !newGid && draft.length) {
-      remove(draft[draft.length - 1]);
+    } else if (e.key === "Backspace" && !newGid) {
+      const last = draft.filter((g) => g !== MASTER_GID).pop();
+      if (last) remove(last);
     }
   };
 
@@ -86,14 +92,16 @@ export function GroupsEditor({
             className="chip"
           >
             {gid}
-            <button
-              type="button"
-              aria-label={`retirer ${gid}`}
-              data-testid={`groups-remove-${uid}-${gid}`}
-              onClick={() => remove(gid)}
-            >
-              ×
-            </button>
+            {gid !== MASTER_GID && (
+              <button
+                type="button"
+                aria-label={`retirer ${gid}`}
+                data-testid={`groups-remove-${uid}-${gid}`}
+                onClick={() => remove(gid)}
+              >
+                ×
+              </button>
+            )}
           </span>
         ))}
         <input

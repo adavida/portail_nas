@@ -279,6 +279,20 @@ async fn create_duplicate_gid_is_500() {
     assert!(body.get("error").is_some(), "error body expected");
 }
 
+#[tokio::test]
+async fn delete_protected_gid_is_403() {
+    for gid in ["admin", "user"] {
+        let (status, body) = send(Method::DELETE, &format!("/api/groups/{gid}"), None).await;
+
+        assert_eq!(
+            status,
+            StatusCode::FORBIDDEN,
+            "deleting protected group {gid} should 403"
+        );
+        assert!(body.get("error").is_some(), "error body expected");
+    }
+}
+
 mod repo {
     use crate::common::seed::{
         nanos::nanos, new_group_with_member::new_group_with_member, seed_user::seed_user,

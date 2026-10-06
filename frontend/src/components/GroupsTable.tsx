@@ -3,6 +3,9 @@ import type { Group } from "../api/groups";
 import EditableCell from "./EditableCell";
 import { toast } from "./Toaster";
 
+const PROTECTED_GIDS = ["admin", "user"];
+const isProtected = (gid: string) => PROTECTED_GIDS.includes(gid);
+
 function GroupRow({
   group,
   onUpdated,
@@ -55,14 +58,16 @@ function GroupRow({
         onSave={saveField}
       />
       <td>
-        <button
-          className="btn btn-danger"
-          data-testid={`group-delete-button-${group.gid}`}
-          onClick={remove}
-          type="button"
-        >
-          Supprimer
-        </button>
+        {isProtected(group.gid) ? null : (
+          <button
+            className="btn btn-danger"
+            data-testid={`group-delete-button-${group.gid}`}
+            onClick={remove}
+            type="button"
+          >
+            Supprimer
+          </button>
+        )}
       </td>
     </tr>
   );

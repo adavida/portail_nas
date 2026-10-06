@@ -19,6 +19,20 @@ test("renders rows with gid, name, description and delete", () => {
   expect(screen.getByTestId("group-delete-button-devs")).toBeInTheDocument();
 });
 
+test("admin and user rows have no delete button", () => {
+  const groups = [
+    { gid: "admin", name: "Admin", description: "" },
+    { gid: "user", name: "User", description: "" },
+    { gid: "devs", name: "Devs", description: "" },
+  ];
+
+  render(<GroupsTable groups={groups} />);
+
+  expect(screen.queryByTestId("group-delete-button-admin")).toBeNull();
+  expect(screen.queryByTestId("group-delete-button-user")).toBeNull();
+  expect(screen.getByTestId("group-delete-button-devs")).toBeInTheDocument();
+});
+
 test("delete calls api and refreshes", async () => {
   const onDeleted = vi.fn();
   globalThis.fetch = vi.fn(() =>
