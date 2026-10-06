@@ -142,6 +142,48 @@ test("enter with unknown gid creates group then adds", async () => {
   ).toBeInTheDocument();
 });
 
+test("backspace on empty input removes last chip", () => {
+  const onSave = vi.fn(async () => true);
+
+  render(
+    <GroupsEditor
+      uid="alice"
+      groups={["devs"]}
+      allGroups={["devs", "ops"]}
+      onSave={onSave}
+      onCancel={() => {}}
+    />,
+  );
+
+  const input = screen.getByTestId("groups-new-input-alice");
+  fireEvent.change(input, { target: { value: "ops" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  fireEvent.keyDown(input, { key: "Backspace" });
+
+  expect(screen.getByTestId("groups-chip-alice-devs")).toBeInTheDocument();
+  expect(screen.queryByTestId("groups-chip-alice-ops")).toBeNull();
+});
+
+test("backspace with text in input keeps chips", () => {
+  const onSave = vi.fn(async () => true);
+
+  render(
+    <GroupsEditor
+      uid="alice"
+      groups={["devs"]}
+      allGroups={["devs", "ops"]}
+      onSave={onSave}
+      onCancel={() => {}}
+    />,
+  );
+
+  const input = screen.getByTestId("groups-new-input-alice");
+  fireEvent.change(input, { target: { value: "op" } });
+  fireEvent.keyDown(input, { key: "Backspace" });
+
+  expect(screen.getByTestId("groups-chip-alice-devs")).toBeInTheDocument();
+});
+
 test("save passes draft and cancel signals parent", async () => {
   const onSave = vi.fn(async (next: string[]) => next.length === 1);
   const onCancel = vi.fn();

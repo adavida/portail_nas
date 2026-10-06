@@ -63,6 +63,8 @@ export function GroupsEditor({
     if (e.key === "Enter") {
       e.preventDefault();
       void resolveAndAdd(suggestions[0] ?? newGid);
+    } else if (e.key === "Backspace" && !newGid && draft.length) {
+      remove(draft[draft.length - 1]);
     }
   };
 
@@ -76,45 +78,50 @@ export function GroupsEditor({
 
   return (
     <div data-testid={`groups-editor-${uid}`} className="groups-editor">
-      {draft.map((gid) => (
-        <span
-          key={gid}
-          data-testid={`groups-chip-${uid}-${gid}`}
-          className="chip"
-        >
-          {gid}
-          <button
-            type="button"
-            aria-label={`retirer ${gid}`}
-            data-testid={`groups-remove-${uid}-${gid}`}
-            onClick={() => remove(gid)}
+      <div className="field">
+        {draft.map((gid) => (
+          <span
+            key={gid}
+            data-testid={`groups-chip-${uid}-${gid}`}
+            className="chip"
           >
-            ×
-          </button>
-        </span>
-      ))}
-      <input
-        className="input"
-        data-testid={`groups-new-input-${uid}`}
-        placeholder="ajouter / créer un groupe"
-        value={newGid}
-        onChange={(e) => setNewGid(e.target.value)}
-        onKeyDown={keyDown}
-      />
-      <ul data-testid={`groups-suggest-list-${uid}`} className="suggest">
-        {suggestions.map((gid) => (
-          <li key={gid}>
+            {gid}
             <button
-              className="btn"
               type="button"
-              data-testid={`groups-suggest-${uid}-${gid}`}
-              onClick={() => add(gid)}
+              aria-label={`retirer ${gid}`}
+              data-testid={`groups-remove-${uid}-${gid}`}
+              onClick={() => remove(gid)}
             >
-              {gid}
+              ×
             </button>
-          </li>
+          </span>
         ))}
-      </ul>
+        <input
+          autoFocus
+          className="input"
+          data-testid={`groups-new-input-${uid}`}
+          placeholder={draft.length ? "" : "ajouter / créer un groupe"}
+          value={newGid}
+          onChange={(e) => setNewGid(e.target.value)}
+          onKeyDown={keyDown}
+        />
+      </div>
+      {suggestions.length > 0 && (
+        <ul data-testid={`groups-suggest-list-${uid}`} className="suggest">
+          {suggestions.map((gid) => (
+            <li key={gid}>
+              <button
+                className="btn"
+                type="button"
+                data-testid={`groups-suggest-${uid}-${gid}`}
+                onClick={() => add(gid)}
+              >
+                {gid}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="row-actions">
         <button
           className="btn btn-primary"

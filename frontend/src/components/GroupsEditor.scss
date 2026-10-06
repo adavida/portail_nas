@@ -1,14 +1,42 @@
 @use "../styles/tokens" as *;
 
 .groups-editor {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
+  gap: $s-4;
+  min-width: $control-w;
+}
+
+.field {
+  display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: $s-4;
   border: $border;
   border-radius: $r-sm;
   padding: $s-4;
-  min-width: $control-w;
+  background: var(--c-surface);
+  cursor: text;
+
+  &:focus-within {
+    border-color: var(--c-accent);
+    box-shadow: $ring;
+  }
+
+  .input {
+    flex: 1;
+    min-width: 6rem;
+    width: auto;
+    max-width: none;
+    border: none;
+    padding: $s-2;
+    background: none;
+
+    &:focus {
+      outline: none;
+      box-shadow: none;
+    }
+  }
 }
 
 .chip {
