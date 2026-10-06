@@ -71,7 +71,7 @@ nix flake check
 
 ```bash
 devenv up                    # lance tout : backend 3000, frontend 5173, LDAP 3890/3891, Authelia 9091
-openfrontend                 # ouvre le portail http://localhost:5173
+openfrontend                 # ouvre le portail http://127.0.0.1:5173
 resetUsers                   # réinitialise les comptes LDAP dev (admin/admin, user/user)
 devenv down                  # arrêt
 just test                    # backend (cargo test --features test-api) + frontend (vitest)
@@ -151,7 +151,7 @@ nix flake check
 
 ```bash
 devenv up                    # starts everything: backend 3000, frontend 5173, LDAP 3890/3891, Authelia 9091
-openfrontend                 # opens the portal http://localhost:5173
+openfrontend                 # opens the portal http://127.0.0.1:5173
 resetUsers                   # reseed dev LDAP accounts (admin/admin, user/user)
 devenv down                  # stop
 just test                    # backend (cargo test --features test-api) + frontend (vitest)

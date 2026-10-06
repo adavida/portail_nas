@@ -17,6 +17,7 @@ function Protected() {
   useEffect(() => {
     if (sessionStorage.getItem("login_in_progress") === "1") return;
     if (!token) {
+      if (sessionStorage.getItem("logged_out") === "1") return;
       sessionStorage.setItem("login_in_progress", "1");
       login();
       return;

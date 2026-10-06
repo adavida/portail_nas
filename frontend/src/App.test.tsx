@@ -82,6 +82,25 @@ test("switches to groups tab", async () => {
   expect(table).toBeInTheDocument();
 });
 
+test("stays logged out after manual logout", async () => {
+  localStorage.clear();
+  sessionStorage.clear();
+  sessionStorage.setItem("logged_out", "1");
+
+  render(
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>,
+  );
+
+  expect(await screen.findByTestId("logged-out")).toBeInTheDocument();
+
+  const urls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map(
+    (c) => String(c[0]),
+  );
+  expect(urls.some((u) => u.includes("/api/auth/config"))).toBe(false);
+});
+
 test("non-admin sees home only", async () => {
   globalThis.fetch = vi.fn((url: unknown) => {
     const u = String(url);

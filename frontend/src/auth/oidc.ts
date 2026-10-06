@@ -134,36 +134,11 @@ export async function handleCallback(code: string): Promise<void> {
 
 export async function logout() {
   const { OIDC_ISSUER_URL, APP_URL } = await import("../env");
-  // A: stay on the portal. Clear the storage immediately (instant feedback)
-  // then silently destroy the Authelia session via iframe POST
-  // (GET /api/logout = 405, fetch blocked by CORS).
   clearTokens();
   sessionStorage.setItem("logged_out", "1");
-  try {
-    const iframe = document.createElement("iframe");
-    iframe.name = "authelia-logout-iframe";
-    iframe.style.display = "none";
-    document.body.appendChild(iframe);
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = `${OIDC_ISSUER_URL}/api/logout`;
-    form.target = iframe.name;
-    form.style.display = "none";
-    document.body.appendChild(form);
-    form.submit();
-    await new Promise((r) => setTimeout(r, 500));
-    iframe.remove();
-    form.remove();
-  } catch {
-    try {
-      await fetch(`${OIDC_ISSUER_URL}/api/logout`, {
-        method: "POST",
-        credentials: "include",
-        mode: "no-cors",
-      });
-    } catch {
-      // ignore
-    }
-  }
-  window.location.href = APP_URL + "/";
+  // Navigation top-level vers le /logout natif d'Authelia: same-site donc
+  // session cookie envoyé, le portal POST /api/logout lui-même (iframe POST
+  // cross-site = cookie SameSite=Lax non envoyé = session survivait).
+  // `rd` doit matcher le domaine du cookie (127.0.0.1) pour revenir au portail.
+  window.location.href = `${OIDC_ISSUER_URL}/logout?rd=${encodeURIComponent(`${APP_URL}/`)}`;
 }
