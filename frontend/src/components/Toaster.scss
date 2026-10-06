@@ -14,13 +14,13 @@
   padding: $s-8 $s-12;
   border-radius: $r-sm;
   box-shadow: $shadow;
-  border: $bw solid $ok-border;
-  background: $ok-bg;
-  color: $ok-text;
+  border: $bw solid var(--c-ok-border);
+  background: var(--c-ok-bg);
+  color: var(--c-ok-text);
 
   &--error {
-    border-color: $err-border;
-    background: $err-bg;
-    color: $err-text;
+    border-color: var(--c-err-border);
+    background: var(--c-err-bg);
+    color: var(--c-err-text);
   }
 }

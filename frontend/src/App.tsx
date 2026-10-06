@@ -9,11 +9,27 @@ import { whoami } from "./api/auth";
 import { clearTokens, getToken, login, logout } from "./auth/oidc";
 import "./App.scss";
 
+type Theme = "light" | "dark";
+
+function initialTheme(): Theme {
+  const saved = localStorage.getItem("theme");
+  if (saved === "light" || saved === "dark") return saved;
+  return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches
+    ? "dark"
+    : "light";
+}
+
 function Protected() {
   const [tab, setTab] = useState<"home" | "users" | "groups">("home");
   const [checked, setChecked] = useState(false);
   const [admin, setAdmin] = useState(false);
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   const token = getToken();
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     if (sessionStorage.getItem("login_in_progress") === "1") return;
@@ -103,6 +119,18 @@ function Protected() {
           )}
         </nav>
         <div className="sidebar-spacer" />
+        <button
+          className="nav-item theme-toggle"
+          role="switch"
+          aria-checked={theme === "dark"}
+          data-testid="theme-toggle"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        >
+          <span>{theme === "dark" ? "Thème sombre" : "Thème clair"}</span>
+          <span className="theme-toggle-track" aria-hidden="true">
+            <span className="theme-toggle-thumb" />
+          </span>
+        </button>
         <button
           className="nav-item logout"
           data-testid="logout"

@@ -1,26 +1,67 @@
 // Design tokens — toutes les valeurs du portail vivent ici.
+// Les couleurs thémées sont générées en variables CSS dans `_theme.scss`.
 
-// Couleurs
-$c-bg: #f5f6f8;
-$c-surface: #ffffff;
-$c-border: #e2e5ea;
-$c-text: #1f2430;
-$c-muted: #6b7280;
-$c-accent: #4f46e5;
-$c-accent-strong: #4338ca;
-$c-accent-soft: #eef0fe;
-$c-danger: #dc2626;
-$c-danger-border: #f3c2c2;
-$c-danger-soft: #fdecec;
-$c-on-accent: #ffffff;
+// Couleurs (variables CSS injectées par _theme.scss)
+@use "sass:map";
 
-// Toast
-$ok-bg: #f0fff0;
-$ok-border: #33aa33;
-$ok-text: #117711;
-$err-bg: #fff0f0;
-$err-border: #cc3333;
-$err-text: #991111;
+$themes: (
+  light: (
+    bg: #f5f6f8,
+    surface: #ffffff,
+    border: #e2e5ea,
+    text: #1f2430,
+    muted: #6b7280,
+    accent: #4f46e5,
+    accent-strong: #4338ca,
+    accent-soft: #eef0fe,
+    danger: #dc2626,
+    danger-border: #f3c2c2,
+    danger-soft: #fdecec,
+    on-accent: #ffffff,
+    ok-bg: #f0fff0,
+    ok-border: #33aa33,
+    ok-text: #117711,
+    err-bg: #fff0f0,
+    err-border: #cc3333,
+    err-text: #991111,
+  ),
+  dark: (
+    bg: #0f1216,
+    surface: #1a1f27,
+    border: #2c333f,
+    text: #e7eaf0,
+    muted: #98a2b3,
+    accent: #818cf8,
+    accent-strong: #a5b4fc,
+    accent-soft: #272e4a,
+    danger: #f87171,
+    danger-border: #5b2323,
+    danger-soft: #2a1518,
+    on-accent: #0f1216,
+    ok-bg: #10281a,
+    ok-border: #2f9e57,
+    ok-text: #7ee2a3,
+    err-bg: #2a1416,
+    err-border: #b3403f,
+    err-text: #ff9c97,
+  ),
+);
+
+:root {
+  color-scheme: light;
+
+  @each $k, $v in map.get($themes, light) {
+    --c-#{$k}: #{$v};
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  @each $k, $v in map.get($themes, dark) {
+    --c-#{$k}: #{$v};
+  }
+}
 
 // Échelle d'espacement
 $s-0: 0;
@@ -73,11 +114,26 @@ $badge-size: 32px;
 $control-w: 220px;
 $viewport-h: 100vh;
 $bw: 1px;
-$border: $bw solid $c-border;
+$border: $bw solid var(--c-border);
+$dur: 0.15s;
+$dur-theme: 0.3s;
+$switch-w: 44px;
+$switch-h: 24px;
+$switch-pad: 2px;
+$switch-thumb: $switch-h - $switch-pad * 2;
+$switch-travel: $switch-w - $switch-thumb - $switch-pad * 2;
+$outline-w: 2px;
+$outline-offset: 2px;
+$shadow:
+  0 $s-1 $s-3 rgba(16, 24, 40, 0.08),
+  0 $s-1 $s-2 rgba(16, 24, 40, 0.04);
+$ring: 0 0 0 $s-3 var(--c-accent-soft);
+$z-toast: 1000;
+$bp-narrow: 720px;
 $dur: 0.15s;
 $shadow:
   0 $s-1 $s-3 rgba(16, 24, 40, 0.08),
   0 $s-1 $s-2 rgba(16, 24, 40, 0.04);
-$ring: 0 0 0 $s-3 $c-accent-soft;
+$ring: 0 0 0 $s-3 var(--c-accent-soft);
 $z-toast: 1000;
 $bp-narrow: 720px;

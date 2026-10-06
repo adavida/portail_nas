@@ -11,7 +11,7 @@
 }
 
 .sidebar {
-  background: $c-surface;
+  background: var(--c-surface);
   border-right: $border;
   padding: $s-20 $s-16;
   display: flex;
@@ -43,8 +43,8 @@
   display: grid;
   place-items: center;
   border-radius: $r-sm;
-  background: $c-accent;
-  color: $c-on-accent;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
   font-size: $fs-md;
 }
 
@@ -62,7 +62,7 @@
   appearance: none;
   border: none;
   background: transparent;
-  color: $c-text;
+  color: var(--c-text);
   text-align: left;
   font: inherit;
   font-size: $fs-md;
@@ -77,22 +77,22 @@
     color $dur;
 
   &:hover {
-    background: $c-bg;
+    background: var(--c-bg);
   }
 
   &.active {
-    background: $c-accent-soft;
-    color: $c-accent;
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
     font-weight: $fw-semibold;
   }
 }
 
 .logout {
-  color: $c-muted;
+  color: var(--c-muted);
 
   &:hover {
-    background: $c-danger-soft;
-    color: $c-danger;
+    background: var(--c-danger-soft);
+    color: var(--c-danger);
   }
 
   @media (max-width: $bp-narrow) {
@@ -105,6 +105,45 @@
 
   @media (max-width: $bp-narrow) {
     display: none;
+  }
+}
+
+.theme-toggle {
+  justify-content: space-between;
+
+  &:focus-visible {
+    outline: $outline-w solid var(--c-accent);
+    outline-offset: $outline-offset;
+  }
+}
+
+.theme-toggle-track {
+  position: relative;
+  flex: none;
+  width: $switch-w;
+  height: $switch-h;
+  border-radius: $r-pill;
+  background: var(--c-border);
+  transition: background $dur-theme;
+
+  .theme-toggle[aria-checked="true"] & {
+    background: var(--c-accent);
+  }
+}
+
+.theme-toggle-thumb {
+  position: absolute;
+  top: $switch-pad;
+  left: $switch-pad;
+  width: $switch-thumb;
+  height: $switch-thumb;
+  border-radius: 50%;
+  background: var(--c-surface);
+  box-shadow: $shadow;
+  transition: transform $dur-theme;
+
+  .theme-toggle[aria-checked="true"] & {
+    transform: translateX($switch-travel);
   }
 }
 

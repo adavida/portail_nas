@@ -13,8 +13,8 @@ body,
 body {
   margin: 0;
   font-family: $font-family;
-  color: $c-text;
-  background: $c-bg;
+  color: var(--c-text);
+  background: var(--c-bg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -25,5 +25,18 @@ h2 {
 }
 
 .muted {
-  color: $c-muted;
+  color: var(--c-muted);
+}
+
+body,
+.content,
+.card,
+.sidebar,
+.table th,
+.table td,
+.input {
+  transition:
+    background-color $dur-theme,
+    color $dur-theme,
+    border-color $dur-theme;
 }

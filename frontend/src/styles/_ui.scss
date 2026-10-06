@@ -8,39 +8,39 @@
   padding: $s-6 $s-12;
   border-radius: $r-sm;
   border: $border;
-  background: $c-surface;
-  color: $c-text;
+  background: var(--c-surface);
+  color: var(--c-text);
   cursor: pointer;
   transition:
     background $dur,
     border-color $dur;
 
   &:hover {
-    background: $c-bg;
+    background: var(--c-bg);
   }
 
   &-primary {
-    background: $c-accent;
-    border-color: $c-accent;
-    color: $c-on-accent;
+    background: var(--c-accent);
+    border-color: var(--c-accent);
+    color: var(--c-on-accent);
 
     &:hover {
-      background: $c-accent-strong;
+      background: var(--c-accent-strong);
     }
   }
 
   &-danger {
-    color: $c-danger;
-    border-color: $c-danger-border;
+    color: var(--c-danger);
+    border-color: var(--c-danger-border);
 
     &:hover {
-      background: $c-danger-soft;
+      background: var(--c-danger-soft);
     }
   }
 }
 
 .card {
-  background: $c-surface;
+  background: var(--c-surface);
   border: $border;
   border-radius: $r-md;
   padding: $s-20;
@@ -60,16 +60,16 @@
   }
 
   thead th {
-    color: $c-muted;
+    color: var(--c-muted);
     font-weight: $fw-semibold;
     font-size: $fs-xs;
     text-transform: uppercase;
     letter-spacing: $ls-caps;
-    background: $c-bg;
+    background: var(--c-bg);
   }
 
   tbody tr:hover {
-    background: $c-bg;
+    background: var(--c-bg);
   }
 
   td.editable {
@@ -78,7 +78,7 @@
 
   td.center {
     text-align: center;
-    color: $c-muted;
+    color: var(--c-muted);
   }
 }
 
@@ -95,14 +95,14 @@
   padding: $s-6 $s-10;
   border: $border;
   border-radius: $r-sm;
-  background: $c-surface;
-  color: $c-text;
+  background: var(--c-surface);
+  color: var(--c-text);
   max-width: $control-w;
   width: $pct;
 
   &:focus {
     outline: none;
-    border-color: $c-accent;
+    border-color: var(--c-accent);
     box-shadow: $ring;
   }
 }
