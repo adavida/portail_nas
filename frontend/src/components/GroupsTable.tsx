@@ -5,6 +5,7 @@ import { toast } from "./Toaster";
 
 const PROTECTED_GIDS = ["admin", "user"];
 const isProtected = (gid: string) => PROTECTED_GIDS.includes(gid);
+const isHidden = (gid: string) => gid === "user";
 
 function GroupRow({
   group,
@@ -82,6 +83,8 @@ export function GroupsTable({
   onUpdated?: () => void;
   onDeleted?: () => void;
 }) {
+  const visible = groups.filter((g) => !isHidden(g.gid));
+
   return (
     <table data-testid="groups-table" className="table">
       <thead>
@@ -93,14 +96,14 @@ export function GroupsTable({
         </tr>
       </thead>
       <tbody>
-        {groups.length === 0 ? (
+        {visible.length === 0 ? (
           <tr>
             <td colSpan={4} className="center" data-testid="groups-empty">
               Aucun groupe
             </td>
           </tr>
         ) : (
-          groups.map((g) => (
+          visible.map((g) => (
             <GroupRow
               key={g.gid}
               group={g}

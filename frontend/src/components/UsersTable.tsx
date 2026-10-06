@@ -27,13 +27,14 @@ function GroupsCell({
   const [editing, setEditing] = useState(false);
 
   if (!editing) {
+    const visible = groups.filter((g) => g !== "user");
     return (
       <td
         data-testid={`cell-groups-${uid}`}
         className="editable"
         onDoubleClick={() => setEditing(true)}
       >
-        {groups.length ? groups.join(" ") : "-"}
+        {visible.length ? visible.join(" ") : "-"}
       </td>
     );
   }

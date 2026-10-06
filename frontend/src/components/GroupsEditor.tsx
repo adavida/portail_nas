@@ -28,10 +28,7 @@ export function GroupsEditor({
     setDraft((d) => (d.includes(gid) ? d : [...d, gid]));
   };
 
-  const remove = (gid: string) => {
-    if (gid === MASTER_GID) return;
-    setDraft((d) => d.filter((x) => x !== gid));
-  };
+  const remove = (gid: string) => setDraft((d) => d.filter((x) => x !== gid));
 
   const q = newGid.trim().toLowerCase();
   const suggestions = q
@@ -82,33 +79,33 @@ export function GroupsEditor({
 
   const cancel = () => onCancel();
 
+  const visible = draft.filter((g) => g !== MASTER_GID);
+
   return (
     <div data-testid={`groups-editor-${uid}`} className="groups-editor">
       <div className="field">
-        {draft.map((gid) => (
+        {visible.map((gid) => (
           <span
             key={gid}
             data-testid={`groups-chip-${uid}-${gid}`}
             className="chip"
           >
             {gid}
-            {gid !== MASTER_GID && (
-              <button
-                type="button"
-                aria-label={`retirer ${gid}`}
-                data-testid={`groups-remove-${uid}-${gid}`}
-                onClick={() => remove(gid)}
-              >
-                ×
-              </button>
-            )}
+            <button
+              type="button"
+              aria-label={`retirer ${gid}`}
+              data-testid={`groups-remove-${uid}-${gid}`}
+              onClick={() => remove(gid)}
+            >
+              ×
+            </button>
           </span>
         ))}
         <input
           autoFocus
           className="input"
           data-testid={`groups-new-input-${uid}`}
-          placeholder={draft.length ? "" : "ajouter / créer un groupe"}
+          placeholder={visible.length ? "" : "ajouter / créer un groupe"}
           value={newGid}
           onChange={(e) => setNewGid(e.target.value)}
           onKeyDown={keyDown}

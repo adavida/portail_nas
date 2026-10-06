@@ -19,7 +19,7 @@ test("renders rows with gid, name, description and delete", () => {
   expect(screen.getByTestId("group-delete-button-devs")).toBeInTheDocument();
 });
 
-test("admin and user rows have no delete button", () => {
+test("user row is hidden, admin row has no delete button", () => {
   const groups = [
     { gid: "admin", name: "Admin", description: "" },
     { gid: "user", name: "User", description: "" },
@@ -28,8 +28,9 @@ test("admin and user rows have no delete button", () => {
 
   render(<GroupsTable groups={groups} />);
 
+  expect(screen.queryByTestId("group-row-user")).toBeNull();
+  expect(screen.getByTestId("group-row-admin")).toBeInTheDocument();
   expect(screen.queryByTestId("group-delete-button-admin")).toBeNull();
-  expect(screen.queryByTestId("group-delete-button-user")).toBeNull();
   expect(screen.getByTestId("group-delete-button-devs")).toBeInTheDocument();
 });
 
