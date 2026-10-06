@@ -1,0 +1,41 @@
+@use "../styles/tokens" as *;
+
+.groups-editor {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $s-4;
+  border: $border;
+  border-radius: $r-sm;
+  padding: $s-4;
+  min-width: $control-w;
+}
+
+.chip {
+  border: $border;
+  border-radius: $r-pill;
+  padding: $s-1 $s-4 $s-1 $s-8;
+  font-size: $fs-chip;
+  display: inline-flex;
+  align-items: center;
+  gap: $s-4;
+
+  button {
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: $c-muted;
+    font-size: $fs-icon;
+    line-height: $lh-tight;
+    padding: 0;
+  }
+}
+
+.suggest {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: $s-4;
+}

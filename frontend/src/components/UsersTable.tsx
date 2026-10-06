@@ -30,8 +30,8 @@ function GroupsCell({
     return (
       <td
         data-testid={`cell-groups-${uid}`}
+        className="editable"
         onDoubleClick={() => setEditing(true)}
-        style={{ border: "1px solid #ccc", padding: 8, cursor: "text" }}
       >
         {groups.length ? groups.join(" ") : "-"}
       </td>
@@ -39,7 +39,7 @@ function GroupsCell({
   }
 
   return (
-    <td style={{ border: "1px solid #ccc", padding: 8 }}>
+    <td>
       <GroupsEditor
         uid={uid}
         groups={groups}
@@ -149,7 +149,7 @@ function UserRow({
 
   return (
     <tr data-testid={`user-row-${user.uid}`}>
-      <td style={{ border: "1px solid #ccc", padding: 8 }}>{user.uid}</td>
+      <td>{user.uid}</td>
       <EditableCell
         value={user.name}
         field="name"
@@ -169,9 +169,10 @@ function UserRow({
         onSave={saveGroups}
         onCreateGroup={createGroupWithMember}
       />
-      <td style={{ border: "1px solid #ccc", padding: 8 }}>
-        <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <td>
+        <span className="row-actions">
           <input
+            className="input"
             data-testid={`password-input-${user.uid}`}
             placeholder="nouveau mdp"
             type="password"
@@ -179,6 +180,7 @@ function UserRow({
             onChange={(e) => setPassword(e.target.value)}
           />
           <button
+            className="btn btn-primary"
             data-testid={`password-button-${user.uid}`}
             onClick={submit}
             type="button"
@@ -187,8 +189,9 @@ function UserRow({
           </button>
         </span>
       </td>
-      <td style={{ border: "1px solid #ccc", padding: 8 }}>
+      <td>
         <button
+          className="btn btn-danger"
           data-testid={`delete-button-${user.uid}`}
           onClick={remove}
           type="button"
@@ -227,33 +230,37 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
 
   return (
     <tr data-testid="create-row">
-      <td style={{ border: "1px solid #ccc", padding: 8 }}>
+      <td>
         <input
+          className="input"
           data-testid="input-uid"
           placeholder="uid"
           value={uid}
           onChange={(e) => setUid(e.target.value)}
         />
       </td>
-      <td style={{ border: "1px solid #ccc", padding: 8 }}>
+      <td>
         <input
+          className="input"
           data-testid="input-name"
           placeholder="nom"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
       </td>
-      <td style={{ border: "1px solid #ccc", padding: 8 }}>
+      <td>
         <input
+          className="input"
           data-testid="input-email"
           placeholder="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
       </td>
-      <td style={{ border: "1px solid #ccc", padding: 8 }} />
-      <td style={{ border: "1px solid #ccc", padding: 8 }}>
+      <td />
+      <td>
         <input
+          className="input"
           data-testid="input-password"
           placeholder="mot de passe"
           type="password"
@@ -261,8 +268,13 @@ function CreateRow({ onCreated }: { onCreated?: () => void }) {
           onChange={(e) => setPassword(e.target.value)}
         />
       </td>
-      <td style={{ border: "1px solid #ccc", padding: 8 }}>
-        <button data-testid="create-button" onClick={submit} type="button">
+      <td>
+        <button
+          className="btn btn-primary"
+          data-testid="create-button"
+          onClick={submit}
+          type="button"
+        >
           Créer
         </button>
       </td>
@@ -284,57 +296,22 @@ export function UsersTable({
   onDeleted?: () => void;
 }) {
   return (
-    <table
-      data-testid="users-table"
-      style={{ borderCollapse: "collapse", width: "100%" }}
-    >
+    <table data-testid="users-table" className="table">
       <thead>
         <tr>
-          <th
-            style={{ border: "1px solid #ccc", padding: 8, textAlign: "left" }}
-          >
-            UID
-          </th>
-          <th
-            style={{ border: "1px solid #ccc", padding: 8, textAlign: "left" }}
-          >
-            Nom
-          </th>
-          <th
-            style={{ border: "1px solid #ccc", padding: 8, textAlign: "left" }}
-          >
-            Email
-          </th>
-          <th
-            style={{ border: "1px solid #ccc", padding: 8, textAlign: "left" }}
-          >
-            Groupes
-          </th>
-          <th
-            style={{ border: "1px solid #ccc", padding: 8, textAlign: "left" }}
-          >
-            Mot de passe
-          </th>
-          <th
-            style={{ border: "1px solid #ccc", padding: 8, textAlign: "left" }}
-          >
-            Action
-          </th>
+          <th>UID</th>
+          <th>Nom</th>
+          <th>Email</th>
+          <th>Groupes</th>
+          <th>Mot de passe</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
         {onCreated && <CreateRow onCreated={onCreated} />}
         {users.length === 0 ? (
           <tr>
-            <td
-              colSpan={6}
-              style={{
-                border: "1px solid #ccc",
-                padding: 8,
-                textAlign: "center",
-              }}
-              data-testid="users-empty"
-            >
+            <td colSpan={6} className="center" data-testid="users-empty">
               Aucun utilisateur
             </td>
           </tr>

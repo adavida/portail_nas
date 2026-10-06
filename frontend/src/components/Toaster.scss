@@ -1,0 +1,26 @@
+@use "../styles/tokens" as *;
+
+.toaster {
+  position: fixed;
+  top: $s-16;
+  right: $s-16;
+  z-index: $z-toast;
+  display: flex;
+  flex-direction: column;
+  gap: $s-8;
+}
+
+.toast {
+  padding: $s-8 $s-12;
+  border-radius: $r-sm;
+  box-shadow: $shadow;
+  border: $bw solid $ok-border;
+  background: $ok-bg;
+  color: $ok-text;
+
+  &--error {
+    border-color: $err-border;
+    background: $err-bg;
+    color: $err-text;
+  }
+}

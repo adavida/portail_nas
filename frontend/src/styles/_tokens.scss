@@ -1,0 +1,83 @@
+// Design tokens — toutes les valeurs du portail vivent ici.
+
+// Couleurs
+$c-bg: #f5f6f8;
+$c-surface: #ffffff;
+$c-border: #e2e5ea;
+$c-text: #1f2430;
+$c-muted: #6b7280;
+$c-accent: #4f46e5;
+$c-accent-strong: #4338ca;
+$c-accent-soft: #eef0fe;
+$c-danger: #dc2626;
+$c-danger-border: #f3c2c2;
+$c-danger-soft: #fdecec;
+$c-on-accent: #ffffff;
+
+// Toast
+$ok-bg: #f0fff0;
+$ok-border: #33aa33;
+$ok-text: #117711;
+$err-bg: #fff0f0;
+$err-border: #cc3333;
+$err-text: #991111;
+
+// Échelle d'espacement
+$s-0: 0;
+$s-1: 1px;
+$s-2: 2px;
+$s-3: 3px;
+$s-4: 4px;
+$s-6: 6px;
+$s-8: 8px;
+$s-10: 10px;
+$s-12: 12px;
+$s-16: 16px;
+$s-20: 20px;
+$s-28: 28px;
+$s-32: 32px;
+
+// Rayons
+$r-sm: 8px;
+$r: 10px;
+$r-md: 12px;
+$r-pill: 999px;
+
+// Typo
+$font-family:
+  system-ui,
+  -apple-system,
+  "Segoe UI",
+  Roboto,
+  Helvetica,
+  Arial,
+  sans-serif;
+$fs-h2: 1.35rem;
+$fs-lg: 1.05rem;
+$fs-md: 0.95rem;
+$fs-body: 0.9rem;
+$fs-sm: 0.85rem;
+$fs-chip: 0.8rem;
+$fs-xs: 0.78rem;
+$fs-icon: 1rem;
+$fw-semibold: 600;
+$fw-heading: 650;
+$fw-bold: 700;
+$ls-caps: 0.03em;
+
+// Tailles & infra
+$pct: 100%;
+$lh-tight: 1;
+$sidebar-w: 248px;
+$badge-size: 32px;
+$control-w: 220px;
+$viewport-h: 100vh;
+$bw: 1px;
+$border: $bw solid $c-border;
+$dur: 0.15s;
+$shadow:
+  0 $s-1 $s-3 rgba(16, 24, 40, 0.08),
+  0 $s-1 $s-2 rgba(16, 24, 40, 0.04);
+$ring: 0 0 0 $s-3 $c-accent-soft;
+$z-toast: 1000;
+$bp-narrow: 720px;

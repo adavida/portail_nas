@@ -1,0 +1,29 @@
+@use "../styles/tokens" as *;
+
+.apps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: $s-12;
+}
+
+.app-link {
+  font-weight: $fw-semibold;
+  color: $c-accent;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: $s-8;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.app-desc {
+  margin: $s-4 0 0;
+  color: $c-muted;
+  font-size: $fs-body;
+}

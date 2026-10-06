@@ -23,8 +23,8 @@ function EditableCell({
     return (
       <td
         data-testid={`cell-${field}-${rowId}`}
+        className="editable"
         onDoubleClick={() => setEditing(true)}
-        style={{ border: "1px solid #ccc", padding: 8, cursor: "text" }}
       >
         {value}
       </td>
@@ -32,8 +32,9 @@ function EditableCell({
   }
 
   return (
-    <td style={{ border: "1px solid #ccc", padding: 8 }}>
+    <td>
       <input
+        className="input"
         data-testid={`edit-input-${field}-${rowId}`}
         autoFocus
         value={draft}

@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- toast() and Toaster() coupled by design */
 import { useEffect, useState } from "react";
+import "./Toaster.scss";
 
 export type Toast = { id: number; message: string; isError: boolean };
 
@@ -33,23 +34,12 @@ export function Toaster() {
   if (!toasts.length) return null;
 
   return (
-    <div
-      data-testid="toaster"
-      style={{ position: "fixed", bottom: 16, left: 16, zIndex: 1000 }}
-    >
+    <div data-testid="toaster" className="toaster">
       {toasts.map((t) => (
         <div
           key={t.id}
+          className={t.isError ? "toast toast--error" : "toast"}
           data-testid={t.isError ? "toast-error" : "toast"}
-          style={{
-            background: t.isError ? "#fff0f0" : "#f0fff0",
-            border: `1px solid ${t.isError ? "#cc3333" : "#33aa33"}`,
-            color: t.isError ? "#991111" : "#117711",
-            padding: "8px 12px",
-            marginTop: 8,
-            borderRadius: 6,
-            boxShadow: "0 2px 6px rgba(0,0,0,.15)",
-          }}
         >
           {t.message}
         </div>

@@ -3,8 +3,6 @@ import type { Group } from "../api/groups";
 import EditableCell from "./EditableCell";
 import { toast } from "./Toaster";
 
-const td = { border: "1px solid #ccc", padding: 8 };
-
 function GroupRow({
   group,
   onUpdated,
@@ -43,7 +41,7 @@ function GroupRow({
 
   return (
     <tr data-testid={`group-row-${group.gid}`}>
-      <td style={td}>{group.gid}</td>
+      <td>{group.gid}</td>
       <EditableCell
         value={group.name}
         field="name"
@@ -56,8 +54,9 @@ function GroupRow({
         rowId={group.gid}
         onSave={saveField}
       />
-      <td style={td}>
+      <td>
         <button
+          className="btn btn-danger"
           data-testid={`group-delete-button-${group.gid}`}
           onClick={remove}
           type="button"
@@ -79,26 +78,19 @@ export function GroupsTable({
   onDeleted?: () => void;
 }) {
   return (
-    <table
-      data-testid="groups-table"
-      style={{ borderCollapse: "collapse", width: "100%" }}
-    >
+    <table data-testid="groups-table" className="table">
       <thead>
         <tr>
-          <th style={{ ...td, textAlign: "left" }}>GID</th>
-          <th style={{ ...td, textAlign: "left" }}>Nom</th>
-          <th style={{ ...td, textAlign: "left" }}>Description</th>
-          <th style={{ ...td, textAlign: "left" }}>Action</th>
+          <th>GID</th>
+          <th>Nom</th>
+          <th>Description</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
         {groups.length === 0 ? (
           <tr>
-            <td
-              colSpan={4}
-              style={{ ...td, textAlign: "center" }}
-              data-testid="groups-empty"
-            >
+            <td colSpan={4} className="center" data-testid="groups-empty">
               Aucun groupe
             </td>
           </tr>

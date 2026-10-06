@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { listApps } from "../api/apps";
 import type { App } from "../api/apps";
 import { toast } from "../components/Toaster";
+import "./Home.scss";
 
 export default function Home() {
   const [apps, setApps] = useState<App[] | null>(null);
@@ -21,7 +22,7 @@ export default function Home() {
   }, [fetchApps]);
 
   return (
-    <section style={{ marginTop: 24 }}>
+    <section>
       <h2>Applications</h2>
       {error ? (
         <p data-testid="apps-error">Erreur: {error}</p>
@@ -30,39 +31,23 @@ export default function Home() {
       ) : apps.length === 0 ? (
         <p data-testid="apps-empty">Aucune application</p>
       ) : (
-        <ul
-          style={{
-            listStyle: "none",
-            padding: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
+        <ul className="apps">
           {apps.map((app, i) => (
             <li key={`${app.name}-${app.url}`} data-testid={`app-${i}`}>
               <a
+                className="app-link"
                 data-testid={`app-link-${i}`}
                 href={app.url}
                 target="_blank"
                 rel="noopener"
-                style={{ fontWeight: 600 }}
               >
                 {app.icon ? (
-                  <img
-                    src={app.icon}
-                    width={20}
-                    height={20}
-                    alt=""
-                    style={{ marginRight: 8, verticalAlign: "middle" }}
-                  />
+                  <img src={app.icon} width={20} height={20} alt="" />
                 ) : null}
                 {app.name}
               </a>
               {app.description ? (
-                <p style={{ margin: "4px 0 0", color: "#555" }}>
-                  {app.description}
-                </p>
+                <p className="app-desc">{app.description}</p>
               ) : null}
             </li>
           ))}

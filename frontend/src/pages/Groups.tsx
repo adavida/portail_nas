@@ -22,18 +22,20 @@ export default function Groups() {
   }, [fetchGroups]);
 
   return (
-    <section style={{ marginTop: 24 }}>
+    <section>
       <h2>Groupes</h2>
       {error ? (
         <p data-testid="groups-error">Erreur: {error}</p>
       ) : groups === null ? (
         <p data-testid="groups-loading">Chargement...</p>
       ) : (
-        <GroupsTable
-          groups={groups}
-          onUpdated={fetchGroups}
-          onDeleted={fetchGroups}
-        />
+        <div className="card">
+          <GroupsTable
+            groups={groups}
+            onUpdated={fetchGroups}
+            onDeleted={fetchGroups}
+          />
+        </div>
       )}
     </section>
   );

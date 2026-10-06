@@ -28,20 +28,22 @@ export default function Users() {
   }, [fetchUsers]);
 
   return (
-    <section style={{ marginTop: 24 }}>
+    <section>
       <h2>Utilisateurs</h2>
       {error ? (
         <p data-testid="users-error">Erreur: {error}</p>
       ) : users === null ? (
         <p data-testid="users-loading">Chargement...</p>
       ) : (
-        <UsersTable
-          users={users}
-          allGroups={groups.map((g) => g.gid)}
-          onCreated={fetchUsers}
-          onUpdated={fetchUsers}
-          onDeleted={fetchUsers}
-        />
+        <div className="card">
+          <UsersTable
+            users={users}
+            allGroups={groups.map((g) => g.gid)}
+            onCreated={fetchUsers}
+            onUpdated={fetchUsers}
+            onDeleted={fetchUsers}
+          />
+        </div>
       )}
     </section>
   );

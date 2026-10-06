@@ -1,0 +1,108 @@
+// Primitives partagées par plusieurs composants (utilisées à ≥2 endroits).
+// Les styles propres à un seul composant vivent dans son .scss colocated.
+@use "tokens" as *;
+
+.btn {
+  font: inherit;
+  font-size: $fs-sm;
+  padding: $s-6 $s-12;
+  border-radius: $r-sm;
+  border: $border;
+  background: $c-surface;
+  color: $c-text;
+  cursor: pointer;
+  transition:
+    background $dur,
+    border-color $dur;
+
+  &:hover {
+    background: $c-bg;
+  }
+
+  &-primary {
+    background: $c-accent;
+    border-color: $c-accent;
+    color: $c-on-accent;
+
+    &:hover {
+      background: $c-accent-strong;
+    }
+  }
+
+  &-danger {
+    color: $c-danger;
+    border-color: $c-danger-border;
+
+    &:hover {
+      background: $c-danger-soft;
+    }
+  }
+}
+
+.card {
+  background: $c-surface;
+  border: $border;
+  border-radius: $r-md;
+  padding: $s-20;
+  box-shadow: $shadow;
+}
+
+.table {
+  width: $pct;
+  border-collapse: collapse;
+  font-size: $fs-body;
+
+  th,
+  td {
+    padding: $s-10 $s-12;
+    text-align: left;
+    border-bottom: $border;
+  }
+
+  thead th {
+    color: $c-muted;
+    font-weight: $fw-semibold;
+    font-size: $fs-xs;
+    text-transform: uppercase;
+    letter-spacing: $ls-caps;
+    background: $c-bg;
+  }
+
+  tbody tr:hover {
+    background: $c-bg;
+  }
+
+  td.editable {
+    cursor: text;
+  }
+
+  td.center {
+    text-align: center;
+    color: $c-muted;
+  }
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $s-8;
+}
+
+.input {
+  font: inherit;
+  font-size: $fs-body;
+  padding: $s-6 $s-10;
+  border: $border;
+  border-radius: $r-sm;
+  background: $c-surface;
+  color: $c-text;
+  max-width: $control-w;
+  width: $pct;
+
+  &:focus {
+    outline: none;
+    border-color: $c-accent;
+    box-shadow: $ring;
+  }
+}

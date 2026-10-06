@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./GroupsEditor.scss";
 
 type Props = {
   uid: string;
@@ -74,31 +75,17 @@ export function GroupsEditor({
   const cancel = () => onCancel();
 
   return (
-    <div
-      data-testid={`groups-editor-${uid}`}
-      style={{
-        display: "inline-flex",
-        flexWrap: "wrap",
-        gap: 4,
-        alignItems: "center",
-        border: "1px solid #ccc",
-        padding: 4,
-        minWidth: 220,
-      }}
-    >
+    <div data-testid={`groups-editor-${uid}`} className="groups-editor">
       {draft.map((gid) => (
         <span
           key={gid}
           data-testid={`groups-chip-${uid}-${gid}`}
-          style={{
-            border: "1px solid #999",
-            borderRadius: 8,
-            padding: "1px 5px",
-          }}
+          className="chip"
         >
-          {gid}{" "}
+          {gid}
           <button
             type="button"
+            aria-label={`retirer ${gid}`}
             data-testid={`groups-remove-${uid}-${gid}`}
             onClick={() => remove(gid)}
           >
@@ -107,19 +94,18 @@ export function GroupsEditor({
         </span>
       ))}
       <input
+        className="input"
         data-testid={`groups-new-input-${uid}`}
         placeholder="ajouter / créer un groupe"
         value={newGid}
         onChange={(e) => setNewGid(e.target.value)}
         onKeyDown={keyDown}
       />
-      <ul
-        data-testid={`groups-suggest-list-${uid}`}
-        style={{ margin: 0, padding: 0, listStyle: "none" }}
-      >
+      <ul data-testid={`groups-suggest-list-${uid}`} className="suggest">
         {suggestions.map((gid) => (
           <li key={gid}>
             <button
+              className="btn"
               type="button"
               data-testid={`groups-suggest-${uid}-${gid}`}
               onClick={() => add(gid)}
@@ -129,8 +115,9 @@ export function GroupsEditor({
           </li>
         ))}
       </ul>
-      <div>
+      <div className="row-actions">
         <button
+          className="btn btn-primary"
           type="button"
           data-testid={`groups-save-${uid}`}
           onClick={() => void save()}
@@ -138,6 +125,7 @@ export function GroupsEditor({
           Valider
         </button>
         <button
+          className="btn"
           type="button"
           data-testid={`groups-cancel-${uid}`}
           onClick={cancel}

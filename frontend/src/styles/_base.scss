@@ -1,0 +1,29 @@
+@use "tokens" as *;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: $pct;
+}
+
+body {
+  margin: 0;
+  font-family: $font-family;
+  color: $c-text;
+  background: $c-bg;
+  -webkit-font-smoothing: antialiased;
+}
+
+h2 {
+  font-size: $fs-h2;
+  font-weight: $fw-heading;
+  margin: 0 0 $s-16;
+}
+
+.muted {
+  color: $c-muted;
+}

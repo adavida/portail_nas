@@ -10,6 +10,11 @@ if (!process.env.VITE_OIDC_REDIRECT_URI)
 
 export default defineConfig({
   plugins: [react()],
+  css: {
+    preprocessorOptions: {
+      scss: { api: "modern-compiler" },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

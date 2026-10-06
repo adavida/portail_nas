@@ -7,6 +7,7 @@ import Callback from "./pages/Callback";
 import { Toaster } from "./components/Toaster";
 import { whoami } from "./api/auth";
 import { clearTokens, getToken, login, logout } from "./auth/oidc";
+import "./App.scss";
 
 function Protected() {
   const [tab, setTab] = useState<"home" | "users" | "groups">("home");
@@ -38,9 +39,10 @@ function Protected() {
   if (!token) {
     if (sessionStorage.getItem("logged_out") === "1")
       return (
-        <div>
+        <div className="logged-out">
           <p data-testid="logged-out">Déconnecté</p>
           <button
+            className="btn btn-primary"
             data-testid="login-button"
             onClick={() => {
               sessionStorage.removeItem("logged_out");
@@ -52,32 +54,66 @@ function Protected() {
           </button>
         </div>
       );
-    return <p data-testid="redirecting">Redirection vers Authelia...</p>;
+    return (
+      <p className="muted" data-testid="redirecting">
+        Redirection vers Authelia...
+      </p>
+    );
   }
 
-  if (!checked) return <p data-testid="checking">Vérification...</p>;
+  if (!checked)
+    return (
+      <p className="muted" data-testid="checking">
+        Vérification...
+      </p>
+    );
 
   return (
-    <div>
-      <nav style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <button data-testid="tab-home" onClick={() => setTab("home")}>
-          Accueil
-        </button>
-        {admin && (
-          <button data-testid="tab-users" onClick={() => setTab("users")}>
-            Utilisateurs
+    <div className="layout">
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="brand-badge">P</span>
+          <span>Portail</span>
+        </div>
+        <nav className="nav">
+          <button
+            className={tab === "home" ? "nav-item active" : "nav-item"}
+            data-testid="tab-home"
+            onClick={() => setTab("home")}
+          >
+            Accueil
           </button>
-        )}
-        {admin && (
-          <button data-testid="tab-groups" onClick={() => setTab("groups")}>
-            Groupes
-          </button>
-        )}
-        <button data-testid="logout" onClick={logout}>
+          {admin && (
+            <button
+              className={tab === "users" ? "nav-item active" : "nav-item"}
+              data-testid="tab-users"
+              onClick={() => setTab("users")}
+            >
+              Utilisateurs
+            </button>
+          )}
+          {admin && (
+            <button
+              className={tab === "groups" ? "nav-item active" : "nav-item"}
+              data-testid="tab-groups"
+              onClick={() => setTab("groups")}
+            >
+              Groupes
+            </button>
+          )}
+        </nav>
+        <div className="sidebar-spacer" />
+        <button
+          className="nav-item logout"
+          data-testid="logout"
+          onClick={logout}
+        >
           Déconnexion
         </button>
-      </nav>
-      {tab === "home" ? <Home /> : tab === "users" ? <Users /> : <Groups />}
+      </aside>
+      <main className="content">
+        {tab === "home" ? <Home /> : tab === "users" ? <Users /> : <Groups />}
+      </main>
       <Toaster />
     </div>
   );

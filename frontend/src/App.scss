@@ -1,0 +1,127 @@
+@use "styles/tokens" as *;
+
+.layout {
+  display: grid;
+  grid-template-columns: $sidebar-w 1fr;
+  min-height: $viewport-h;
+
+  @media (max-width: $bp-narrow) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sidebar {
+  background: $c-surface;
+  border-right: $border;
+  padding: $s-20 $s-16;
+  display: flex;
+  flex-direction: column;
+  gap: $s-20;
+
+  @media (max-width: $bp-narrow) {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: $s-8;
+    border-right: none;
+    border-bottom: $border;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: $s-10;
+  font-weight: $fw-bold;
+  font-size: $fs-lg;
+  padding: $s-4 $s-8;
+}
+
+.brand-badge {
+  width: $badge-size;
+  height: $badge-size;
+  display: grid;
+  place-items: center;
+  border-radius: $r-sm;
+  background: $c-accent;
+  color: $c-on-accent;
+  font-size: $fs-md;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: $s-4;
+
+  @media (max-width: $bp-narrow) {
+    flex-direction: row;
+  }
+}
+
+.nav-item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: $c-text;
+  text-align: left;
+  font: inherit;
+  font-size: $fs-md;
+  padding: $s-10 $s-12;
+  border-radius: $r;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: $s-10;
+  transition:
+    background $dur,
+    color $dur;
+
+  &:hover {
+    background: $c-bg;
+  }
+
+  &.active {
+    background: $c-accent-soft;
+    color: $c-accent;
+    font-weight: $fw-semibold;
+  }
+}
+
+.logout {
+  color: $c-muted;
+
+  &:hover {
+    background: $c-danger-soft;
+    color: $c-danger;
+  }
+
+  @media (max-width: $bp-narrow) {
+    margin-left: auto;
+  }
+}
+
+.sidebar-spacer {
+  flex: 1;
+
+  @media (max-width: $bp-narrow) {
+    display: none;
+  }
+}
+
+.content {
+  padding: $s-28 $s-32;
+  min-width: 0;
+
+  @media (max-width: $bp-narrow) {
+    padding: $s-16;
+  }
+}
+
+.logged-out {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: $s-16;
+  min-height: $viewport-h;
+  text-align: center;
+}
