@@ -11,7 +11,7 @@ pkgs.buildNpmPackage {
   pname = "portail-frontend";
   version = "0.1.0";
   src = ../frontend;
-  npmDepsHash = "sha256-m7ZXnXFBVNeVI4jlhAjr5hRznOoHdMMTT5xugrkDZVI=";
+  npmDepsHash = "sha256-ymXBQLCWOZCowSxaKCA5MX5KJBK/EMbUbteNhKAKRCc=";
   VITE_APP_URL = appUrl;
   VITE_BACKEND_URL = appUrl;
   VITE_OIDC_ISSUER_URL = oidcIssuerUrl;
