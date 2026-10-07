@@ -1,0 +1,61 @@
+# Généré par docker/gen-secrets.sh depuis config.yml.template — ne pas éditer config.yml directement.
+# Secrets scalaires fournis par env AUTHELIA_*_FILE (voir docker/compose.yml).
+server:
+  address: tcp://0.0.0.0:9091
+  tls:
+    certificate: /secrets/portal.crt
+    key: /secrets/portal.key
+
+authentication_backend:
+  ldap:
+    address: ldap://openldap:3890
+    implementation: custom
+    base_dn: dc=dev,dc=example,dc=com
+    user: cn=admin,dc=dev,dc=example,dc=com
+    additional_users_dn: ou=people
+    additional_groups_dn: ou=groups
+    users_filter: "(&(|({username_attribute}={input})({mail_attribute}={input}))(objectClass=person))"
+    groups_filter: "(&(member={dn})(objectClass=groupOfNames))"
+    attributes:
+      username: uid
+      group_name: cn
+      mail: mail
+
+access_control:
+  default_policy: one_factor
+
+identity_providers:
+  oidc:
+    jwks:
+      - key: |
+#JWKS_PEM#
+    clients:
+      - client_id: portail-dev
+        client_name: Portail Dev
+        client_secret: '__CLIENT_SECRET_HASH__'
+        pkce_challenge_method: S256
+        public: false
+        authorization_policy: one_factor
+        consent_mode: implicit
+        redirect_uris:
+          - https://portail.localhost/callback
+          - http://localhost:5173/callback
+          - http://localhost:3000/callback
+        scopes: [openid, groups, email, profile, offline_access]
+        grant_types: [authorization_code, refresh_token]
+        response_types: [code]
+        token_endpoint_auth_method: client_secret_basic
+
+session:
+  name: portail_session
+  cookies:
+    - domain: authelia.localhost
+      authelia_url: https://authelia.localhost
+
+storage:
+  local:
+    path: /config/db.sqlite3
+
+notifier:
+  filesystem:
+    filename: /config/notifications.txt

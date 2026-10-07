@@ -1,0 +1,10 @@
+.git
+.devenv
+target
+frontend
+node_modules
+.vscode
+.opencode
+AGENTS.md
+justfile
+.envrc

@@ -1,0 +1,37 @@
+# Seed dev LDAP (mirrors devenv.nix devUsers). Applied by osixia/openldap on first start only.
+dn: ou=people,dc=dev,dc=example,dc=com
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=dev,dc=example,dc=com
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=admin,ou=people,dc=dev,dc=example,dc=com
+objectClass: inetOrgPerson
+uid: admin
+cn: Admin
+sn: Admin
+mail: admin@example.com
+userPassword: admin
+
+dn: uid=user,ou=people,dc=dev,dc=example,dc=com
+objectClass: inetOrgPerson
+uid: user
+cn: User
+sn: User
+mail: user@example.com
+userPassword: user
+
+dn: cn=user,ou=groups,dc=dev,dc=example,dc=com
+objectClass: groupOfNames
+cn: user
+description: Utilisateurs du portail
+member: uid=admin,ou=people,dc=dev,dc=example,dc=com
+member: uid=user,ou=people,dc=dev,dc=example,dc=com
+
+dn: cn=admin,ou=groups,dc=dev,dc=example,dc=com
+objectClass: groupOfNames
+cn: admin
+description: Administrateurs du portail
+member: uid=admin,ou=people,dc=dev,dc=example,dc=com

@@ -1,0 +1,81 @@
+# Stack prod (images locales, ni build ni download au `up`).
+# Prérequis (une fois, hors compose) :
+#   bash docker/gen-secrets.sh
+#   bash docker/build-images.sh                      # tag = branche git (sanitisée)
+# Lancer (depuis la racine du repo) :
+#   GIT_TAG=$(git rev-parse --abbrev-ref HEAD | tr '/_' '--') docker compose -f docker/compose.yml up -d
+# Entrée unique : le conteneur frontend fait edge TLS par SNI sur 443 —
+#   https://authelia.localhost (login portal + issuer OIDC) et https://portail.localhost (SPA + /api).
+# ldap/authelia/backend ne publient aucun port (réseau interne compose uniquement).
+
+services:
+  openldap:
+    image: docker.io/osixia/openldap:1.5.0
+    pull_policy: never
+    environment:
+      LDAP_PORT: "3890"
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin}
+      LDAP_DOMAIN: dev.example.com
+      LDAP_ORGANISATION: dev example
+    volumes:
+      - ./seed.ldif:/container/slapd/ldif/00-seed.ldif:ro
+      - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d
+
+  authelia:
+    image: docker.io/authelia/authelia:4
+    pull_policy: never
+    command: ["authelia", "--config", "/config/config.yml"]
+    environment:
+      AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE: /secrets/ldap-admin-pw
+      AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET_FILE: /secrets/hmac-secret
+      AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /secrets/reset-password-jwt-secret
+      AUTHELIA_SESSION_SECRET_FILE: /secrets/session-secret
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /secrets/storage-encryption-key
+    volumes:
+      - ./authelia/config.yml:/config/config.yml:ro
+      - ./secrets:/secrets:ro
+      - authelia-data:/config
+    depends_on:
+      - openldap
+    restart: on-failure
+
+  backend:
+    image: portail-backend:${GIT_TAG:-dev}
+    pull_policy: never
+    environment:
+      APP_URL: https://portail.localhost
+      BIND_ADDR: 0.0.0.0:3000
+      LDAP_BASE_DN: dc=dev,dc=example,dc=com
+      LDAP_URL: ldap://openldap:3890
+      LDAP_ADMIN_PW: /secrets/ldap-admin-pw
+      OIDC_CLIENT_ID: portail-dev
+      OIDC_CLIENT_SECRET: /secrets/oidc-client-secret
+      OIDC_ISSUER_URL: https://authelia.localhost # résolu via l'alias DNS du frontend
+      OIDC_REDIRECT_URI: https://portail.localhost/callback
+    volumes:
+      - ./secrets:/secrets:ro
+    depends_on:
+      - openldap
+      - authelia
+
+  frontend:
+    image: portail-frontend:${GIT_TAG:-dev}
+    pull_policy: never
+    ports:
+      - "443:443" # edge TLS SNI : authelia.localhost -> authelia, portail.localhost -> SPA + /api
+    volumes:
+      - ./secrets/portal.crt:/etc/nginx/tls/portal.crt:ro
+      - ./secrets/portal.key:/etc/nginx/tls/portal.key:ro
+    networks:
+      default:
+        aliases:
+          - authelia.localhost # le backend atteint l'issuer par ce nom sans /etc/hosts
+    depends_on:
+      - backend
+      - authelia
+
+volumes:
+  ldap-data:
+  ldap-config:
+  authelia-data:
