@@ -230,7 +230,7 @@
             <td
               data-testid={`cell-groups-${u.uid}`}
               class="editable"
-              ondblclick={() => (editingGroupsUid = u.uid)}
+              onclick={() => (editingGroupsUid = u.uid)}
             >
               {visibleGroups.length ? visibleGroups.join(" ") : "-"}
             </td>

@@ -80,6 +80,13 @@
     text-align: center;
     color: var(--c-muted);
   }
+
+  @media (max-width: $bp-narrow) {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 .row-actions {
@@ -104,5 +111,9 @@
     outline: none;
     border-color: var(--c-accent);
     box-shadow: $ring;
+  }
+
+  @media (max-width: $bp-narrow) {
+    font-size: 1rem; // évite le zoom iOS < 16px
   }
 }

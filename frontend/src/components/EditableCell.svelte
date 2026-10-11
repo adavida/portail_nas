@@ -30,7 +30,7 @@
   <td
     data-testid={`cell-${field}-${rowId}`}
     class="editable"
-    ondblclick={startEditing}
+    onclick={startEditing}
   >
     {value}
   </td>

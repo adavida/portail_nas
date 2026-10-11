@@ -101,7 +101,7 @@ test("edit name sends PUT with name and current description", async () => {
 
   render(GroupsTable, { props: { groups, onUpdated: () => {} } });
 
-  await fireEvent.doubleClick(screen.getByTestId("cell-name-devs"));
+  await fireEvent.click(screen.getByTestId("cell-name-devs"));
   const input = screen.getByTestId("edit-input-name-devs");
   await fireEvent.input(input, { target: { value: "Renamed" } });
   await fireEvent.keyDown(input, { key: "Enter" });
@@ -130,7 +130,7 @@ test("edit description sends PUT with description and current name", async () =>
 
   render(GroupsTable, { props: { groups, onUpdated: () => {} } });
 
-  await fireEvent.doubleClick(screen.getByTestId("cell-description-devs"));
+  await fireEvent.click(screen.getByTestId("cell-description-devs"));
   const input = screen.getByTestId("edit-input-description-devs");
   await fireEvent.input(input, { target: { value: "" } });
   await fireEvent.keyDown(input, { key: "Enter" });

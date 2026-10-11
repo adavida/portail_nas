@@ -106,7 +106,7 @@ test("double-click name opens editor then saves", async () => {
 
   render(UsersTable, { props: { users: [alice], onUpdated } });
 
-  await fireEvent.doubleClick(screen.getByTestId("cell-name-alice"));
+  await fireEvent.click(screen.getByTestId("cell-name-alice"));
 
   const input = screen.getByTestId("edit-input-name-alice");
 
@@ -141,7 +141,7 @@ test("edit error keeps editor open", async () => {
 
   renderWithToaster(UsersTable, { users: [alice] });
 
-  await fireEvent.doubleClick(screen.getByTestId("cell-name-alice"));
+  await fireEvent.click(screen.getByTestId("cell-name-alice"));
   const input = screen.getByTestId("edit-input-name-alice");
   await fireEvent.input(input, { target: { value: "" } });
   await fireEvent.keyDown(input, { key: "Enter" });
@@ -171,7 +171,7 @@ test("groups cell edit proposes groups and diffs membership", async () => {
     props: { users: [alice], allGroups: ["devs", "ops"], onUpdated },
   });
 
-  await fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  await fireEvent.click(screen.getByTestId("cell-groups-alice"));
 
   expect(
     Array.from(
@@ -220,7 +220,7 @@ test("groups save error keeps editor open with message", async () => {
 
   renderWithToaster(UsersTable, { users: [alice], allGroups: ["devs"] });
 
-  await fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  await fireEvent.click(screen.getByTestId("cell-groups-alice"));
   await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
     target: { value: "devs" },
   });
@@ -248,7 +248,7 @@ test("create group from groups cell with user as member", async () => {
 
   render(UsersTable, { props: { users: [alice], onUpdated: () => {} } });
 
-  await fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  await fireEvent.click(screen.getByTestId("cell-groups-alice"));
   await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
     target: { value: "devs" },
   });
@@ -285,7 +285,7 @@ test("create group error keeps input and shows message", async () => {
 
   renderWithToaster(UsersTable, { users: [alice] });
 
-  await fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  await fireEvent.click(screen.getByTestId("cell-groups-alice"));
   await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
     target: { value: "devs" },
   });
