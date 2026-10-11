@@ -379,3 +379,39 @@ test("save passes draft and cancel signals parent", async () => {
     expect(onCancel).toHaveBeenCalled();
   });
 });
+
+test("escape calls onCancel", async () => {
+  const onCancel = vi.fn();
+
+  render(GroupsEditor, {
+    props: {
+      uid: "alice",
+      groups: ["devs"],
+      allGroups: [],
+      onSave: async () => true,
+      onCancel,
+    },
+  });
+
+  await fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
+    key: "Escape",
+  });
+
+  expect(onCancel).toHaveBeenCalled();
+});
+
+test("hideActions removes the validate and cancel buttons", () => {
+  render(GroupsEditor, {
+    props: {
+      uid: "alice",
+      groups: ["devs"],
+      allGroups: [],
+      onSave: async () => true,
+      onCancel: () => {},
+      hideActions: true,
+    },
+  });
+
+  expect(screen.queryByTestId("groups-save-alice")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("groups-cancel-alice")).not.toBeInTheDocument();
+});

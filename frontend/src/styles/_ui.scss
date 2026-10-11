@@ -72,8 +72,13 @@
     background: var(--c-bg);
   }
 
-  td.editable {
-    cursor: text;
+  tbody tr.clickable {
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: $outline-w solid var(--c-accent);
+      outline-offset: -$outline-w;
+    }
   }
 
   td.center {
@@ -82,7 +87,6 @@
   }
 
   @media (max-width: $bp-narrow) {
-    display: block;
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
@@ -116,4 +120,56 @@
   @media (max-width: $bp-narrow) {
     font-size: 1rem; // évite le zoom iOS < 16px
   }
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: $z-modal;
+  display: grid;
+  place-items: center;
+  padding: $s-16;
+  background: $overlay;
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  gap: $s-12;
+  width: min($pct, $modal-w);
+  max-height: 85vh;
+  overflow-y: auto;
+
+  .input {
+    max-width: none;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: $fs-lg;
+    font-weight: $fw-bold;
+  }
+
+  h4 {
+    margin: 0;
+    color: var(--c-muted);
+    font-size: $fs-xs;
+    text-transform: uppercase;
+    letter-spacing: $ls-caps;
+  }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $s-12;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: $s-4;
+  color: var(--c-muted);
+  font-size: $fs-sm;
 }

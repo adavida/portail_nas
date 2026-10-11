@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { expect, test, vi } from "vitest";
 import { renderWithToaster } from "../test/render_with_toaster";
 import { mockFetchByUrl } from "../test/mock_fetch_by_url";
+import { mockMedia } from "../test/mock_media";
 import UsersTable from "./UsersTable.svelte";
 
 test("empty", () => {
@@ -23,18 +24,19 @@ test("renders rows", () => {
   expect(screen.getByTestId("user-row-bob")).toHaveTextContent("Bob");
 });
 
-test("create row is first line of table", () => {
-  const { container } = render(UsersTable, {
-    props: { users: [], onCreated: () => {} },
-  });
+test("create button opens the create modal", async () => {
+  render(UsersTable, { props: { users: [], onCreated: () => {} } });
 
-  const rows = container.querySelectorAll("tbody tr");
-  const firstRowId = rows[0].getAttribute("data-testid");
+  expect(screen.queryByTestId("create-row")).not.toBeInTheDocument();
+  await fireEvent.click(screen.getByTestId("create-user-button"));
 
-  expect(firstRowId).toBe("create-row");
-  expect(screen.getByTestId("input-uid")).toBeInTheDocument();
-  expect(screen.getByTestId("input-password")).toBeInTheDocument();
-  expect(screen.queryByTestId("input-user-group")).not.toBeInTheDocument();
+  expect(screen.getByTestId("user-create-modal")).toBeInTheDocument();
+});
+
+test("no create button without onCreated", () => {
+  render(UsersTable, { props: { users: [] } });
+
+  expect(screen.queryByTestId("create-user-button")).not.toBeInTheDocument();
 });
 
 test("existing user has password field", () => {
@@ -60,6 +62,8 @@ test("delete user calls api and refreshes", async () => {
   render(UsersTable, { props: { users: [alice], onDeleted } });
 
   await fireEvent.click(screen.getByTestId("delete-button-alice"));
+  expect(globalThis.fetch).not.toHaveBeenCalled();
+  await fireEvent.click(screen.getByTestId("confirm-yes"));
 
   await waitFor(() => {
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -87,6 +91,7 @@ test("delete shows error on failure", async () => {
   renderWithToaster(UsersTable, { users: [alice] });
 
   await fireEvent.click(screen.getByTestId("delete-button-alice"));
+  await fireEvent.click(screen.getByTestId("confirm-yes"));
 
   const error = await screen.findByTestId("toast-error");
 
@@ -185,7 +190,7 @@ test("groups cell edit proposes groups and diffs membership", async () => {
   await fireEvent.input(input, { target: { value: "ops" } });
   await fireEvent.click(screen.getByTestId("groups-suggest-alice-ops"));
   await fireEvent.click(screen.getByTestId("groups-remove-alice-devs"));
-  await fireEvent.click(screen.getByTestId("groups-save-alice"));
+  await fireEvent.keyDown(input, { key: "Enter" });
 
   await waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(
@@ -227,12 +232,14 @@ test("groups save error keeps editor open with message", async () => {
   await fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
     key: "Enter",
   });
-  await fireEvent.click(screen.getByTestId("groups-save-alice"));
+  await fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
+    key: "Enter",
+  });
 
   const error = await screen.findByTestId("toast-error");
 
   expect(error).toHaveTextContent("not found: uid=ghost");
-  expect(screen.getByTestId("groups-save-alice")).toBeInTheDocument();
+  expect(screen.getByTestId("groups-editor-alice")).toBeInTheDocument();
 });
 
 test("create group from groups cell with user as member", async () => {
@@ -297,4 +304,35 @@ test("create group error keeps input and shows message", async () => {
 
   expect(error).toHaveTextContent("ldap: boom");
   expect(screen.getByTestId("groups-new-input-alice")).toBeInTheDocument();
+});
+
+test("mobile: rows have no inline password or delete", () => {
+  mockMedia(true);
+  const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
+
+  render(UsersTable, { props: { users: [alice] } });
+
+  expect(screen.queryByTestId("password-input-alice")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("delete-button-alice")).not.toBeInTheDocument();
+});
+
+test("mobile: click on a row opens the user edit modal", async () => {
+  mockMedia(true);
+  const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
+
+  render(UsersTable, { props: { users: [alice] } });
+  await fireEvent.click(screen.getByTestId("user-row-alice"));
+
+  expect(screen.getByTestId("user-modal-alice")).toBeInTheDocument();
+});
+
+test("mobile: close button hides the modal", async () => {
+  mockMedia(true);
+  const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
+
+  render(UsersTable, { props: { users: [alice] } });
+  await fireEvent.click(screen.getByTestId("user-row-alice"));
+  await fireEvent.click(screen.getByTestId("modal-close-alice"));
+
+  expect(screen.queryByTestId("user-modal-alice")).not.toBeInTheDocument();
 });

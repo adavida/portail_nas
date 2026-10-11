@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { expect, test, vi } from "vitest";
 import { renderWithToaster } from "../test/render_with_toaster";
+import { mockMedia } from "../test/mock_media";
 import GroupsTable from "./GroupsTable.svelte";
 
 test("empty", () => {
@@ -48,6 +49,8 @@ test("delete calls api and refreshes", async () => {
   render(GroupsTable, { props: { groups, onDeleted } });
 
   await fireEvent.click(screen.getByTestId("group-delete-button-devs"));
+  expect(globalThis.fetch).not.toHaveBeenCalled();
+  await fireEvent.click(screen.getByTestId("confirm-yes"));
 
   await waitFor(() => {
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -75,6 +78,7 @@ test("delete shows error on failure", async () => {
   renderWithToaster(GroupsTable, { groups });
 
   await fireEvent.click(screen.getByTestId("group-delete-button-devs"));
+  await fireEvent.click(screen.getByTestId("confirm-yes"));
 
   const error = await screen.findByTestId("toast-error");
 
@@ -144,4 +148,36 @@ test("edit description sends PUT with description and current name", async () =>
       }),
     );
   });
+});
+
+test("mobile: rows have no inline delete button", () => {
+  mockMedia(true);
+  const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
+
+  render(GroupsTable, { props: { groups } });
+
+  expect(
+    screen.queryByTestId("group-delete-button-devs"),
+  ).not.toBeInTheDocument();
+});
+
+test("mobile: click on a row opens the group edit modal", async () => {
+  mockMedia(true);
+  const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
+
+  render(GroupsTable, { props: { groups } });
+  await fireEvent.click(screen.getByTestId("group-row-devs"));
+
+  expect(screen.getByTestId("group-modal-devs")).toBeInTheDocument();
+});
+
+test("mobile: close button hides the modal", async () => {
+  mockMedia(true);
+  const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
+
+  render(GroupsTable, { props: { groups } });
+  await fireEvent.click(screen.getByTestId("group-row-devs"));
+  await fireEvent.click(screen.getByTestId("modal-close-devs"));
+
+  expect(screen.queryByTestId("group-modal-devs")).not.toBeInTheDocument();
 });

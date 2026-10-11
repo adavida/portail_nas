@@ -8,12 +8,20 @@
     onSave: (next: string[]) => Promise<boolean>;
     onCreateGroup?: (gid: string) => Promise<{ ok: boolean; error?: string }>;
     onCancel: () => void;
+    hideActions?: boolean;
   };
 
   const MASTER_GID = "user";
 
-  let { uid, groups, allGroups, onSave, onCreateGroup, onCancel }: Props =
-    $props();
+  let {
+    uid,
+    groups,
+    allGroups,
+    onSave,
+    onCreateGroup,
+    onCancel,
+    hideActions = false,
+  }: Props = $props();
   let edited = $state<string[] | null>(null);
   const draft = $derived(edited ?? groups);
   let newGid = $state("");
@@ -102,6 +110,8 @@
     } else if (e.key === "Backspace" && !newGid) {
       const last = draft.filter((g) => g !== MASTER_GID).pop();
       if (last) remove(last);
+    } else if (e.key === "Escape") {
+      onCancel();
     }
   }
 
@@ -163,22 +173,24 @@
       </ul>
     {/if}
   </div>
-  <div class="row-actions">
-    <button
-      class="btn btn-primary"
-      type="button"
-      data-testid={`groups-save-${uid}`}
-      onclick={() => void save()}
-    >
-      Valider
-    </button>
-    <button
-      class="btn"
-      type="button"
-      data-testid={`groups-cancel-${uid}`}
-      onclick={onCancel}
-    >
-      Annuler
-    </button>
-  </div>
+  {#if !hideActions}
+    <div class="row-actions">
+      <button
+        class="btn btn-primary"
+        type="button"
+        data-testid={`groups-save-${uid}`}
+        onclick={() => void save()}
+      >
+        Valider
+      </button>
+      <button
+        class="btn"
+        type="button"
+        data-testid={`groups-cancel-${uid}`}
+        onclick={onCancel}
+      >
+        Annuler
+      </button>
+    </div>
+  {/if}
 </div>

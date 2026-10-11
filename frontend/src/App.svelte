@@ -21,6 +21,7 @@
   }
 
   let tab = $state<"home" | "users" | "groups">("home");
+  let menuOpen = $state(false);
   let checked = $state(false);
   let admin = $state(false);
   let theme = $state<Theme>(initialTheme());
@@ -79,52 +80,73 @@
   <p class="muted" data-testid="checking">Vérification...</p>
 {:else}
   <div class="layout">
-    <aside class="sidebar">
+    <aside class="sidebar" class:open={menuOpen}>
       <div class="brand">
         <span class="brand-badge">P</span>
         <span>Portail</span>
       </div>
-      <nav class="nav">
-        <button
-          class={tab === "home" ? "nav-item active" : "nav-item"}
-          data-testid="tab-home"
-          onclick={() => (tab = "home")}
-        >
-          Accueil
-        </button>
-        {#if admin}
-          <button
-            class={tab === "users" ? "nav-item active" : "nav-item"}
-            data-testid="tab-users"
-            onclick={() => (tab = "users")}
-          >
-            Utilisateurs
-          </button>
-          <button
-            class={tab === "groups" ? "nav-item active" : "nav-item"}
-            data-testid="tab-groups"
-            onclick={() => (tab = "groups")}
-          >
-            Groupes
-          </button>
-        {/if}
-      </nav>
-      <div class="sidebar-spacer"></div>
       <button
-        class="nav-item theme-toggle"
-        role="switch"
-        aria-checked={theme === "dark"}
-        data-testid="theme-toggle"
-        onclick={() => (theme = theme === "dark" ? "light" : "dark")}
+        class="nav-item nav-burger"
+        type="button"
+        aria-label="Menu"
+        aria-expanded={menuOpen}
+        data-testid="nav-burger"
+        onclick={() => (menuOpen = !menuOpen)}
       >
-        <span>{theme === "dark" ? "Thème sombre" : "Thème clair"}</span>
-        <span class="theme-toggle-track" aria-hidden="true">
-          <span class="theme-toggle-thumb"></span>
-        </span>
+        {menuOpen ? "✕" : "☰"}
       </button>
-      <button class="nav-item logout" data-testid="logout" onclick={logout}>
-        Déconnexion
-      </button>
+      <div class="sidebar-menu">
+        <nav class="nav">
+          <button
+            class={tab === "home" ? "nav-item active" : "nav-item"}
+            data-testid="tab-home"
+            onclick={() => {
+              tab = "home";
+              menuOpen = false;
+            }}
+          >
+            Accueil
+          </button>
+          {#if admin}
+            <button
+              class={tab === "users" ? "nav-item active" : "nav-item"}
+              data-testid="tab-users"
+              onclick={() => {
+                tab = "users";
+                menuOpen = false;
+              }}
+            >
+              Utilisateurs
+            </button>
+            <button
+              class={tab === "groups" ? "nav-item active" : "nav-item"}
+              data-testid="tab-groups"
+              onclick={() => {
+                tab = "groups";
+                menuOpen = false;
+              }}
+            >
+              Groupes
+            </button>
+          {/if}
+        </nav>
+        <div class="sidebar-spacer"></div>
+        <button
+          class="nav-item theme-toggle"
+          role="switch"
+          aria-checked={theme === "dark"}
+          data-testid="theme-toggle"
+          onclick={() => (theme = theme === "dark" ? "light" : "dark")}
+        >
+          <span>{theme === "dark" ? "Thème sombre" : "Thème clair"}</span>
+          <span class="theme-toggle-track" aria-hidden="true">
+            <span class="theme-toggle-thumb"></span>
+          </span>
+        </button>
+        <button class="nav-item logout" data-testid="logout" onclick={logout}>
+          Déconnexion
+        </button>
+      </div>
     </aside>
     <main class="content">
       {#if tab === "home"}

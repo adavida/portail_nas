@@ -81,6 +81,21 @@ test("stays logged out after manual logout", async () => {
   expect(urls.some((u) => u.includes("/api/auth/config"))).toBe(false);
 });
 
+test("burger button toggles the mobile menu", async () => {
+  render(App);
+
+  await waitFor(() => {
+    expect(screen.getByTestId("apps-empty")).toBeInTheDocument();
+  });
+
+  const burger = screen.getByTestId("nav-burger");
+
+  expect(burger).toHaveAttribute("aria-expanded", "false");
+  await fireEvent.click(burger);
+  expect(burger).toHaveAttribute("aria-expanded", "true");
+  expect(document.querySelector(".sidebar")).toHaveClass("open");
+});
+
 test("non-admin sees home only", async () => {
   globalThis.fetch = vi.fn((url: unknown) => {
     const u = String(url);
