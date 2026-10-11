@@ -3,6 +3,7 @@
   import EditableCell from "./EditableCell.svelte";
   import GroupModal from "./GroupModal.svelte";
   import ConfirmModal from "./ConfirmModal.svelte";
+  import { t, translate } from "../i18n";
   import { toast } from "./toast";
 
   type Props = {
@@ -44,7 +45,7 @@
       return;
     }
     onDeleted?.();
-    toast(`Groupe ${group.gid} supprimé`);
+    toast(translate("groups.deleted", { gid: group.gid }));
   }
 
   async function saveField(
@@ -62,7 +63,7 @@
       toast((e as Error).message, true);
       return false;
     }
-    toast("Modifications enregistrées");
+    toast(translate("common.saved"));
     onUpdated?.();
     return true;
   }
@@ -73,15 +74,15 @@
     <thead>
       <tr>
         <th>GID</th>
-        <th>Nom</th>
-        <th>Description</th>
+        <th>{$t("col.name")}</th>
+        <th>{$t("col.description")}</th>
       </tr>
     </thead>
     <tbody>
       {#if visible.length === 0}
         <tr>
           <td colSpan={3} class="center" data-testid="groups-empty">
-            Aucun groupe
+            {$t("groups.empty")}
           </td>
         </tr>
       {:else}
@@ -116,16 +117,16 @@
     <thead>
       <tr>
         <th>GID</th>
-        <th>Nom</th>
-        <th>Description</th>
-        <th>Action</th>
+        <th>{$t("col.name")}</th>
+        <th>{$t("col.description")}</th>
+        <th>{$t("col.action")}</th>
       </tr>
     </thead>
     <tbody>
       {#if visible.length === 0}
         <tr>
           <td colSpan={4} class="center" data-testid="groups-empty">
-            Aucun groupe
+            {$t("groups.empty")}
           </td>
         </tr>
       {:else}
@@ -152,7 +153,7 @@
                   onclick={() => (deleteTarget = g)}
                   type="button"
                 >
-                  Supprimer
+                  {$t("common.delete")}
                 </button>
               {/if}
             </td>
@@ -165,7 +166,7 @@
 
 {#if deleteTarget}
   <ConfirmModal
-    message={`Supprimer le groupe ${deleteTarget.gid} ?`}
+    message={$t("groups.confirm_delete", { gid: deleteTarget.gid })}
     onConfirm={() => {
       const target = deleteTarget;
       deleteTarget = null;

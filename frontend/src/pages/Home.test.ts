@@ -32,7 +32,7 @@ test("empty shows message", async () => {
 
   const empty = await screen.findByTestId("apps-empty");
 
-  expect(empty).toHaveTextContent("Aucune application");
+  expect(empty).toHaveTextContent("No application");
 });
 
 test("error on fetch failure", async () => {
@@ -42,5 +42,5 @@ test("error on fetch failure", async () => {
 
   const error = await screen.findByTestId("apps-error");
 
-  expect(error).toHaveTextContent("Erreur");
+  expect(error).toHaveTextContent("Error");
 });

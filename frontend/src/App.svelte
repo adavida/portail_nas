@@ -6,6 +6,7 @@
   import Toaster from "./components/Toaster.svelte";
   import { whoami } from "./api/auth";
   import { clearTokens, getToken, login, logout } from "./auth/oidc";
+  import { lang, t } from "./i18n";
   import "./App.scss";
 
   type Theme = "light" | "dark";
@@ -60,7 +61,7 @@
 {:else if !token}
   {#if sessionStorage.getItem("logged_out") === "1"}
     <div class="logged-out">
-      <p data-testid="logged-out">Déconnecté</p>
+      <p data-testid="logged-out">{$t("auth.logged_out")}</p>
       <button
         class="btn btn-primary"
         data-testid="login-button"
@@ -70,14 +71,14 @@
           void login();
         }}
       >
-        Se connecter
+        {$t("auth.login")}
       </button>
     </div>
   {:else}
-    <p class="muted" data-testid="redirecting">Redirection vers Authelia...</p>
+    <p class="muted" data-testid="redirecting">{$t("auth.redirecting")}</p>
   {/if}
 {:else if !checked}
-  <p class="muted" data-testid="checking">Vérification...</p>
+  <p class="muted" data-testid="checking">{$t("auth.checking")}</p>
 {:else}
   <div class="layout">
     <aside class="sidebar" class:open={menuOpen}>
@@ -88,7 +89,7 @@
       <button
         class="nav-item nav-burger"
         type="button"
-        aria-label="Menu"
+        aria-label={$t("nav.menu")}
         aria-expanded={menuOpen}
         data-testid="nav-burger"
         onclick={() => (menuOpen = !menuOpen)}
@@ -105,7 +106,7 @@
               menuOpen = false;
             }}
           >
-            Accueil
+            {$t("nav.home")}
           </button>
           {#if admin}
             <button
@@ -116,7 +117,7 @@
                 menuOpen = false;
               }}
             >
-              Utilisateurs
+              {$t("nav.users")}
             </button>
             <button
               class={tab === "groups" ? "nav-item active" : "nav-item"}
@@ -126,7 +127,7 @@
                 menuOpen = false;
               }}
             >
-              Groupes
+              {$t("nav.groups")}
             </button>
           {/if}
         </nav>
@@ -138,13 +139,22 @@
           data-testid="theme-toggle"
           onclick={() => (theme = theme === "dark" ? "light" : "dark")}
         >
-          <span>{theme === "dark" ? "Thème sombre" : "Thème clair"}</span>
+          <span>{theme === "dark" ? $t("nav.theme_dark") : $t("nav.theme_light")}</span>
           <span class="theme-toggle-track" aria-hidden="true">
             <span class="theme-toggle-thumb"></span>
           </span>
         </button>
+        <select
+          class="lang-select"
+          data-testid="lang-select"
+          aria-label={$t("nav.lang")}
+          bind:value={$lang}
+        >
+          <option value="fr">🇫🇷 FR</option>
+          <option value="en">🇺🇸 EN</option>
+        </select>
         <button class="nav-item logout" data-testid="logout" onclick={logout}>
-          Déconnexion
+          {$t("nav.logout")}
         </button>
       </div>
     </aside>

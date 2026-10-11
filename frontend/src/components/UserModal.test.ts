@@ -98,7 +98,7 @@ test("empty password asks for a password", async () => {
 
   const error = await screen.findByTestId("toast-error");
 
-  expect(error).toHaveTextContent("mot de passe requis");
+  expect(error).toHaveTextContent("password required");
   expect(globalThis.fetch).not.toHaveBeenCalled();
 });
 

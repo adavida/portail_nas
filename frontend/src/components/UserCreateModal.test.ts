@@ -59,7 +59,7 @@ test("missing fields asks for uid, name and password", async () => {
 
   const error = await screen.findByTestId("toast-error");
 
-  expect(error).toHaveTextContent("uid, nom et mot de passe requis");
+  expect(error).toHaveTextContent("uid, name and password required");
   expect(fetchMock).not.toHaveBeenCalled();
 });
 

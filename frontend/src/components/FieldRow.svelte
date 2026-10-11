@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { t } from "../i18n";
+
   type Props = {
     label: string;
     id: string;
@@ -27,7 +29,7 @@
     data-testid={`${id}-save`}
     onclick={onValidate}
   >
-    Valider
+    {$t("common.validate")}
   </button>
   <button
     class="btn"
@@ -35,6 +37,6 @@
     data-testid={`${id}-cancel`}
     onclick={onCancel}
   >
-    Annuler
+    {$t("common.cancel")}
   </button>
 </div>

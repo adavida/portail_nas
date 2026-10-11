@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createUser } from "../api/users";
+  import { t, translate } from "../i18n";
   import { toast } from "./toast";
 
   type Props = {
@@ -20,7 +21,7 @@
 
   async function submit() {
     if (!uid.trim() || !name.trim() || !password) {
-      toast("uid, nom et mot de passe requis", true);
+      toast(translate("common.fields_required"), true);
       return;
     }
     const created = uid;
@@ -32,7 +33,7 @@
     }
     onCreated?.();
     onClose();
-    toast(`Utilisateur ${created} créé`);
+    toast(translate("users.created", { uid: created }));
   }
 </script>
 
@@ -43,15 +44,15 @@
   data-testid="user-create-modal"
   role="dialog"
   aria-modal="true"
-  aria-label="Création utilisateur"
+  aria-label={$t("modal.user_create")}
 >
   <div class="modal card">
     <div class="modal-header">
-      <h3>Nouvel utilisateur</h3>
+      <h3>{$t("modal.user_new")}</h3>
       <button
         class="btn"
         type="button"
-        aria-label="Fermer"
+        aria-label={$t("nav.close")}
         data-testid="create-close"
         onclick={onClose}
       >
@@ -64,15 +65,15 @@
       <input class="input" data-testid="input-uid" bind:value={uid} />
     </label>
     <label class="label">
-      Nom
+      {$t("field.name")}
       <input class="input" data-testid="input-name" bind:value={name} />
     </label>
     <label class="label">
-      Email
+      {$t("field.email")}
       <input class="input" data-testid="input-email" bind:value={email} />
     </label>
     <label class="label">
-      Mot de passe
+      {$t("field.password")}
       <input
         class="input"
         type="password"
@@ -88,7 +89,7 @@
         data-testid="create-button"
         onclick={() => void submit()}
       >
-        Valider
+        {$t("common.validate")}
       </button>
       <button
         class="btn"
@@ -96,7 +97,7 @@
         data-testid="create-cancel"
         onclick={onClose}
       >
-        Annuler
+        {$t("common.cancel")}
       </button>
     </div>
   </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { listApps, type App } from "../api/apps";
+  import { t, translate } from "../i18n";
   import { toast } from "../components/toast";
   import "./Home.scss";
 
@@ -12,7 +13,7 @@
       .then((a) => (apps = a))
       .catch(() => {
         error = "error";
-        toast("Erreur: chargement des applications impossible", true);
+        toast(translate("apps.error_loading"), true);
       });
   }
 
@@ -20,13 +21,13 @@
 </script>
 
 <section>
-  <h2>Applications</h2>
+  <h2>{$t("apps.title")}</h2>
   {#if error}
-    <p data-testid="apps-error">Erreur: {error}</p>
+    <p data-testid="apps-error">{$t("common.error", { error: error ?? "" })}</p>
   {:else if apps === null}
-    <p data-testid="apps-loading">Chargement...</p>
+    <p data-testid="apps-loading">{$t("common.loading")}</p>
   {:else if apps.length === 0}
-    <p data-testid="apps-empty">Aucune application</p>
+    <p data-testid="apps-empty">{$t("apps.empty")}</p>
   {:else}
     <ul class="apps">
       {#each apps as app, i (`${app.name}-${app.url}`)}

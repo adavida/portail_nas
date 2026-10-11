@@ -27,6 +27,7 @@ Le flake expose `packages.portail-backend`, `packages.portail-frontend` et `nixo
     ldap.baseDn = "dc=example,dc=com";
     ldap.adminPasswordFile = "/etc/portail/ldap-admin-pw";
     oidc.clientSecretFile = "/etc/portail/oidc-client-secret";
+    lang = "fr";
   };
 }
 ```
@@ -38,6 +39,7 @@ Le flake expose `packages.portail-backend`, `packages.portail-frontend` et `nixo
 | `package`                    | (requis)            | binaire backend (ex: `inputs.portail.packages...`)        |
 | `bindAddress`                | `127.0.0.1:3000`    | BIND_ADDR du backend                                      |
 | `oidcClientId`               | `portail`           | client_id OIDC                                            |
+| `lang`                       | `en`                | langue par défaut de l'interface (`fr`/`en`)              |
 | `ldap.url`                   | `ldap://127.0.0.1`  | URL du serveur LDAP (`ldap://` ou `ldaps://`)             |
 | `ldap.baseDn`                | `dc=example,dc=com` | suffixe LDAP                                              |
 | `ldap.adminPasswordFile`     | (requis)            | mot de passe `cn=admin,<baseDn>` (backend + Authelia)     |
@@ -107,6 +109,7 @@ The flake exposes `packages.portail-backend`, `packages.portail-frontend` and `n
     ldap.baseDn = "dc=example,dc=com";
     ldap.adminPasswordFile = "/etc/portail/ldap-admin-pw";
     oidc.clientSecretFile = "/etc/portail/oidc-client-secret";
+    lang = "fr";
   };
 }
 ```
@@ -118,6 +121,7 @@ The flake exposes `packages.portail-backend`, `packages.portail-frontend` and `n
 | `package`                    | (required)          | backend binary (e.g. `inputs.portail.packages...`)     |
 | `bindAddress`                | `127.0.0.1:3000`    | backend BIND_ADDR                                      |
 | `oidcClientId`               | `portail`           | OIDC client_id                                         |
+| `lang`                       | `en`                | default UI language (`fr`/`en`)                        |
 | `ldap.url`                   | `ldap://127.0.0.1`  | LDAP server URL (`ldap://` or `ldaps://`)              |
 | `ldap.baseDn`                | `dc=example,dc=com` | LDAP suffix                                            |
 | `ldap.adminPasswordFile`     | (required)          | password of `cn=admin,<baseDn>` (backend + Authelia)   |

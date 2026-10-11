@@ -34,7 +34,7 @@ test("empty shows message", async () => {
 
   const empty = await screen.findByTestId("groups-empty");
 
-  expect(empty).toHaveTextContent("Aucun groupe");
+  expect(empty).toHaveTextContent("No group");
 });
 
 test("error", async () => {
@@ -44,5 +44,5 @@ test("error", async () => {
 
   const error = await screen.findByTestId("groups-error");
 
-  expect(error).toHaveTextContent("Erreur");
+  expect(error).toHaveTextContent("Error");
 });

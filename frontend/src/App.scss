@@ -109,6 +109,21 @@
   }
 }
 
+.lang-select {
+  font: inherit;
+  font-size: $fs-md;
+  color: var(--c-text);
+  background: transparent;
+  border: none;
+  padding: $s-10 $s-12;
+  border-radius: $r;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--c-bg);
+  }
+}
+
 .logout {
   color: var(--c-muted);
 

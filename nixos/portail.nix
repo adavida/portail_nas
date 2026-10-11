@@ -31,6 +31,12 @@ in
       example = "http://auth.portail.nas.local";
     };
 
+    lang = lib.mkOption {
+      type = lib.types.str;
+      default = "en";
+      description = "Default UI language baked into the frontend build as `VITE_APP_LANG` — `fr` or `en`.";
+    };
+
     bindAddress = lib.mkOption {
       type = lib.types.str;
       default = "127.0.0.1:3000";
@@ -219,6 +225,7 @@ in
             appUrl = cfg.appUrl;
             oidcIssuerUrl = cfg.issuerUrl;
             oidcRedirectUri = "${cfg.appUrl}/callback";
+            appLang = cfg.lang;
           };
           locations."/".index = "index.html";
           locations."/".tryFiles = "$uri /index.html";

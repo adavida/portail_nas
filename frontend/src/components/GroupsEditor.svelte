@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "../i18n";
   import "./GroupsEditor.scss";
 
   type Props = {
@@ -127,7 +128,7 @@
         {gid}
         <button
           type="button"
-          aria-label={`retirer ${gid}`}
+          aria-label={$t("editor.remove", { gid })}
           data-testid={`groups-remove-${uid}-${gid}`}
           onclick={() => remove(gid)}
         >
@@ -140,7 +141,7 @@
       autofocus
       class="input"
       data-testid={`groups-new-input-${uid}`}
-      placeholder={visible.length ? "" : "ajouter / créer un groupe"}
+      placeholder={visible.length ? "" : $t("editor.add_group")}
       bind:value={newGid}
       oninput={() => (active = 0)}
       onkeydown={onKeyDown}
@@ -166,7 +167,9 @@
                   ? void resolveAndAdd(newGid)
                   : add(opt.gid)}
             >
-              {opt.kind === "create" ? `créer « ${newGid.trim()} »` : opt.gid}
+              {opt.kind === "create"
+                ? $t("editor.create", { gid: newGid.trim() })
+                : opt.gid}
             </button>
           </li>
         {/each}
@@ -181,7 +184,7 @@
         data-testid={`groups-save-${uid}`}
         onclick={() => void save()}
       >
-        Valider
+        {$t("common.validate")}
       </button>
       <button
         class="btn"
@@ -189,7 +192,7 @@
         data-testid={`groups-cancel-${uid}`}
         onclick={onCancel}
       >
-        Annuler
+        {$t("common.cancel")}
       </button>
     </div>
   {/if}

@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { listGroups, type Group } from "../api/groups";
   import { listUsers, type User } from "../api/users";
+  import { t, translate } from "../i18n";
   import UsersTable from "../components/UsersTable.svelte";
   import { toast } from "../components/toast";
 
@@ -12,12 +13,12 @@
   function fetchUsers() {
     listGroups()
       .then((g) => (groups = g))
-      .catch(() => toast("Erreur: chargement des groupes impossible", true));
+      .catch(() => toast(translate("groups.error_loading"), true));
     listUsers()
       .then((u) => (users = u))
       .catch(() => {
         error = "error";
-        toast("Erreur: chargement des utilisateurs impossible", true);
+        toast(translate("users.error_loading"), true);
       });
   }
 
@@ -25,11 +26,11 @@
 </script>
 
 <section>
-  <h2>Utilisateurs</h2>
+  <h2>{$t("nav.users")}</h2>
   {#if error}
-    <p data-testid="users-error">Erreur: {error}</p>
+    <p data-testid="users-error">{$t("common.error", { error: error ?? "" })}</p>
   {:else if users === null}
-    <p data-testid="users-loading">Chargement...</p>
+    <p data-testid="users-loading">{$t("common.loading")}</p>
   {:else}
     <div class="card">
       <UsersTable

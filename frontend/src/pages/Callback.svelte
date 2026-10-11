@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { handleCallback } from "../auth/oidc";
+  import { t } from "../i18n";
 
   let error = $state<string | null>(null);
 
@@ -47,7 +48,7 @@
 </script>
 
 {#if error}
-  <p data-testid="callback-error">Erreur: {error}</p>
+  <p data-testid="callback-error">{$t("common.error", { error: error ?? "" })}</p>
 {:else}
-  <p data-testid="callback-loading">Connexion...</p>
+  <p data-testid="callback-loading">{$t("auth.connecting")}</p>
 {/if}

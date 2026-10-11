@@ -41,7 +41,7 @@ test("empty shows message", async () => {
 
   const empty = await screen.findByTestId("users-empty");
 
-  expect(empty).toHaveTextContent("Aucun utilisateur");
+  expect(empty).toHaveTextContent("No user");
 });
 
 test("error", async () => {
@@ -51,5 +51,5 @@ test("error", async () => {
 
   const error = await screen.findByTestId("users-error");
 
-  expect(error).toHaveTextContent("Erreur");
+  expect(error).toHaveTextContent("Error");
 });

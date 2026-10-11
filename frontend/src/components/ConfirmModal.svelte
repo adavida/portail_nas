@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { t } from "../i18n";
+
   type Props = {
     message: string;
     onConfirm: () => void;
@@ -18,7 +20,7 @@
   class="modal-backdrop"
   role="alertdialog"
   aria-modal="true"
-  aria-label="Confirmation de suppression"
+  aria-label={$t("modal.confirm_delete")}
   data-testid="confirm-modal"
 >
   <div class="modal card">
@@ -32,7 +34,7 @@
         data-testid="confirm-yes"
         onclick={onConfirm}
       >
-        Supprimer
+        {$t("common.delete")}
       </button>
       <button
         class="btn"
@@ -40,7 +42,7 @@
         data-testid="confirm-no"
         onclick={onCancel}
       >
-        Annuler
+        {$t("common.cancel")}
       </button>
     </div>
   </div>

@@ -6,6 +6,7 @@
   import UserModal from "./UserModal.svelte";
   import UserCreateModal from "./UserCreateModal.svelte";
   import ConfirmModal from "./ConfirmModal.svelte";
+  import { t, translate } from "../i18n";
   import { toast } from "./toast";
 
   type Props = {
@@ -52,7 +53,7 @@
       toast((e as Error).message, true);
       return false;
     }
-    toast("Modifications enregistrées");
+    toast(translate("common.saved"));
     onUpdated?.();
     return true;
   }
@@ -73,7 +74,7 @@
       toast(error, true);
       return { ok: false, error };
     }
-    toast(`Groupe ${gid} créé`);
+    toast(translate("groups.created", { gid }));
     onUpdated?.();
     return { ok: true };
   }
@@ -81,7 +82,7 @@
   async function submitPassword(user: User) {
     const password = passwords[user.uid] ?? "";
     if (!password) {
-      toast("mot de passe requis", true);
+      toast(translate("common.password_required"), true);
       return;
     }
     try {
@@ -91,7 +92,7 @@
       return;
     }
     passwords[user.uid] = "";
-    toast("Mot de passe modifié");
+    toast(translate("common.password_changed"));
   }
 
   async function removeUser(user: User) {
@@ -102,7 +103,7 @@
       return;
     }
     onDeleted?.();
-    toast(`Utilisateur ${user.uid} supprimé`);
+    toast(translate("users.deleted", { uid: user.uid }));
   }
 
   async function saveField(
@@ -133,7 +134,7 @@
       data-testid="create-user-button"
       onclick={() => (creating = true)}
     >
-      Créer un utilisateur
+      {$t("users.create")}
     </button>
   </div>
 {/if}
@@ -143,16 +144,16 @@
     <thead>
       <tr>
         <th>UID</th>
-        <th>Nom</th>
-        <th>Email</th>
-        <th>Groupes</th>
+        <th>{$t("col.name")}</th>
+        <th>{$t("col.email")}</th>
+        <th>{$t("col.groups")}</th>
       </tr>
     </thead>
     <tbody>
       {#if users.length === 0}
         <tr>
           <td colSpan={4} class="center" data-testid="users-empty">
-            Aucun utilisateur
+            {$t("users.empty")}
           </td>
         </tr>
       {:else}
@@ -191,18 +192,18 @@
     <thead>
       <tr>
         <th>UID</th>
-        <th>Nom</th>
-        <th>Email</th>
-        <th>Groupes</th>
-        <th>Mot de passe</th>
-        <th>Action</th>
+        <th>{$t("col.name")}</th>
+        <th>{$t("col.email")}</th>
+        <th>{$t("col.groups")}</th>
+        <th>{$t("col.password")}</th>
+        <th>{$t("col.action")}</th>
       </tr>
     </thead>
     <tbody>
       {#if users.length === 0}
         <tr>
           <td colSpan={6} class="center" data-testid="users-empty">
-            Aucun utilisateur
+            {$t("users.empty")}
           </td>
         </tr>
       {:else}
@@ -249,7 +250,7 @@
                 <input
                   class="input"
                   data-testid={`password-input-${u.uid}`}
-                  placeholder="nouveau mdp"
+                  placeholder={$t("common.password_new")}
                   type="password"
                   bind:value={passwords[u.uid]}
                 />
@@ -259,7 +260,7 @@
                   onclick={() => void submitPassword(u)}
                   type="button"
                 >
-                  Modifier
+                  {$t("common.edit")}
                 </button>
               </span>
             </td>
@@ -270,7 +271,7 @@
                 onclick={() => (deleteTarget = u)}
                 type="button"
               >
-                Supprimer
+                {$t("common.delete")}
               </button>
             </td>
           </tr>
@@ -282,7 +283,7 @@
 
 {#if deleteTarget}
   <ConfirmModal
-    message={`Supprimer l'utilisateur ${deleteTarget.uid} ?`}
+    message={$t("users.confirm_delete", { uid: deleteTarget.uid })}
     onConfirm={() => {
       const target = deleteTarget;
       deleteTarget = null;

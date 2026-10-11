@@ -1,4 +1,5 @@
 export interface Env {
+  appLang: string;
   appUrl: string;
   backendUrl: string;
   oidcIssuerUrl: string;
@@ -19,6 +20,10 @@ export function createEnv(
     return v;
   };
 
+  // Optionnel — langue de l'interface, défaut "en" (cf. i18n.ts).
+  const appLangRaw = (get("APP_LANG") ?? "").trim();
+  const appLang = appLangRaw || "en";
+
   const appUrl = take("APP_URL");
   const backendUrl = take("BACKEND_URL");
   const oidcIssuerUrl = take("OIDC_ISSUER_URL");
@@ -28,12 +33,13 @@ export function createEnv(
     throw new Error(`missing or empty env vars: ${missing.join(", ")}`);
   }
 
-  return { appUrl, backendUrl, oidcIssuerUrl, oidcRedirectUri };
+  return { appLang, appUrl, backendUrl, oidcIssuerUrl, oidcRedirectUri };
 }
 
 export const env: Env = createEnv();
 
 // Backward-compatible named exports — single source is `env`.
+export const APP_LANG = env.appLang;
 export const APP_URL = env.appUrl;
 export const BACKEND_URL = env.backendUrl;
 export const OIDC_ISSUER_URL = env.oidcIssuerUrl;

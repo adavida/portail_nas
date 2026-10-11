@@ -254,6 +254,7 @@ in
     OIDC_CLIENT_SECRET = "${config.env.DEVENV_STATE}/secrets/oidc-client-secret";
     OIDC_ISSUER_URL = "https://127.0.0.1:9091";
     OIDC_REDIRECT_URI = "http://localhost:5173/callback";
+    VITE_APP_LANG = "en";
     VITE_APP_URL = "http://localhost:5173";
     VITE_BACKEND_URL = "http://localhost:3000";
     VITE_OIDC_ISSUER_URL = "https://127.0.0.1:9091";

@@ -315,7 +315,7 @@ test("no exact match: first option is a muted create, then matches", async () =>
     .getAllByRole("button")
     .filter((el) => el.classList.contains("opt"));
 
-  expect(create).toHaveTextContent("créer « dev »");
+  expect(create).toHaveTextContent("create « dev »");
   expect(create).toHaveClass("muted");
   expect(items[0]).toBe(create);
   expect(items.length).toBe(3);

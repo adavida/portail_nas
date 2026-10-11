@@ -3,6 +3,7 @@
   import { deleteGroup, updateGroup, type Group } from "../api/groups";
   import FieldRow from "./FieldRow.svelte";
   import ConfirmModal from "./ConfirmModal.svelte";
+  import { t, translate } from "../i18n";
   import { toast } from "./toast";
 
   type Props = {
@@ -32,7 +33,7 @@
       return;
     }
     onUpdated?.();
-    toast("Modifications enregistrées");
+    toast(translate("common.saved"));
   }
 
   async function remove() {
@@ -44,7 +45,7 @@
     }
     onDeleted?.();
     onClose();
-    toast(`Groupe ${group.gid} supprimé`);
+    toast(translate("groups.deleted", { gid: group.gid }));
   }
 </script>
 
@@ -55,7 +56,7 @@
   data-testid={`group-modal-${group.gid}`}
   role="dialog"
   aria-modal="true"
-  aria-label="Édition groupe"
+  aria-label={$t("modal.group_edit")}
 >
   <div class="modal card">
     <div class="modal-header">
@@ -63,7 +64,7 @@
       <button
         class="btn"
         type="button"
-        aria-label="Fermer"
+        aria-label={$t("nav.close")}
         data-testid={`modal-close-${group.gid}`}
         onclick={onClose}
       >
@@ -72,14 +73,14 @@
     </div>
 
     <FieldRow
-      label="Nom"
+      label={$t("field.name")}
       id={`modal-name-${group.gid}`}
       bind:value={name}
       onValidate={() => void saveInfos()}
       onCancel={onClose}
     />
     <FieldRow
-      label="Description"
+      label={$t("field.description")}
       id={`modal-description-${group.gid}`}
       bind:value={description}
       onValidate={() => void saveInfos()}
@@ -94,7 +95,7 @@
           data-testid={`group-delete-button-${group.gid}`}
           onclick={() => (confirmDelete = true)}
         >
-          Supprimer
+          {$t("common.delete")}
         </button>
       </div>
     {/if}
@@ -103,7 +104,7 @@
 
 {#if confirmDelete}
   <ConfirmModal
-    message={`Supprimer le groupe ${group.gid} ?`}
+    message={$t("groups.confirm_delete", { gid: group.gid })}
     onConfirm={() => void remove()}
     onCancel={() => (confirmDelete = false)}
   />

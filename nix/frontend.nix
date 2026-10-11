@@ -5,6 +5,7 @@
   appUrl ? "http://localhost:5173",
   oidcIssuerUrl ? "https://127.0.0.1:9091",
   oidcRedirectUri ? "http://localhost:5173/callback",
+  appLang ? "en",
 }:
 
 pkgs.buildNpmPackage {
@@ -17,6 +18,7 @@ pkgs.buildNpmPackage {
   VITE_BACKEND_URL = appUrl;
   VITE_OIDC_ISSUER_URL = oidcIssuerUrl;
   VITE_OIDC_REDIRECT_URI = oidcRedirectUri;
+  VITE_APP_LANG = appLang;
   # Vite app: serve the static `dist` build, not the npm package stub.
   installPhase = ''
     runHook preInstall

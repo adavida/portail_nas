@@ -10,6 +10,7 @@
   import GroupsEditor from "./GroupsEditor.svelte";
   import FieldRow from "./FieldRow.svelte";
   import ConfirmModal from "./ConfirmModal.svelte";
+  import { t, translate } from "../i18n";
   import { toast } from "./toast";
 
   type Props = {
@@ -40,12 +41,12 @@
       return;
     }
     onUpdated?.();
-    toast("Modifications enregistrées");
+    toast(translate("common.saved"));
   }
 
   async function submitPassword() {
     if (!password) {
-      toast("mot de passe requis", true);
+      toast(translate("common.password_required"), true);
       return;
     }
     try {
@@ -55,7 +56,7 @@
       return;
     }
     password = "";
-    toast("Mot de passe modifié");
+    toast(translate("common.password_changed"));
   }
 
   async function removeUser() {
@@ -67,7 +68,7 @@
     }
     onDeleted?.();
     onClose();
-    toast(`Utilisateur ${user.uid} supprimé`);
+    toast(translate("users.deleted", { uid: user.uid }));
   }
 
   async function saveGroups(next: string[]): Promise<boolean> {
@@ -81,7 +82,7 @@
       toast((e as Error).message, true);
       return false;
     }
-    toast("Modifications enregistrées");
+    toast(translate("common.saved"));
     onUpdated?.();
     return true;
   }
@@ -101,7 +102,7 @@
       toast(error, true);
       return { ok: false, error };
     }
-    toast(`Groupe ${gid} créé`);
+    toast(translate("groups.created", { gid }));
     onUpdated?.();
     return { ok: true };
   }
@@ -114,7 +115,7 @@
   data-testid={`user-modal-${user.uid}`}
   role="dialog"
   aria-modal="true"
-  aria-label="Édition utilisateur"
+  aria-label={$t("modal.user_edit")}
 >
   <div class="modal card">
     <div class="modal-header">
@@ -122,7 +123,7 @@
       <button
         class="btn"
         type="button"
-        aria-label="Fermer"
+        aria-label={$t("nav.close")}
         data-testid={`modal-close-${user.uid}`}
         onclick={onClose}
       >
@@ -131,26 +132,26 @@
     </div>
 
     <FieldRow
-      label="Nom"
+      label={$t("field.name")}
       id={`modal-name-${user.uid}`}
       bind:value={name}
       onValidate={() => void saveInfos()}
       onCancel={onClose}
     />
     <FieldRow
-      label="Email"
+      label={$t("field.email")}
       id={`modal-email-${user.uid}`}
       bind:value={email}
       onValidate={() => void saveInfos()}
       onCancel={onClose}
     />
 
-    <h4>Mot de passe</h4>
+    <h4>{$t("field.password")}</h4>
     <div class="row-actions">
       <input
         class="input"
         type="password"
-        placeholder="nouveau mdp"
+        placeholder={$t("common.password_new")}
         data-testid={`password-input-${user.uid}`}
         bind:value={password}
       />
@@ -160,11 +161,11 @@
         data-testid={`password-button-${user.uid}`}
         onclick={() => void submitPassword()}
       >
-        Modifier
+        {$t("common.edit")}
       </button>
     </div>
 
-    <h4>Groupes</h4>
+    <h4>{$t("nav.groups")}</h4>
     <GroupsEditor
       uid={user.uid}
       groups={user.groups ?? []}
@@ -181,7 +182,7 @@
         data-testid={`delete-button-${user.uid}`}
         onclick={() => (confirmDelete = true)}
       >
-        Supprimer
+        {$t("common.delete")}
       </button>
     </div>
   </div>
@@ -189,7 +190,7 @@
 
 {#if confirmDelete}
   <ConfirmModal
-    message={`Supprimer l'utilisateur ${user.uid} ?`}
+    message={$t("users.confirm_delete", { uid: user.uid })}
     onConfirm={() => void removeUser()}
     onCancel={() => (confirmDelete = false)}
   />
