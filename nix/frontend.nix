@@ -13,7 +13,7 @@ pkgs.buildNpmPackage {
   version = "0.1.0";
   src = ../frontend;
   # npmDepsHash = pkgs.lib.fakeHash;
-  npmDepsHash = "sha256-Pc3r2KtCYqnFNO9QHfiuM2MNSa7FtPPogz/XZ4P1/rQ=";
+  npmDepsHash = "sha256-BSNGIEav4QnfF96cOH2TSqazwgAKbJ/w7vcSNOXQRMw=";
   VITE_APP_URL = appUrl;
   VITE_BACKEND_URL = appUrl;
   VITE_OIDC_ISSUER_URL = oidcIssuerUrl;
