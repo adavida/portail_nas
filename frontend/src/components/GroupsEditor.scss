@@ -8,6 +8,7 @@
 }
 
 .field {
+  position: relative;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -60,10 +61,44 @@
 }
 
 .suggest {
+  position: absolute;
+  top: calc(100% + #{$s-3});
+  left: 0;
+  right: 0;
+  z-index: 10;
+  max-height: 12rem;
+  overflow-y: auto;
   margin: 0;
-  padding: 0;
+  padding: $s-3;
   list-style: none;
   display: flex;
-  flex-wrap: wrap;
-  gap: $s-4;
+  flex-direction: column;
+  gap: $s-2;
+  background: var(--c-surface);
+  border: $border;
+  border-radius: $r-md;
+  box-shadow: $shadow;
+
+  .opt {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: $r-sm;
+    padding: $s-4 $s-8;
+    font-size: $fs-chip;
+    background: none;
+    color: var(--c-text);
+    cursor: pointer;
+
+    &.active {
+      background: var(--c-accent-soft);
+      box-shadow: $ring;
+    }
+
+    &.muted {
+      color: var(--c-muted);
+      font-style: italic;
+    }
+  }
 }

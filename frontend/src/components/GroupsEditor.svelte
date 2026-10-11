@@ -14,16 +14,17 @@
 
   let { uid, groups, allGroups, onSave, onCreateGroup, onCancel }: Props =
     $props();
-
   let edited = $state<string[] | null>(null);
   const draft = $derived(edited ?? groups);
   let newGid = $state("");
 
   const q = $derived(newGid.trim().toLowerCase());
-  const suggestions = $derived(
+  const matches = $derived(
     q
       ? allGroups
-          .filter((gid) => !draft.includes(gid) && gid.toLowerCase().includes(q))
+          .filter(
+            (gid) => !draft.includes(gid) && gid.toLowerCase().includes(q),
+          )
           .sort(
             (a, b) =>
               Number(b.toLowerCase().startsWith(q)) -
@@ -31,6 +32,23 @@
           )
       : [],
   );
+  const exact = $derived(
+    q !== "" && allGroups.some((g) => g.toLowerCase() === q),
+  );
+  type Option = { kind: "create" } | { kind: "add"; gid: string };
+  const options = $derived<Option[]>([
+    ...(q && !exact ? [{ kind: "create" as const }] : []),
+    ...matches.map((gid) => ({ kind: "add" as const, gid })),
+  ]);
+  let active = $state(0);
+  const activeIdx = $derived(Math.min(active, options.length - 1));
+  let listEl = $state<HTMLUListElement | null>(null);
+
+  $effect(() => {
+    if (activeIdx >= 0) {
+      listEl?.querySelector(".active")?.scrollIntoView?.({ block: "nearest" });
+    }
+  });
   const visible = $derived(draft.filter((g) => g !== MASTER_GID));
 
   function add(gid: string) {
@@ -48,13 +66,8 @@
     const existing = allGroups.find(
       (g) => g.toLowerCase() === gid.toLowerCase(),
     );
-    const inDraft = draft.some((g) => g.toLowerCase() === gid.toLowerCase());
-    if (existing && !inDraft) {
+    if (existing) {
       add(existing);
-      return;
-    }
-    if (existing && inDraft) {
-      newGid = "";
       return;
     }
     if (!onCreateGroup) return;
@@ -62,10 +75,30 @@
     if (res.ok) add(gid);
   }
 
+  async function handleEnter() {
+    if (!newGid.trim()) {
+      await save();
+      return;
+    }
+    const opt = options[activeIdx];
+    if (!opt) {
+      newGid = "";
+      return;
+    }
+    if (opt.kind === "create") await resolveAndAdd(newGid);
+    else add(opt.gid);
+  }
+
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === "Enter") {
       e.preventDefault();
-      void resolveAndAdd(suggestions[0] ?? newGid);
+      void handleEnter();
+    } else if (e.key === "ArrowDown" && options.length) {
+      e.preventDefault();
+      active = (active + 1) % options.length;
+    } else if (e.key === "ArrowUp" && options.length) {
+      e.preventDefault();
+      active = (active - 1 + options.length) % options.length;
     } else if (e.key === "Backspace" && !newGid) {
       const last = draft.filter((g) => g !== MASTER_GID).pop();
       if (last) remove(last);
@@ -99,25 +132,37 @@
       data-testid={`groups-new-input-${uid}`}
       placeholder={visible.length ? "" : "ajouter / créer un groupe"}
       bind:value={newGid}
+      oninput={() => (active = 0)}
       onkeydown={onKeyDown}
     />
+    {#if options.length > 0}
+      <ul
+        bind:this={listEl}
+        data-testid={`groups-suggest-list-${uid}`}
+        class="suggest"
+      >
+        {#each options as opt, i (opt.kind === "create" ? "create" : opt.gid)}
+          <li>
+            <button
+              type="button"
+              class="opt"
+              class:active={i === activeIdx}
+              class:muted={opt.kind === "create"}
+              data-testid={opt.kind === "create"
+                ? `groups-create-${uid}`
+                : `groups-suggest-${uid}-${opt.gid}`}
+              onclick={() =>
+                opt.kind === "create"
+                  ? void resolveAndAdd(newGid)
+                  : add(opt.gid)}
+            >
+              {opt.kind === "create" ? `créer « ${newGid.trim()} »` : opt.gid}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </div>
-  {#if suggestions.length > 0}
-    <ul data-testid={`groups-suggest-list-${uid}`} class="suggest">
-      {#each suggestions as gid (gid)}
-        <li>
-          <button
-            class="btn"
-            type="button"
-            data-testid={`groups-suggest-${uid}-${gid}`}
-            onclick={() => add(gid)}
-          >
-            {gid}
-          </button>
-        </li>
-      {/each}
-    </ul>
-  {/if}
   <div class="row-actions">
     <button
       class="btn btn-primary"

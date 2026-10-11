@@ -181,9 +181,8 @@ test("groups cell edit proposes groups and diffs membership", async () => {
     ).map((el) => el.getAttribute("data-testid")),
   ).toContain("groups-chip-alice-devs");
 
-  await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
-    target: { value: "ops" },
-  });
+  const input = screen.getByTestId("groups-new-input-alice");
+  await fireEvent.input(input, { target: { value: "ops" } });
   await fireEvent.click(screen.getByTestId("groups-suggest-alice-ops"));
   await fireEvent.click(screen.getByTestId("groups-remove-alice-devs"));
   await fireEvent.click(screen.getByTestId("groups-save-alice"));
