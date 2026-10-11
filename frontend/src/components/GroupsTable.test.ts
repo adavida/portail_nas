@@ -1,10 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { expect, test, vi } from "vitest";
-import { GroupsTable } from "./GroupsTable";
-import { Toaster } from "./Toaster";
+import { renderWithToaster } from "../test/render_with_toaster";
+import GroupsTable from "./GroupsTable.svelte";
 
 test("empty", () => {
-  render(<GroupsTable groups={[]} />);
+  render(GroupsTable, { props: { groups: [] } });
 
   expect(screen.getByTestId("groups-empty")).toBeInTheDocument();
 });
@@ -12,7 +12,7 @@ test("empty", () => {
 test("renders rows with gid, name, description and delete", () => {
   const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
-  render(<GroupsTable groups={groups} />);
+  render(GroupsTable, { props: { groups } });
 
   expect(screen.getByTestId("groups-table")).toBeInTheDocument();
   expect(screen.getByTestId("group-row-devs")).toHaveTextContent("Devs");
@@ -26,7 +26,7 @@ test("user row is hidden, admin row has no delete button", () => {
     { gid: "devs", name: "Devs", description: "" },
   ];
 
-  render(<GroupsTable groups={groups} />);
+  render(GroupsTable, { props: { groups } });
 
   expect(screen.queryByTestId("group-row-user")).toBeNull();
   expect(screen.getByTestId("group-row-admin")).toBeInTheDocument();
@@ -37,14 +37,17 @@ test("user row is hidden, admin row has no delete button", () => {
 test("delete calls api and refreshes", async () => {
   const onDeleted = vi.fn();
   globalThis.fetch = vi.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({}),
+    } as unknown as Response),
   );
 
   const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
-  render(<GroupsTable groups={groups} onDeleted={onDeleted} />);
+  render(GroupsTable, { props: { groups, onDeleted } });
 
-  fireEvent.click(screen.getByTestId("group-delete-button-devs"));
+  await fireEvent.click(screen.getByTestId("group-delete-button-devs"));
 
   await waitFor(() => {
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -64,19 +67,14 @@ test("delete shows error on failure", async () => {
       ok: false,
       status: 500,
       json: () => Promise.resolve({ error: "ldap: boom" }),
-    } as Response),
+    } as unknown as Response),
   );
 
   const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
-  render(
-    <>
-      <GroupsTable groups={groups} />
-      <Toaster />
-    </>,
-  );
+  renderWithToaster(GroupsTable, { groups });
 
-  fireEvent.click(screen.getByTestId("group-delete-button-devs"));
+  await fireEvent.click(screen.getByTestId("group-delete-button-devs"));
 
   const error = await screen.findByTestId("toast-error");
 
@@ -84,7 +82,7 @@ test("delete shows error on failure", async () => {
 });
 
 test("no create row: creation is done from the users page", () => {
-  render(<GroupsTable groups={[]} onDeleted={() => {}} />);
+  render(GroupsTable, { props: { groups: [], onDeleted: () => {} } });
 
   expect(screen.queryByTestId("group-create-row")).not.toBeInTheDocument();
   expect(screen.queryByTestId("input-member")).not.toBeInTheDocument();
@@ -92,21 +90,21 @@ test("no create row: creation is done from the users page", () => {
 
 test("edit name sends PUT with name and current description", async () => {
   const fetchMock = vi.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({}),
+    } as unknown as Response),
   );
   globalThis.fetch = fetchMock;
 
   const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
-  render(<GroupsTable groups={groups} onUpdated={() => {}} />);
+  render(GroupsTable, { props: { groups, onUpdated: () => {} } });
 
-  fireEvent.doubleClick(screen.getByTestId("cell-name-devs"));
-  fireEvent.change(screen.getByTestId("edit-input-name-devs"), {
-    target: { value: "Renamed" },
-  });
-  fireEvent.keyDown(screen.getByTestId("edit-input-name-devs"), {
-    key: "Enter",
-  });
+  await fireEvent.doubleClick(screen.getByTestId("cell-name-devs"));
+  const input = screen.getByTestId("edit-input-name-devs");
+  await fireEvent.input(input, { target: { value: "Renamed" } });
+  await fireEvent.keyDown(input, { key: "Enter" });
 
   await waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(
@@ -121,21 +119,21 @@ test("edit name sends PUT with name and current description", async () => {
 
 test("edit description sends PUT with description and current name", async () => {
   const fetchMock = vi.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({}),
+    } as unknown as Response),
   );
   globalThis.fetch = fetchMock;
 
   const groups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
 
-  render(<GroupsTable groups={groups} onUpdated={() => {}} />);
+  render(GroupsTable, { props: { groups, onUpdated: () => {} } });
 
-  fireEvent.doubleClick(screen.getByTestId("cell-description-devs"));
-  fireEvent.change(screen.getByTestId("edit-input-description-devs"), {
-    target: { value: "" },
-  });
-  fireEvent.keyDown(screen.getByTestId("edit-input-description-devs"), {
-    key: "Enter",
-  });
+  await fireEvent.doubleClick(screen.getByTestId("cell-description-devs"));
+  const input = screen.getByTestId("edit-input-description-devs");
+  await fireEvent.input(input, { target: { value: "" } });
+  await fireEvent.keyDown(input, { key: "Enter" });
 
   await waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(

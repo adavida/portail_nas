@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { expect, test, vi } from "vitest";
-import { UsersTable } from "./UsersTable";
-import { Toaster } from "./Toaster";
+import { renderWithToaster } from "../test/render_with_toaster";
+import { mockFetchByUrl } from "../test/mock_fetch_by_url";
+import UsersTable from "./UsersTable.svelte";
 
 test("empty", () => {
-  render(<UsersTable users={[]} />);
+  render(UsersTable, { props: { users: [] } });
 
   expect(screen.getByTestId("users-empty")).toBeInTheDocument();
 });
@@ -15,7 +16,7 @@ test("renders rows", () => {
     { uid: "bob", name: "Bob", email: "" },
   ];
 
-  render(<UsersTable users={users} />);
+  render(UsersTable, { props: { users } });
 
   expect(screen.getByTestId("users-table")).toBeInTheDocument();
   expect(screen.getByTestId("user-row-alice")).toHaveTextContent("alice");
@@ -23,7 +24,9 @@ test("renders rows", () => {
 });
 
 test("create row is first line of table", () => {
-  const { container } = render(<UsersTable users={[]} onCreated={() => {}} />);
+  const { container } = render(UsersTable, {
+    props: { users: [], onCreated: () => {} },
+  });
 
   const rows = container.querySelectorAll("tbody tr");
   const firstRowId = rows[0].getAttribute("data-testid");
@@ -37,7 +40,7 @@ test("create row is first line of table", () => {
 test("existing user has password field", () => {
   const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
 
-  render(<UsersTable users={[alice]} onCreated={() => {}} />);
+  render(UsersTable, { props: { users: [alice], onCreated: () => {} } });
 
   expect(screen.getByTestId("password-input-alice")).toBeInTheDocument();
   expect(screen.getByTestId("password-button-alice")).toBeInTheDocument();
@@ -46,14 +49,17 @@ test("existing user has password field", () => {
 test("delete user calls api and refreshes", async () => {
   const onDeleted = vi.fn();
   globalThis.fetch = vi.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({}),
+    } as unknown as Response),
   );
 
   const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
 
-  render(<UsersTable users={[alice]} onDeleted={onDeleted} />);
+  render(UsersTable, { props: { users: [alice], onDeleted } });
 
-  fireEvent.click(screen.getByTestId("delete-button-alice"));
+  await fireEvent.click(screen.getByTestId("delete-button-alice"));
 
   await waitFor(() => {
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -73,19 +79,14 @@ test("delete shows error on failure", async () => {
       ok: false,
       status: 500,
       json: () => Promise.resolve({ error: "ldap: boom" }),
-    } as Response),
+    } as unknown as Response),
   );
 
   const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
 
-  render(
-    <>
-      <UsersTable users={[alice]} />
-      <Toaster />
-    </>,
-  );
+  renderWithToaster(UsersTable, { users: [alice] });
 
-  fireEvent.click(screen.getByTestId("delete-button-alice"));
+  await fireEvent.click(screen.getByTestId("delete-button-alice"));
 
   const error = await screen.findByTestId("toast-error");
 
@@ -95,19 +96,22 @@ test("delete shows error on failure", async () => {
 test("double-click name opens editor then saves", async () => {
   const onUpdated = vi.fn();
   globalThis.fetch = vi.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({}),
+    } as unknown as Response),
   );
 
   const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
 
-  render(<UsersTable users={[alice]} onUpdated={onUpdated} />);
+  render(UsersTable, { props: { users: [alice], onUpdated } });
 
-  fireEvent.doubleClick(screen.getByTestId("cell-name-alice"));
+  await fireEvent.doubleClick(screen.getByTestId("cell-name-alice"));
 
   const input = screen.getByTestId("edit-input-name-alice");
 
-  fireEvent.change(input, { target: { value: "Alice Dupont" } });
-  fireEvent.keyDown(input, { key: "Enter" });
+  await fireEvent.input(input, { target: { value: "Alice Dupont" } });
+  await fireEvent.keyDown(input, { key: "Enter" });
 
   await waitFor(() => {
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -130,25 +134,17 @@ test("edit error keeps editor open", async () => {
       ok: false,
       status: 500,
       json: () => Promise.resolve({ error: "name is empty" }),
-    } as Response),
+    } as unknown as Response),
   );
 
   const alice = { uid: "alice", name: "Alice", email: "a@ex.com" };
 
-  render(
-    <>
-      <UsersTable users={[alice]} />
-      <Toaster />
-    </>,
-  );
+  renderWithToaster(UsersTable, { users: [alice] });
 
-  fireEvent.doubleClick(screen.getByTestId("cell-name-alice"));
-  fireEvent.change(screen.getByTestId("edit-input-name-alice"), {
-    target: { value: "" },
-  });
-  fireEvent.keyDown(screen.getByTestId("edit-input-name-alice"), {
-    key: "Enter",
-  });
+  await fireEvent.doubleClick(screen.getByTestId("cell-name-alice"));
+  const input = screen.getByTestId("edit-input-name-alice");
+  await fireEvent.input(input, { target: { value: "" } });
+  await fireEvent.keyDown(input, { key: "Enter" });
 
   const error = await screen.findByTestId("toast-error");
 
@@ -159,34 +155,23 @@ test("edit error keeps editor open", async () => {
 test("groups cell shows memberships", () => {
   const alice = { uid: "alice", name: "Alice", email: "", groups: ["devs"] };
 
-  render(
-    <>
-      <UsersTable users={[alice]} />
-      <Toaster />
-    </>,
-  );
+  render(UsersTable, { props: { users: [alice] } });
 
   expect(screen.getByTestId("cell-groups-alice")).toHaveTextContent("devs");
 });
 
 test("groups cell edit proposes groups and diffs membership", async () => {
-  const fetchMock = vi.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
-  );
-  globalThis.fetch = fetchMock;
+  globalThis.fetch = mockFetchByUrl({});
+  const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
   const onUpdated = vi.fn();
 
   const alice = { uid: "alice", name: "Alice", email: "", groups: ["devs"] };
 
-  render(
-    <UsersTable
-      users={[alice]}
-      allGroups={["devs", "ops"]}
-      onUpdated={onUpdated}
-    />,
-  );
+  render(UsersTable, {
+    props: { users: [alice], allGroups: ["devs", "ops"], onUpdated },
+  });
 
-  fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  await fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
 
   expect(
     Array.from(
@@ -196,12 +181,12 @@ test("groups cell edit proposes groups and diffs membership", async () => {
     ).map((el) => el.getAttribute("data-testid")),
   ).toContain("groups-chip-alice-devs");
 
-  fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
+  await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
     target: { value: "ops" },
   });
-  fireEvent.click(screen.getByTestId("groups-suggest-alice-ops"));
-  fireEvent.click(screen.getByTestId("groups-remove-alice-devs"));
-  fireEvent.click(screen.getByTestId("groups-save-alice"));
+  await fireEvent.click(screen.getByTestId("groups-suggest-alice-ops"));
+  await fireEvent.click(screen.getByTestId("groups-remove-alice-devs"));
+  await fireEvent.click(screen.getByTestId("groups-save-alice"));
 
   await waitFor(() => {
     expect(fetchMock).toHaveBeenCalledWith(
@@ -229,26 +214,21 @@ test("groups save error keeps editor open with message", async () => {
       ok: false,
       status: 404,
       json: () => Promise.resolve({ error: "not found: uid=ghost" }),
-    } as Response),
+    } as unknown as Response),
   );
 
   const alice = { uid: "alice", name: "Alice", email: "", groups: [] };
 
-  render(
-    <>
-      <UsersTable users={[alice]} allGroups={["devs"]} />
-      <Toaster />
-    </>,
-  );
+  renderWithToaster(UsersTable, { users: [alice], allGroups: ["devs"] });
 
-  fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
-  fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
+  await fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
     target: { value: "devs" },
   });
-  fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
+  await fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
     key: "Enter",
   });
-  fireEvent.click(screen.getByTestId("groups-save-alice"));
+  await fireEvent.click(screen.getByTestId("groups-save-alice"));
 
   const error = await screen.findByTestId("toast-error");
 
@@ -258,19 +238,22 @@ test("groups save error keeps editor open with message", async () => {
 
 test("create group from groups cell with user as member", async () => {
   const fetchMock = vi.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response),
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({}),
+    } as unknown as Response),
   );
   globalThis.fetch = fetchMock;
 
   const alice = { uid: "alice", name: "Alice", email: "", groups: [] };
 
-  render(<UsersTable users={[alice]} onUpdated={() => {}} />);
+  render(UsersTable, { props: { users: [alice], onUpdated: () => {} } });
 
-  fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
-  fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
+  await fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
     target: { value: "devs" },
   });
-  fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
+  await fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
     key: "Enter",
   });
 
@@ -296,23 +279,18 @@ test("create group error keeps input and shows message", async () => {
       ok: false,
       status: 500,
       json: () => Promise.resolve({ error: "ldap: boom" }),
-    } as Response),
+    } as unknown as Response),
   );
 
   const alice = { uid: "alice", name: "Alice", email: "", groups: [] };
 
-  render(
-    <>
-      <UsersTable users={[alice]} />
-      <Toaster />
-    </>,
-  );
+  renderWithToaster(UsersTable, { users: [alice] });
 
-  fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
-  fireEvent.change(screen.getByTestId("groups-new-input-alice"), {
+  await fireEvent.doubleClick(screen.getByTestId("cell-groups-alice"));
+  await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
     target: { value: "devs" },
   });
-  fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
+  await fireEvent.keyDown(screen.getByTestId("groups-new-input-alice"), {
     key: "Enter",
   });
 

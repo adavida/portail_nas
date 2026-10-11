@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/svelte";
 import { expect, test, vi } from "vitest";
 import { mockFetchByUrl } from "../test/mock_fetch_by_url";
-import Home from "./Home";
+import Home from "./Home.svelte";
 
 test("loading then apps list", async () => {
   globalThis.fetch = mockFetchByUrl({
@@ -15,7 +15,7 @@ test("loading then apps list", async () => {
     ],
   });
 
-  render(<Home />);
+  render(Home);
 
   expect(screen.getByTestId("apps-loading")).toBeInTheDocument();
 
@@ -28,7 +28,7 @@ test("loading then apps list", async () => {
 test("empty shows message", async () => {
   globalThis.fetch = mockFetchByUrl({ "/apps.json": [] });
 
-  render(<Home />);
+  render(Home);
 
   const empty = await screen.findByTestId("apps-empty");
 
@@ -38,7 +38,7 @@ test("empty shows message", async () => {
 test("error on fetch failure", async () => {
   globalThis.fetch = vi.fn(() => Promise.reject(new Error("fail")));
 
-  render(<Home />);
+  render(Home);
 
   const error = await screen.findByTestId("apps-error");
 

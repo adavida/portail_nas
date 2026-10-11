@@ -22,11 +22,11 @@ fn example() {
 
 Frontend:
 
-```tsx
-test("example", () => {
-  render(<Comp />);
+```ts
+test("example", async () => {
+  render(Comp, { props: {} });
 
-  fireEvent.click(screen.getByTestId("btn"));
+  await fireEvent.click(screen.getByTestId("btn"));
 
   expect(screen.getByTestId("out")).toBeInTheDocument();
 });

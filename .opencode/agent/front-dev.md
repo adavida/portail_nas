@@ -11,8 +11,8 @@ L'orchestrateur te fournit : le contrat JSON exact du/des endpoints (méthodes, 
 
 ## Règles
 
-1. **Layout** : composants réutilisables dans `components/<X>.tsx`, pages dans `pages/<X>.tsx`, glue minimal dans `App.tsx`. Fetch `/api/...` via le proxy vite (pas d'URL absolue hardcodée).
-2. **1 composant = 1 fichier + son test collocalisé** (`<X>.test.tsx`) — vitest + `@testing-library/react` + `jsdom`.
+1. **Layout** : composants réutilisables dans `components/<X>.svelte`, pages dans `pages/<X>.svelte`, glue minimal dans `App.svelte`. Fetch `/api/...` via le proxy vite (pas d'URL absolue hardcodée).
+2. **1 composant = 1 fichier + son test collocalisé** (`<X>.test.ts`) — vitest + `@testing-library/svelte` + `jsdom`.
 3. **Tests AAA** : `fireEvent` + `vi.waitFor` ; testids cohérents (`*-table`, `*-row-*`, `*-create-*`, `*-delete-button-*`, `*-error-*`) ; mock `globalThis.fetch`.
 4. **Types** alignés sur le contrat JSON du backend (uid/gid string — VOs sérialisés transparents) ; éclaret avec l'orchestrateur si un champ manque.
 5. Erreurs affichées (pas de fail silencieux) — message `j.error || \`error ${status}\`` comme le reste du code.

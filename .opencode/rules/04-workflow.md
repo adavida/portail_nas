@@ -10,13 +10,13 @@
 - Watchers `backend-test`/`frontend-test` tournent en permanence — ne pas relancer `cargo test` en boucle manuelle.
 - `just test` (`justfile:9`) = `cargo test` + `npm --prefix frontend test -- --run` (raccourci local).
 - Nouvelle route LDAP → trait `LdapClient` mockable, pas de vrai LDAP en unit test (intégration seulement via `LDAP_TEST_*`).
-- Tests AAA : tout `#[test]` / `test(` suit Arrange, Act, Assert avec **ligne vide entre les 3** + **assertions faciles à lire** (`assert_eq!` avec message, variable intermédiaire, `assert_auth_*` helpers) — skill `.opencode/skills/test-aaa/SKILL.md` trigger `*.rs` `*.test.tsx`.
+- Tests AAA : tout `#[test]` / `test(` suit Arrange, Act, Assert avec **ligne vide entre les 3** + **assertions faciles à lire** (`assert_eq!` avec message, variable intermédiaire, `assert_auth_*` helpers) — skill `.opencode/skills/test-aaa/SKILL.md` trigger `*.rs` `*.test.ts`.
 - **1 fonction publique = au moins 1 test** : toute `pub fn`/`pub async fn` (domain, repository, controllers, http) a un test collocalisé `#[cfg(test)]` (repo/domain) ou d'intégration `backend/tests/*.rs` (routes). Une fonction publique sans test = pas finie.
 - Après toute modif Rust (`backend/src/**/*.rs`, `Cargo.toml`) → `devenv shell -- cargo fmt` obligatoire en fin de modif, puis `devenv shell -- treefmt --fail-on-change` avant `git add` — skill `.opencode/skills/backend-format/SKILL.md`.
 
 ## VSCode
 
-- `codiumWithExt = pkgs.vscode-with-extensions.override { vscode = pkgs.vscodium; vscodeExtensions = [rust-analyzer even-better-toml vscode-lldb prettier-vscode vscode-eslint nix-ide direnv vscode-tailwindcss] }` dans `packages` et `processes.vscode.exec = "${codiumWithExt}/bin/codium .; sleep infinity"`. Extensions aussi dans `.vscode/extensions.json`/`settings.json` — ne pas installer via Marketplace.
+- `codiumWithExt = pkgs.vscode-with-extensions.override { vscode = pkgs.vscodium; vscodeExtensions = [rust-analyzer even-better-toml vscode-lldb prettier-vscode vscode-eslint nix-ide direnv vscode-tailwindcss svelte-vscode] }` dans `packages` et `processes.vscode.exec = "${codiumWithExt}/bin/codium .; sleep infinity"`. Extensions aussi dans `.vscode/extensions.json`/`settings.json` — ne pas installer via Marketplace.
 
 ## Sécurité & garde-fous
 
@@ -28,5 +28,5 @@
 ## Layout
 
 - Racine: `devenv.nix` / `devenv.yaml` / `devenv.lock` / `.envrc` (`/home/david/projects/rust/nas/202260917_portail`)
-- Code: `backend/src/main.rs`, `backend/src/{domain,http,controllers}/`, `frontend/src/` (`App.tsx`, `main.tsx`, `App.test.tsx`, `vite.config.ts`)
+- Code: `backend/src/main.rs`, `backend/src/{domain,http,controllers}/`, `frontend/src/` (`App.svelte`, `main.ts`, `App.test.ts`, `vite.config.ts`)
 - Config: `.vscode/{settings,extensions}.json`, `justfile`, `.opencode/rules/01-devenv.md` … `04-workflow.md`

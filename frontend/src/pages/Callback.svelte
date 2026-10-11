@@ -1,34 +1,34 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { handleCallback } from "../auth/oidc";
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { handleCallback } from "../auth/oidc";
 
-export default function Callback() {
-  const [params] = useSearchParams();
-  const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
+  let error = $state<string | null>(null);
 
-  useEffect(() => {
+  function done() {
+    window.location.replace("/");
+  }
+
+  onMount(() => {
+    const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const state = params.get("state");
     const storedState = sessionStorage.getItem("oidc_state");
     if (state && storedState && state !== storedState) {
-      setError(`state mismatch: ${state} vs ${storedState}`);
+      error = `state mismatch: ${state} vs ${storedState}`;
       return;
     }
     if (!code) {
       const err = params.get("error");
       const desc = params.get("error_description");
-      setError(err ? `${err}: ${desc ?? ""}` : "code missing");
+      error = err ? `${err}: ${desc ?? ""}` : "code missing";
       return;
     }
-    // StrictMode double-mount guard + code already exchanged
     const key = `handled_${code}`;
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
-    // if we already have a token, don't exchange again
     if (localStorage.getItem("access_token")) {
       sessionStorage.removeItem("login_in_progress");
-      navigate("/", { replace: true });
+      done();
       return;
     }
     handleCallback(code)
@@ -37,14 +37,17 @@ export default function Callback() {
         sessionStorage.removeItem("logged_out");
         sessionStorage.removeItem("oidc_state");
         sessionStorage.removeItem("oidc_verifier");
-        navigate("/", { replace: true });
+        done();
       })
       .catch((e) => {
         sessionStorage.removeItem("login_in_progress");
-        setError(String(e));
+        error = String(e);
       });
-  }, [params, navigate]);
+  });
+</script>
 
-  if (error) return <p data-testid="callback-error">Erreur: {error}</p>;
-  return <p data-testid="callback-loading">Connexion...</p>;
-}
+{#if error}
+  <p data-testid="callback-error">Erreur: {error}</p>
+{:else}
+  <p data-testid="callback-loading">Connexion...</p>
+{/if}

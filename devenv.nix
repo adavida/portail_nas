@@ -19,6 +19,7 @@ let
         mhutchie.git-graph
         mkhl.direnv
         rust-lang.rust-analyzer
+        svelte.svelte-vscode
         tamasfe.even-better-toml
         vadimcn.vscode-lldb
       ]

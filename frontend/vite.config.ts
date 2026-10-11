@@ -1,5 +1,6 @@
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { svelteTesting } from "@testing-library/svelte/vite";
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
 
 if (!process.env.VITE_OIDC_ISSUER_URL)
   throw new Error("VITE_OIDC_ISSUER_URL manquant");
@@ -9,7 +10,7 @@ if (!process.env.VITE_OIDC_REDIRECT_URI)
   throw new Error("VITE_OIDC_REDIRECT_URI manquant");
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [svelte(), ...(process.env.VITEST ? [svelteTesting()] : [])],
   css: {
     preprocessorOptions: {
       scss: { api: "modern-compiler" },

@@ -35,7 +35,7 @@ backend/src/
 5. `http/foo.rs`: `use crate::controllers::foo; pub async fn foo() -> Result<Json<Vec<Foo>>, AppError> { Ok(Json(foo::list().await?)) }` — `axum` seul, `?` propage `AppError`, `IntoResponse` via `http/error.rs`
 6. `domain/mod.rs:1` + `repository/mod.rs:1` + `http/mod.rs:1` + `controllers/mod.rs:1` → `pub mod <aggregate>;` + `error.rs` inchangé
 7. `lib.rs:7` → `.route("/api/foo", get(http::foo::foo))`
-8. Ne pas déplacer `/api/health` sans MAJ `frontend/src/App.tsx` + `frontend/vite.config.ts` proxy
+8. Ne pas déplacer `/api/health` sans MAJ `frontend/src/App.svelte` + `frontend/vite.config.ts` proxy
 
 ### Domain — 1 objet = 1 dossier (règle 08)
 

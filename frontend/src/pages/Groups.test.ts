@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/svelte";
 import { expect, test, vi } from "vitest";
-import Groups from "./Groups";
+import Groups from "./Groups.svelte";
 
 test("loading then data", async () => {
   const mockGroups = [{ gid: "devs", name: "Devs", description: "Devs team" }];
@@ -8,10 +8,10 @@ test("loading then data", async () => {
     Promise.resolve({
       ok: true,
       json: () => Promise.resolve(mockGroups),
-    } as Response),
+    } as unknown as Response),
   );
 
-  render(<Groups />);
+  render(Groups);
 
   expect(screen.getByTestId("groups-loading")).toBeInTheDocument();
 
@@ -24,10 +24,13 @@ test("loading then data", async () => {
 
 test("empty shows message", async () => {
   globalThis.fetch = vi.fn(() =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response),
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve([]),
+    } as unknown as Response),
   );
 
-  render(<Groups />);
+  render(Groups);
 
   const empty = await screen.findByTestId("groups-empty");
 
@@ -37,7 +40,7 @@ test("empty shows message", async () => {
 test("error", async () => {
   globalThis.fetch = vi.fn(() => Promise.reject(new Error("fail")));
 
-  render(<Groups />);
+  render(Groups);
 
   const error = await screen.findByTestId("groups-error");
 

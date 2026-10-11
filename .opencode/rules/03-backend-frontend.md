@@ -1,6 +1,6 @@
 # 03 — Backend & Frontend
 
-> Skills: `backend-format` (trigger `*.rs`), `backend-structure` (trigger `http/`, `controllers/`, `domain/`), `frontend-format` + `frontend-structure` (trigger `frontend/src`, `*.tsx`).
+> Skills: `backend-format` (trigger `*.rs`), `backend-structure` (trigger `http/`, `controllers/`, `domain/`), `frontend-format` + `frontend-structure` (trigger `frontend/src`, `*.svelte`).
 
 ## Backend `portail-backend` (Axum 0.7, Tokio full)
 
@@ -18,13 +18,13 @@
 - **Routes test-only** (ex: `POST /api/users/:uid/authenticate`): feature flag `test-api` (`backend/Cargo.toml` `[features]`, `#[cfg(feature = "test-api")]` dans `users_router`) — absentes du build prod. **Piège**: `#[cfg(test)]` est ignoré dans la lib quand `backend/tests/*.rs` la compilent comme dépendance — dans `tests/`, seul le feature flag filtre (`#[cfg(feature = "test-api")]` au-dessus de `#[tokio::test]`); `#[cfg(test)]` réservé aux unit tests collocalisés.
 - Verif: `devenv shell -- cargo test --features test-api -- --nocapture` (unit + intégration).
 
-## Frontend `portail-frontend` (Vite + React 18 + TS)
+## Frontend `portail-frontend` (Vite + Svelte 5 runes + TS)
 
-- `package.json:6` scripts `dev`/`build`/`test` (`vitest run`)/`test:watch`. `vite.config.ts:12` jsdom + `setupFiles=./src/test/setup.ts`.
-- `vite.config.ts:8` proxy `/api → http://localhost:3000`, port `5173`; `pages/Users.tsx` fetch `/api/users`, `App.tsx` glue.
-- Tests collocalisés `@testing-library/react` + `jsdom` (`*.test.tsx` collocalisés, `App.test.tsx`).
+- `package.json:6` scripts `dev`/`build`/`test` (`vitest run`)/`test:watch`/`check` (`svelte-check`). `vite.config.ts` jsdom + `setupFiles=./src/test/setup.ts` + plugin `svelteTesting()` sous `VITEST`; preprocess dans `svelte.config.js` (`vitePreprocess`).
+- proxy `/api → backend`, port `5173`; `pages/Users.svelte` fetch `/api/users`, `App.svelte` glue (pas de routeur: `window.location.pathname === "/callback"`).
+- Tests collocalisés `@testing-library/svelte` + `jsdom` (`<X>.test.ts` à côté de `<X>.svelte`, `App.test.ts`); toast store resetté dans `test/setup.ts`.
 - Commandes: `devenv shell -- npm --prefix frontend test -- --run` (single: `-t "renders title"`); prérequis `devenv shell -- bash -c 'cd frontend && npm install'`.
 
 ## Lien backend ↔ frontend
 
-- `vite.config.ts:8` proxy doit matcher `main.rs` `bind 0.0.0.0:3000`. Changer l'un ⇒ changer l'autre + `justfile:5`.
+- Le proxy `vite.config.ts` doit matcher `main.rs` `bind 0.0.0.0:3000`. Changer l'un ⇒ changer l'autre + `justfile:5`.
