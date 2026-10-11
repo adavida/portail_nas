@@ -14,13 +14,6 @@ pub async fn update_user(uid: &Uid, data: UpdateUser) -> Result<(), AppError> {
     let mut ldap = connect().await?;
     let dn = find_user_dn(&mut ldap, uid).await?;
 
-    let sn = data
-        .name
-        .as_str()
-        .split_whitespace()
-        .last()
-        .unwrap_or(data.name.as_str())
-        .to_string();
     let set_name = one_set(data.name.as_str().to_string());
     let set_mail = if data.email.as_str().is_empty() {
         HashSet::new()
@@ -31,9 +24,7 @@ pub async fn update_user(uid: &Uid, data: UpdateUser) -> Result<(), AppError> {
     ldap.modify(
         &dn,
         vec![
-            Mod::Replace("cn".to_string(), set_name.clone()),
             Mod::Replace("displayName".to_string(), set_name),
-            Mod::Replace("sn".to_string(), one_set(sn)),
             Mod::Replace("mail".to_string(), set_mail),
         ],
     )
