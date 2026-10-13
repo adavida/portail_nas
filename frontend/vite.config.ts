@@ -5,7 +5,6 @@ import { defineConfig } from "vite";
 if (!process.env.VITE_OIDC_ISSUER_URL)
   throw new Error("VITE_OIDC_ISSUER_URL manquant");
 if (!process.env.VITE_APP_URL) throw new Error("VITE_APP_URL manquant");
-if (!process.env.VITE_BACKEND_URL) throw new Error("VITE_BACKEND_URL manquant");
 if (!process.env.VITE_OIDC_REDIRECT_URI)
   throw new Error("VITE_OIDC_REDIRECT_URI manquant");
 
@@ -19,7 +18,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": process.env.VITE_BACKEND_URL,
+      "/api": process.env.VITE_BACKEND_URL ?? process.env.VITE_APP_URL,
     },
   },
   test: {

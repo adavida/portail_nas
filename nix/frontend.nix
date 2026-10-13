@@ -15,7 +15,6 @@ pkgs.buildNpmPackage {
   # npmDepsHash = pkgs.lib.fakeHash;
   npmDepsHash = "sha256-BSNGIEav4QnfF96cOH2TSqazwgAKbJ/w7vcSNOXQRMw=";
   VITE_APP_URL = appUrl;
-  VITE_BACKEND_URL = appUrl;
   VITE_OIDC_ISSUER_URL = oidcIssuerUrl;
   VITE_OIDC_REDIRECT_URI = oidcRedirectUri;
   VITE_APP_LANG = appLang;
