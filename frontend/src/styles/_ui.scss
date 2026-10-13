@@ -97,6 +97,18 @@
   align-items: center;
   flex-wrap: wrap;
   gap: $s-8;
+
+  &:has(> .input) {
+    flex-wrap: nowrap;
+
+    > .input {
+      min-width: 0;
+    }
+
+    > .btn {
+      flex-shrink: 0;
+    }
+  }
 }
 
 .input {
