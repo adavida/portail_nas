@@ -85,12 +85,11 @@
     text-align: center;
     color: var(--c-muted);
   }
+}
 
-  @media (max-width: $bp-narrow) {
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-  }
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .row-actions {
