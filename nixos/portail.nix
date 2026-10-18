@@ -20,20 +20,45 @@ let
       }) sortedApps
     )
   );
-  oidcClients = map (a: {
-    id = if a.oidc.clientId != "" then a.oidc.clientId else lib.strings.toLower a.name;
-    public = a.oidc.public;
-    redirectUris = a.oidc.redirectUris;
-    scopes = a.oidc.scopes;
-    secretFile = a.oidc.secretFile;
-  }) (lib.filter (a: a.oidc.enable) cfg.apps);
-  mergeClient = c: ''
-    id='${c.id}'
-    redirects='${builtins.toJSON c.redirectUris}'
-    scopes='${builtins.toJSON c.scopes}'
-    secret="${if c.public then "" else "$(cat '${toString c.secretFile}' | tr -d '[:space:]')"}"
-    jq --arg id "$id" --arg secret "$secret" --argjson redirects "$redirects" --argjson scopes "$scopes" 'if any(.[]; .id == $id) then map(if .id == $id then .secret = $secret | .redirect_uris = $redirects | .scopes = $scopes else . end) else . + [{"id": $id, "secret": $secret, "redirect_uris": $redirects, "scopes": $scopes}] end' "$clients" > "$clients.tmp" && mv "$clients.tmp" "$clients" && chmod 600 "$clients"
-  '';
+  oidcClients = map (
+    a:
+    let
+      id = if a.oidc.clientId != "" then a.oidc.clientId else lib.strings.toLower a.name;
+    in
+    {
+      inherit id;
+      public = a.oidc.public;
+      redirectUris = a.oidc.redirectUris;
+      scopes = a.oidc.scopes;
+      secretPath =
+        if a.oidc.secretFile != null then
+          toString a.oidc.secretFile
+        else
+          "${cfg.oidc.secretsDir}/${id}_oidc";
+    }
+  ) (lib.filter (a: a.oidc.enable) cfg.apps);
+  mergeClient =
+    c:
+    ''
+      id='${c.id}'
+      redirects='${builtins.toJSON c.redirectUris}'
+      scopes='${builtins.toJSON c.scopes}'
+    ''
+    + (
+      if c.public then
+        ''
+          secret=""
+        ''
+      else
+        ''
+          secret_file='${c.secretPath}'
+          if [ ! -f "$secret_file" ]; then umask 077; head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$secret_file"; fi
+          secret="$(cat "$secret_file" | tr -d '[:space:]')"
+        ''
+    )
+    + ''
+      jq --arg id "$id" --arg secret "$secret" --argjson redirects "$redirects" --argjson scopes "$scopes" 'if any(.[]; .id == $id) then map(if .id == $id then .secret = $secret | .redirect_uris = $redirects | .scopes = $scopes else . end) else . + [{"id": $id, "secret": $secret, "redirect_uris": $redirects, "scopes": $scopes}] end' "$clients" > "$clients.tmp" && mv "$clients.tmp" "$clients" && chmod 600 "$clients"
+    '';
   # Runs after the backend started (it creates clients.json on first boot);
   # clients.json is re-read on every request, so the upsert needs no restart.
   registerOidcClients = pkgs.writeShellScript "portail-oidc-clients" (
@@ -137,7 +162,8 @@ in
           The backend **generates** the RSA signing key and a default
           `clients.json` (portal client with a random secret) on first start,
           then reads `clients.json` on every request — adding a client is a
-          file edit, no restart. Pass paths via `OIDC_SECRETS_DIR`.
+          file edit, no restart. Confidential app clients get their secret
+          generated here as `<client_id>_oidc` on first activation. Pass paths via `OIDC_SECRETS_DIR`.
         '';
       };
     };
@@ -227,7 +253,12 @@ in
                   secretFile = lib.mkOption {
                     type = with lib.types; nullOr path;
                     default = null;
-                    description = "File holding the client secret (agenix/sops), read at activation — required unless `public = true`. Must be readable by the `portail` user.";
+                    description = ''
+                      File holding the client secret (agenix/sops), read at activation — optional override.
+                      When null and `public = false`, the portal generates a random secret at
+                      `oidc.secretsDir/<client_id>_oidc` (0600, never overwritten) on first activation.
+                      A provided file must be readable by the `portail` user.
+                    '';
                   };
                 };
               };
@@ -257,8 +288,8 @@ in
   config = lib.mkIf cfg.enable {
     assertions = [
       {
-        assertion = lib.all (c: c.redirectUris != [ ] && (c.public || c.secretFile != null)) oidcClients;
-        message = "each services.portail.apps entry with oidc.enable = true needs non-empty oidc.redirectUris and either oidc.secretFile or oidc.public = true";
+        assertion = lib.all (c: c.redirectUris != [ ]) oidcClients;
+        message = "each services.portail.apps entry with oidc.enable = true needs non-empty oidc.redirectUris";
       }
     ];
 

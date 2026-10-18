@@ -36,7 +36,7 @@ Le flake expose `packages.portail-backend`, `packages.portail-frontend` et `nixo
 | `package`                    | (requis)                | binaire backend (ex: `inputs.portail.packages...`)                                         |
 | `bindAddress`                | `127.0.0.1:3000`        | BIND_ADDR du backend                                                                       |
 | `oidcClientId`               | `portail`               | client_id du portail (généré dans `clients.json` au 1er start)                             |
-| `oidc.secretsDir`            | `/var/lib/portail/oidc` | répertoire des secrets OIDC générés (clé RSA + clients.json)                               |
+| `oidc.secretsDir`            | `/var/lib/portail/oidc` | répertoire des secrets OIDC générés (clé RSA + clients.json + `<clientId>_oidc` des apps)  |
 | `lang`                       | `en`                    | langue par défaut de l'interface (`fr`/`en`)                                               |
 | `ldap.url`                   | `ldap://127.0.0.1`      | URL du serveur LDAP (`ldap://` ou `ldaps://`)                                              |
 | `ldap.baseDn`                | `dc=example,dc=com`     | suffixe LDAP                                                                               |
@@ -50,7 +50,7 @@ Le flake expose `packages.portail-backend`, `packages.portail-frontend` et `nixo
 
 ### Applications affichées
 
-`services.portail.apps` alimente la page d'accueil : chaque entrée = un lien (nom + URL, description et icône optionnelles), trié par nom. Le module le rend dans un `/apps.json` statique servi par le vhost nginx — le backend n'intervient pas. En dev, la liste vient de `frontend/public/apps.json` (servie par vite, modifiable à chaud). Chaque entrée accepte un sous-objet `oidc` désactivé par défaut : `oidc.enable = true` enregistre l'application comme client OIDC du portail dans `clients.json` (relu à chaud, sans redémarrage), avec `clientId` (défaut : nom en minuscules), `redirectUris`, `scopes`, et soit `secretFile` soit `public = true`.
+`services.portail.apps` alimente la page d'accueil : chaque entrée = un lien (nom + URL, description et icône optionnelles), trié par nom. Le module le rend dans un `/apps.json` statique servi par le vhost nginx — le backend n'intervient pas. En dev, la liste vient de `frontend/public/apps.json` (servie par vite, modifiable à chaud). Chaque entrée accepte un sous-objet `oidc` désactivé par défaut : `oidc.enable = true` enregistre l'application comme client OIDC du portail dans `clients.json` (relu à chaud, sans redémarrage), avec `clientId` (défaut : nom en minuscules), `redirectUris`, `scopes`, et soit `public = true` soit un secret **généré** au premier activation dans `oidc.secretsDir/<clientId>_oidc` (0600, jamais écrasé) — surchargeable par `secretFile` (agenix/sops).
 
 ```nix
 services.portail.apps = [
@@ -64,7 +64,6 @@ services.portail.apps = [
       enable = true;
       clientId = "nextcloud";
       redirectUris = [ "https://cloud.portail.example.com/apps/oauth2/redirect_ui" ];
-      secretFile = /etc/secrets/nextcloud-oidc;
     };
   }
 ];
@@ -134,7 +133,7 @@ The flake exposes `packages.portail-backend`, `packages.portail-frontend` and `n
 | `package`                    | (required)              | backend binary (e.g. `inputs.portail.packages...`)                                         |
 | `bindAddress`                | `127.0.0.1:3000`        | backend BIND_ADDR                                                                          |
 | `oidcClientId`               | `portail`               | portal client_id (generated into `clients.json` on first start)                            |
-| `oidc.secretsDir`            | `/var/lib/portail/oidc` | OIDC secrets directory (RSA key + clients.json)                                            |
+| `oidc.secretsDir`            | `/var/lib/portail/oidc` | OIDC secrets directory (RSA key + clients.json + app `<clientId>_oidc` secrets)            |
 | `lang`                       | `en`                    | default UI language (`fr`/`en`)                                                            |
 | `ldap.url`                   | `ldap://127.0.0.1`      | LDAP server URL (`ldap://` or `ldaps://`)                                                  |
 | `ldap.baseDn`                | `dc=example,dc=com`     | LDAP suffix                                                                                |
@@ -148,7 +147,7 @@ The flake exposes `packages.portail-backend`, `packages.portail-frontend` and `n
 
 #### Listed applications
 
-`services.portail.apps` feeds the home page: each entry = a link (name + URL, optional description and icon), sorted by name. The module renders it into a static `/apps.json` served by the nginx vhost — the backend is not involved. In dev, the list comes from `frontend/public/apps.json` (served by vite, hot-editable). Each entry accepts an `oidc` sub-object, disabled by default: `oidc.enable = true` registers the app as an OIDC client of the portal in `clients.json` (re-read live, no restart), with `clientId` (default: lowercased name), `redirectUris`, `scopes`, and either `secretFile` or `public = true`.
+`services.portail.apps` feeds the home page: each entry = a link (name + URL, optional description and icon), sorted by name. The module renders it into a static `/apps.json` served by the nginx vhost — the backend is not involved. In dev, the list comes from `frontend/public/apps.json` (served by vite, hot-editable). Each entry accepts an `oidc` sub-object, disabled by default: `oidc.enable = true` registers the app as an OIDC client of the portal in `clients.json` (re-read live, no restart), with `clientId` (default: lowercased name), `redirectUris`, `scopes`, and either `public = true` or a **generated** secret written to `oidc.secretsDir/<clientId>_oidc` on first activation (0600, never overwritten) — overridable with `secretFile` (agenix/sops).
 
 ```nix
 services.portail.apps = [
@@ -162,7 +161,6 @@ services.portail.apps = [
       enable = true;
       clientId = "nextcloud";
       redirectUris = [ "https://cloud.portail.example.com/apps/oauth2/redirect_ui" ];
-      secretFile = /etc/secrets/nextcloud-oidc;
     };
   }
 ];
