@@ -37,17 +37,5 @@ export function createEnv(
 export const env: Env = createEnv();
 
 // Backward-compatible named exports — single source is `env`.
-export const APP_LANG = env.appLang;
 export const APP_URL = env.appUrl;
 export const OIDC_ISSUER_URL = env.oidcIssuerUrl;
-export const OIDC_REDIRECT_URI = env.oidcRedirectUri;
-
-export function appUrl(): string {
-  return env.appUrl;
-}
-export function oidcIssuerUrl(): string {
-  return env.oidcIssuerUrl;
-}
-export function oidcRedirectUri(): string {
-  return env.oidcRedirectUri;
-}

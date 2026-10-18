@@ -2,7 +2,7 @@ export function getToken(): string | null {
   return localStorage.getItem("access_token");
 }
 
-export function setTokens(data: {
+function setTokens(data: {
   access_token: string;
   id_token?: string;
   refresh_token?: string;
@@ -21,21 +21,6 @@ export function clearTokens() {
 export function authHeader(): Record<string, string> {
   const t = getToken() ?? localStorage.getItem("id_token");
   return t ? { Authorization: `Bearer ${t}` } : {};
-}
-
-export function isAdmin(): boolean {
-  const token = localStorage.getItem("id_token") ?? getToken();
-  if (!token) return false;
-  try {
-    const payload = token.split(".")[1];
-    const json = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
-    );
-    const groups: string[] = json.groups ?? [];
-    return groups.includes("admin");
-  } catch {
-    return false;
-  }
 }
 
 export function installAuthFetch() {
@@ -64,7 +49,7 @@ export function installAuthFetch() {
   };
 }
 
-export async function fetchAuthConfig(): Promise<{
+async function fetchAuthConfig(): Promise<{
   issuer: string;
   client_id: string;
   redirect_uri: string;
