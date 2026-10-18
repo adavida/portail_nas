@@ -192,7 +192,8 @@ impl Env {
 
     fn from_compile_fallback() -> Self {
         // ponytail: test fallback outside devenv — the secrets dir points to a
-        // temp path where the portal generates key + clients file on first use.
+        // temp path where `secrets::ensure` creates key + clients file at
+        // startup (main) or when the test app is built.
         Self {
             oidc_issuer_url: option_env!("OIDC_ISSUER_URL")
                 .unwrap_or("http://127.0.0.1:3000")

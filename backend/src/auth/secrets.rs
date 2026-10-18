@@ -21,6 +21,7 @@ pub fn key_path(env: &Env) -> PathBuf {
 /// Ensures the secrets directory: RSA key (PKCS#8 PEM) and default
 /// clients.json (portal client with a random secret) are **generated on
 /// first startup** if missing, never overwritten if they exist. Idempotent.
+/// Called once by `main` and by the test app builders — reads never create.
 pub fn ensure(env: &Env) -> Result<(), String> {
     let dir = &env.oidc_secrets_dir;
     std::fs::create_dir_all(dir)
@@ -33,7 +34,6 @@ pub fn ensure(env: &Env) -> Result<(), String> {
 }
 
 pub(crate) fn read_clients(env: &Env) -> Result<String, String> {
-    ensure(env)?;
     std::fs::read_to_string(clients_path(env)).map_err(|e| {
         format!(
             "cannot read clients file {}: {e}",
@@ -43,7 +43,6 @@ pub(crate) fn read_clients(env: &Env) -> Result<String, String> {
 }
 
 pub(crate) fn read_key(env: &Env) -> Result<String, String> {
-    ensure(env)?;
     std::fs::read_to_string(key_path(env))
         .map_err(|e| format!("cannot read signing key {}: {e}", key_path(env).display()))
 }
