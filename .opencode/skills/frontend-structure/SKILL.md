@@ -13,10 +13,14 @@ frontend/src/
   App.svelte               # glue: import Home from './pages/Home.svelte' → <Home />
   api/<ressource>.ts       # seul endroit avec fetch("/api/...") (users, groups, auth) + request<T> via api/http.ts
   pages/<Name>.svelte      # page: $state/$derived + onMount → compose components
-  components/<Name>.svelte # pure: $props → markup, data-testid, no fetch
+  components/<Name>.svelte # pure: $props → markup, data-testid, no fetch — 1 composant = 1 fichier
   pages/<Name>.test.ts + components/<Name>.test.ts   # colocalized vitest
   test/setup.ts            # jest-dom + reset store toasts
 ```
+
+### 1 composant = 1 fichier
+
+Source of truth: `.opencode/rules/08-struct-folder.md` § Frontend — un fichier `.svelte` = un seul composant; un composant regroupant = `import` + `<A /><B />` uniquement, zéro logique.
 
 ### Adding a page/component
 

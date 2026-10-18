@@ -2,7 +2,8 @@
 
 > Skills de référence:
 >
-> - Structure: `.opencode/skills/backend-structure/SKILL.md` (trigger `backend/src/`)
+> - Structure backend: `.opencode/skills/backend-structure/SKILL.md` (trigger `backend/src/`)
+> - Structure frontend: `.opencode/skills/frontend-structure/SKILL.md` (trigger `frontend/src`)
 > - VO: `.opencode/rules/05-value-objects.md`
 
 ## Objectif
@@ -36,6 +37,17 @@ Helper de test → `src/test_helpers/` (1 helper = 1 fichier, règle `10-test-he
 
 Exemples standards: `env/` (`Env`/`EnvError`), `domain/groups/group/` (`Group`/`GroupError`), `domain/groups/members/` (`Members`/`MembersError`), VOs `users/uid/` (`Uid`/`UidError`).
 
+### Frontend — 1 composant = 1 fichier
+
+Symétrique du backend (skills `frontend-structure` + `frontend-format`) :
+
+```text
+frontend/src/components/<Name>.svelte   # 1 composant visible = 1 fichier: markup + logique locale seule
+frontend/src/components/<Name>.test.ts  # test vitest collocalisé
+```
+
+- Un composant purement regroupant (ex: `ThemeLangControls.svelte`) ne contient que `import` + `<A /><B />` — zéro logique, zéro markup; chaque sous-composant a son fichier et son test (`ThemeToggle.svelte`, `LangSelect.svelte`).
+
 ## Interdits
 
 - `pub enum <Struct>Error` dans le même fichier que `pub struct <Struct>` → toujours `errors.rs`.
@@ -54,4 +66,7 @@ rg -n "allow\(clippy::module_inception\)" backend/src # doit être vide
 
 devenv shell -- cargo clippy -- -D warnings
 devenv shell -- cargo test
+
+# frontend: chaque .svelte doit compter exactement 1 <script> (2 composants racines = hors règle)
+rg -c "<script" frontend/src/components
 ```

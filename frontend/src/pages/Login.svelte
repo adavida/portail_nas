@@ -1,5 +1,6 @@
 <script lang="ts">
   import { loginWithPassword } from "../api/oidc";
+  import ThemeLangControls from "../components/ThemeLangControls.svelte";
   import { t, translate } from "../i18n";
   import "./Login.scss";
 
@@ -77,4 +78,8 @@
       {$t("login.submit")}
     </button>
   </form>
+
+  <div class="login-settings">
+    <ThemeLangControls />
+  </div>
 </div>

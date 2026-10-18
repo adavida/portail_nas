@@ -5,35 +5,20 @@
   import Login from "./pages/Login.svelte";
   import Users from "./pages/Users.svelte";
   import Toaster from "./components/Toaster.svelte";
+  import ThemeLangControls from "./components/ThemeLangControls.svelte";
   import { whoami } from "./api/auth";
   import { clearTokens, getToken, login, logout } from "./auth/oidc";
-  import { lang, t } from "./i18n";
+  import { t } from "./i18n";
   import "./App.scss";
-
-  type Theme = "light" | "dark";
 
   const isCallback = window.location.pathname === "/callback";
   const isLogin = window.location.pathname === "/login";
-
-  function initialTheme(): Theme {
-    const saved = localStorage.getItem("theme");
-    if (saved === "light" || saved === "dark") return saved;
-    return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches
-      ? "dark"
-      : "light";
-  }
 
   let tab = $state<"home" | "users" | "groups">("home");
   let menuOpen = $state(false);
   let checked = $state(false);
   let admin = $state(false);
-  let theme = $state<Theme>(initialTheme());
   const token = getToken();
-
-  $effect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem("theme", theme);
-  });
 
   $effect(() => {
     // isLogin: never auto-login here, otherwise authorize → /login → effect →
@@ -137,27 +122,7 @@
           {/if}
         </nav>
         <div class="sidebar-spacer"></div>
-        <button
-          class="nav-item theme-toggle"
-          role="switch"
-          aria-checked={theme === "dark"}
-          data-testid="theme-toggle"
-          onclick={() => (theme = theme === "dark" ? "light" : "dark")}
-        >
-          <span>{theme === "dark" ? $t("nav.theme_dark") : $t("nav.theme_light")}</span>
-          <span class="theme-toggle-track" aria-hidden="true">
-            <span class="theme-toggle-thumb"></span>
-          </span>
-        </button>
-        <select
-          class="lang-select"
-          data-testid="lang-select"
-          aria-label={$t("nav.lang")}
-          bind:value={$lang}
-        >
-          <option value="fr">🇫🇷 FR</option>
-          <option value="en">🇺🇸 EN</option>
-        </select>
+        <ThemeLangControls />
         <button class="nav-item logout" data-testid="logout" onclick={logout}>
           {$t("nav.logout")}
         </button>

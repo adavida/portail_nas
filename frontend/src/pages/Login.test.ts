@@ -40,6 +40,15 @@ afterEach(() => {
   });
 });
 
+test("shows theme and language controls in the corner", () => {
+  stubLocation("?req=flow-1");
+
+  render(Login);
+
+  expect(screen.getByTestId("theme-toggle")).toBeInTheDocument();
+  expect(screen.getByTestId("lang-select")).toBeInTheDocument();
+});
+
 test("200 redirects to the provider callback URL", async () => {
   stubLocation("?req=flow-1");
   mockLoginResponse(200, {

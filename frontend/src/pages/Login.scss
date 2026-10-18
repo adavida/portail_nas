@@ -25,3 +25,14 @@
   color: var(--c-danger);
   font-size: $fs-sm;
 }
+
+.login-settings {
+  position: fixed;
+  bottom: $s-16;
+  left: $s-16;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $s-4;
+  max-width: $sidebar-w;
+}
