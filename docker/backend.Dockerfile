@@ -1,9 +1,11 @@
 # Image backend du portail (multi-stage : build Rust -> runtime debian slim).
 # Variables obligatoires a fournir au run (cf. backend/src/env/mod.rs) :
-#   OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_REDIRECT_URI,
+#   OIDC_ISSUER_URL, OIDC_CLIENT_ID, OIDC_SECRETS_DIR, OIDC_REDIRECT_URI,
 #   APP_URL, LDAP_URL, LDAP_BASE_DN
-# OIDC_CLIENT_SECRET et LDAP_ADMIN_PW sont des CHEMINS de fichiers dont le
-# contenu est le secret (monter les secrets, jamais d'ENV en clair).
+# OIDC_SECRETS_DIR est un repertoire ecribable par le user du process : le
+# portail y genere la cle de signature et clients.json au premier start.
+# LDAP_ADMIN_PW est un CHEMIN de fichier dont le contenu est le secret
+# (monter les secrets, jamais d'ENV en clair).
 # Optionnel : LDAP_PEOPLE_OU (people), LDAP_GROUPS_OU (groups),
 # LDAP_ADMIN_PW (admin), LDAP_TLS_CA (pem CA pour LDAPS), BIND_ADDR (0.0.0.0:3000).
 
@@ -30,7 +32,9 @@ FROM docker.io/library/debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libssl3 ca-certificates tini \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 --shell /usr/sbin/nologin portail
+    && useradd --system --uid 10001 --shell /usr/sbin/nologin portail \
+    && mkdir -p /oidc-secrets \
+    && chown 10001:10001 /oidc-secrets
 
 COPY --from=build /app/target/release/portail-backend /usr/local/bin/portail-backend
 

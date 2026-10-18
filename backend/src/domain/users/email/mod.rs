@@ -9,17 +9,17 @@ pub struct Email(String);
 
 impl Email {
     pub fn try_new(raw: String) -> Result<Self, EmailError> {
-        let s = raw.trim().to_string();
-        if s.is_empty() {
-            return Ok(Self(s));
+        let trimmed = raw.trim().to_string();
+        if trimmed.is_empty() {
+            return Ok(Self(trimmed));
         }
-        if s.len() > 254 {
+        if trimmed.len() > 254 {
             return Err(EmailError::InvalidFormat);
         }
-        if !s.contains('@') || !s.contains('.') {
+        if !trimmed.contains('@') || !trimmed.contains('.') {
             return Err(EmailError::InvalidFormat);
         }
-        Ok(Self(s))
+        Ok(Self(trimmed))
     }
 
     pub fn as_str(&self) -> &str {
@@ -29,8 +29,8 @@ impl Email {
 
 impl<'de> Deserialize<'de> for Email {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        Self::try_new(s).map_err(serde::de::Error::custom)
+        let raw = String::deserialize(deserializer)?;
+        Self::try_new(raw).map_err(serde::de::Error::custom)
     }
 }
 

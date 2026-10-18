@@ -11,6 +11,11 @@ impl IntoResponse for AppError {
                 let body = Json(json!({"error": m}));
                 return (StatusCode::NOT_FOUND, body).into_response();
             }
+            Self::BadRequest(m) => {
+                tracing::warn!("400 {}", m);
+                let body = Json(json!({"error": m}));
+                return (StatusCode::BAD_REQUEST, body).into_response();
+            }
             Self::Unauthorized(m) => {
                 tracing::warn!("401 {}", m);
                 let body = Json(json!({"error": m}));

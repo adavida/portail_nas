@@ -3,7 +3,7 @@
 { pkgs }:
 {
   appUrl ? "http://localhost:5173",
-  oidcIssuerUrl ? "https://127.0.0.1:9091",
+  oidcIssuerUrl ? "http://127.0.0.1:3000",
   oidcRedirectUri ? "http://localhost:5173/callback",
   appLang ? "en",
 }:

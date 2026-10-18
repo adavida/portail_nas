@@ -50,7 +50,9 @@ export function installAuthFetch() {
       resp.status === 401 &&
       !String(input).includes("/api/auth/config") &&
       !String(input).includes("/api/auth/callback") &&
-      !String(input).includes("/api/auth/me")
+      !String(input).includes("/api/auth/me") &&
+      // The login page renders its own inline error on 401 — do not hijack it.
+      !String(input).includes("/api/oidc/login")
     ) {
       if (sessionStorage.getItem("login_in_progress") !== "1") {
         clearTokens();
@@ -79,9 +81,9 @@ function b64url(bytes: Uint8Array): string {
     .replace(/=+$/, "");
 }
 
-// PKCE S256: Authelia exige un code_challenge pour l'authorization_code flow.
-// Sauve le verifier en sessionStorage — `login()` le crée, `handleCallback()`
-// l'envoie au backend qui le passe à l'endpoint token.
+// PKCE S256: the provider requires a code_challenge for the authorization_code flow.
+// Stores the verifier in sessionStorage — `login()` creates it, `handleCallback()`
+// sends it to the backend which passes it to the token endpoint.
 async function savePkce(): Promise<string> {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const digest = await crypto.subtle.digest(
@@ -97,7 +99,7 @@ export async function login() {
   const state =
     globalThis.crypto?.randomUUID?.() ??
     Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-  // Authelia exige state >= 8 chars
+  // the provider requires state >= 8 chars
   const safeState = state.replace(/-/g, "").slice(0, 32).padEnd(16, "0");
   sessionStorage.setItem("oidc_state", safeState);
   const challenge = await savePkce();
@@ -136,9 +138,9 @@ export async function logout() {
   const { OIDC_ISSUER_URL, APP_URL } = await import("../env");
   clearTokens();
   sessionStorage.setItem("logged_out", "1");
-  // Navigation top-level vers le /logout natif d'Authelia: same-site donc
-  // session cookie envoyé, le portal POST /api/logout lui-même (iframe POST
-  // cross-site = cookie SameSite=Lax non envoyé = session survivait).
-  // `rd` doit matcher le domaine du cookie (127.0.0.1) pour revenir au portail.
+  // Top-level navigation to the provider's native /logout: same-site so the
+  // session cookie is sent; the portal POST /api/logout itself (iframe POST
+  // cross-site = SameSite=Lax cookie not sent = session survived).
+  // `rd` must match the cookie domain (127.0.0.1) to come back to the portal.
   window.location.href = `${OIDC_ISSUER_URL}/logout?rd=${encodeURIComponent(`${APP_URL}/`)}`;
 }

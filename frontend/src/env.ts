@@ -20,7 +20,7 @@ export function createEnv(
     return v;
   };
 
-  // Optionnel — langue de l'interface, défaut "en" (cf. i18n.ts).
+  // Optional — UI language, defaults to "en" (see i18n.ts).
   const appLangRaw = (get("APP_LANG") ?? "").trim();
   const appLang = appLangRaw || "en";
 

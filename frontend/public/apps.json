@@ -1,13 +1,18 @@
 [
   {
-    "name": "Authelia",
-    "url": "https://127.0.0.1:9091/",
-    "description": "Portail SSO et gestion des sessions",
+    "name": "Vaultwarden",
+    "url": "http://127.0.0.1:8080/",
+    "description": "Gestionnaire de mots de passe",
     "icon": null
   },
   {
     "name": "Grafana",
     "url": "http://127.0.0.1:3001/",
     "description": "Dashboards et alerting"
+  },
+  {
+    "name": "Fournisseur OIDC",
+    "url": "http://127.0.0.1:3000",
+    "description": "Discovery, JWKS et login du portail"
   }
 ]

@@ -12,6 +12,8 @@ pub struct Claims {
     pub email: Option<String>,
     #[serde(default)]
     pub preferred_username: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
 }
 
 impl Claims {

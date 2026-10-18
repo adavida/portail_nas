@@ -1,5 +1,5 @@
-// Primitives partagées par plusieurs composants (utilisées à ≥2 endroits).
-// Les styles propres à un seul composant vivent dans son .scss colocated.
+// Primitives shared by several components (used in >=2 places).
+// Styles specific to a single component live in its colocated .scss.
 @use "tokens" as *;
 
 .btn {
@@ -129,7 +129,7 @@
   }
 
   @media (max-width: $bp-narrow) {
-    font-size: 1rem; // évite le zoom iOS < 16px
+    font-size: 1rem; // avoids iOS zoom < 16px
   }
 }
 

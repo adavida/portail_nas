@@ -44,6 +44,11 @@ async fn protected_endpoints_return_401_without_token() {
         ),
         (Method::DELETE, "/api/groups/somegid/members/someuid", None),
         (Method::GET, "/api/auth/me", None),
+        (
+            Method::POST,
+            "/api/auth/oidc-test",
+            Some(json!({ "client_id": "portail-dev" })),
+        ),
     ];
 
     for (method, uri, body) in protected {

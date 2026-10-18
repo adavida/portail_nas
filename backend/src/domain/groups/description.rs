@@ -16,8 +16,8 @@ impl Description {
 
 impl<'de> Deserialize<'de> for Description {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        Ok(Self::try_new(s))
+        let raw = String::deserialize(deserializer)?;
+        Ok(Self::try_new(raw))
     }
 }
 

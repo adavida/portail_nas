@@ -9,9 +9,9 @@ async fn main() {
         )
         .init();
     tracing::info!("start ... ... portail");
-    // Validate env once at startup — aggregated error if any var missing/empty.
     let env = Env::create().unwrap_or_else(|e| panic!("{e}"));
     env.log_summary();
+    portail_backend::auth::secrets::ensure(&env).unwrap_or_else(|e| panic!("{e}"));
     let bind = env.bind_addr.clone();
     Env::set(env);
     let app = app();

@@ -16,7 +16,7 @@
 
   let { group, canDelete, onClose, onUpdated, onDeleted }: Props = $props();
 
-  // draft initialisé une fois : le modal est remonté à chaque ouverture
+  // draft initialized once: the modal is remounted on each opening
   let name = $state(untrack(() => group.name));
   let description = $state(untrack(() => group.description));
   let confirmDelete = $state(false);

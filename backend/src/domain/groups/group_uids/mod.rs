@@ -1,7 +1,7 @@
 use super::Gid;
 use crate::domain::users::{Uid, User};
 
-/// Association `gid` -> membres, telle que rapportée par LDAP (cn + DNs member).
+/// `gid` -> members association, as reported by LDAP (cn + member DNs).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GroupUids {
     pub gid: Gid,

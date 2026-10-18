@@ -7,8 +7,9 @@ use std::sync::OnceLock;
 pub struct Env {
     pub oidc_issuer_url: String,
     pub oidc_client_id: String,
-    pub oidc_client_secret: String,
     pub oidc_redirect_uri: String,
+    pub oidc_secrets_dir: String,
+    pub oidc_key_bits: usize,
     pub app_url: String,
     pub bind_addr: String,
     pub ldap_url: String,
@@ -23,8 +24,10 @@ pub struct Env {
 
 static ENV: OnceLock<Env> = OnceLock::new();
 
-/// Secret vars (`OIDC_CLIENT_SECRET`, `LDAP_ADMIN_PW`) hold the **path** of a
-/// file whose content is the secret. Trims whitespace/newline around the content.
+pub const DEFAULT_KEY_BITS: usize = 2048;
+
+/// Secret vars (`LDAP_ADMIN_PW`) hold the **path** of a file whose content is
+/// the secret. Trims whitespace/newline around the content.
 fn read_secret(name: &'static str) -> Option<Result<String, String>> {
     let path = std::env::var(name).ok()?;
     let path = path.trim();
@@ -53,6 +56,7 @@ impl Env {
     pub fn create() -> Result<Self, EnvError> {
         let mut missing: Vec<&'static str> = Vec::new();
         let mut file_errors: Vec<String> = Vec::new();
+        let mut invalid: Vec<String> = Vec::new();
 
         let take = |name: &'static str, missing: &mut Vec<&'static str>| -> String {
             match std::env::var(name) {
@@ -64,7 +68,6 @@ impl Env {
             }
         };
 
-        // Optional: absent/empty value falls back to the documented default.
         let take_opt = |name: &'static str, default: &str| -> String {
             std::env::var(name)
                 .ok()
@@ -73,24 +76,6 @@ impl Env {
                 .unwrap_or_else(|| default.to_string())
         };
 
-        // Secret: var value is a path whose file content is the value.
-        let take_secret = |name: &'static str,
-                           missing: &mut Vec<&'static str>,
-                           file_errors: &mut Vec<String>|
-         -> String {
-            match read_secret(name) {
-                Some(Ok(v)) => v,
-                Some(Err(e)) => {
-                    file_errors.push(e);
-                    String::new()
-                }
-                None => {
-                    missing.push(name);
-                    String::new()
-                }
-            }
-        };
-        // Optional secret: absent -> default; broken file -> reported like required.
         let take_secret_opt =
             |name: &'static str, default: &str, file_errors: &mut Vec<String>| -> String {
                 match read_secret(name) {
@@ -105,7 +90,15 @@ impl Env {
 
         let oidc_issuer_url = take("OIDC_ISSUER_URL", &mut missing);
         let oidc_client_id = take("OIDC_CLIENT_ID", &mut missing);
-        let oidc_client_secret = take_secret("OIDC_CLIENT_SECRET", &mut missing, &mut file_errors);
+        let oidc_secrets_dir = take("OIDC_SECRETS_DIR", &mut missing);
+        let oidc_key_bits =
+            match take_opt("OIDC_KEY_BITS", &DEFAULT_KEY_BITS.to_string()).parse::<usize>() {
+                Ok(n) => n,
+                Err(e) => {
+                    invalid.push(format!("OIDC_KEY_BITS: {e}"));
+                    DEFAULT_KEY_BITS
+                }
+            };
         let oidc_redirect_uri = take("OIDC_REDIRECT_URI", &mut missing);
         let app_url = take("APP_URL", &mut missing);
         let bind_addr = take("BIND_ADDR", &mut missing);
@@ -128,12 +121,19 @@ impl Env {
                 file_errors.join("; ")
             )));
         }
+        if !invalid.is_empty() {
+            return Err(EnvError(format!(
+                "invalid env values: {}. set them in devenv.nix env",
+                invalid.join("; ")
+            )));
+        }
 
         Ok(Self {
             oidc_issuer_url,
             oidc_client_id,
-            oidc_client_secret,
             oidc_redirect_uri,
+            oidc_secrets_dir,
+            oidc_key_bits,
             app_url,
             bind_addr,
             ldap_url,
@@ -145,13 +145,14 @@ impl Env {
         })
     }
 
-    /// Logs every value at startup for production debugging. The secret vars
-    /// hold file paths (never the secret itself), so the full readout is safe.
+    /// Logs the non-secret values at startup for production debugging. Secret
+    /// contents are never logged, only the paths that hold them.
     pub fn log_summary(&self) {
         tracing::info!(
             oidc_issuer_url = %self.oidc_issuer_url,
             oidc_client_id = %self.oidc_client_id,
-            oidc_client_secret = %self.oidc_client_secret,
+            oidc_secrets_dir = %self.oidc_secrets_dir,
+            oidc_key_bits = %self.oidc_key_bits,
             oidc_redirect_uri = %self.oidc_redirect_uri,
             app_url = %self.app_url,
             bind_addr = %self.bind_addr,
@@ -159,7 +160,7 @@ impl Env {
             ldap_base_dn = %self.ldap_base_dn,
             ldap_people_ou = %self.ldap_people_ou,
             ldap_groups_ou = %self.ldap_groups_ou,
-            ldap_admin_pw = %self.ldap_admin_pw,
+            ldap_admin_pw_configured = %!self.ldap_admin_pw.is_empty(),
             ldap_tls_ca = %self.ldap_tls_ca,
             "backend env loaded"
         );
@@ -190,22 +191,31 @@ impl Env {
     }
 
     fn from_compile_fallback() -> Self {
-        // ponytail: secret vars hold paths at runtime; when vars are missing
-        // (test fallback) we return literal dev secrets — a set-but-unreadable
-        // secret file silently degrades to the dev default. Prod fails at `create()`.
+        // ponytail: test fallback outside devenv — the secrets dir points to a
+        // temp path where the portal generates key + clients file on first use.
         Self {
             oidc_issuer_url: option_env!("OIDC_ISSUER_URL")
-                .unwrap_or("https://127.0.0.1:9091")
+                .unwrap_or("http://127.0.0.1:3000")
                 .to_string(),
             oidc_client_id: option_env!("OIDC_CLIENT_ID")
                 .unwrap_or("portail-dev")
                 .to_string(),
-            oidc_client_secret: option_env!("OIDC_CLIENT_SECRET")
-                .unwrap_or("portail-dev-secret")
-                .to_string(),
             oidc_redirect_uri: option_env!("OIDC_REDIRECT_URI")
                 .unwrap_or("http://localhost:5173/callback")
                 .to_string(),
+            oidc_secrets_dir: option_env!("OIDC_SECRETS_DIR")
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| {
+                    format!(
+                        "{}/portail-oidc-secrets-{}",
+                        std::env::temp_dir().display(),
+                        std::process::id()
+                    )
+                }),
+            oidc_key_bits: option_env!("OIDC_KEY_BITS")
+                .and_then(|s| s.trim().parse::<usize>().ok())
+                .unwrap_or(DEFAULT_KEY_BITS),
             app_url: option_env!("APP_URL")
                 .unwrap_or("http://localhost:5173")
                 .to_string(),
@@ -218,7 +228,6 @@ impl Env {
             ldap_base_dn: option_env!("LDAP_BASE_DN")
                 .unwrap_or("dc=dev,dc=example,dc=com")
                 .to_string(),
-            // Optional vars: standard LDAP infra defaults.
             ldap_people_ou: option_env!("LDAP_PEOPLE_OU")
                 .unwrap_or("people")
                 .to_string(),
@@ -249,13 +258,13 @@ mod tests {
     use std::sync::Mutex;
     static LOCK: Mutex<()> = Mutex::new(());
 
-    /// Set all required vars (except `secret`) to fixed values; secret override is
-    /// set by the test itself. Returns the saved values to restore afterwards.
-    fn save_and_set_all(secret: (&'static str, String)) -> Vec<(String, Option<String>)> {
+    /// Set all required vars to fixed values (secrets dir = fresh temp path).
+    /// Returns the saved values to restore afterwards.
+    fn save_and_set_all() -> Vec<(String, Option<String>)> {
         let names = [
             "OIDC_ISSUER_URL",
             "OIDC_CLIENT_ID",
-            secret.0,
+            "OIDC_SECRETS_DIR",
             "OIDC_REDIRECT_URI",
             "APP_URL",
             "BIND_ADDR",
@@ -267,10 +276,11 @@ mod tests {
             .iter()
             .map(|k| (k.to_string(), std::env::var(k).ok()))
             .collect();
+        let secrets_dir = format!("/tmp/portail-test-env-{}", std::process::id());
         for (k, v) in [
-            ("OIDC_ISSUER_URL", "https://127.0.0.1:9091"),
+            ("OIDC_ISSUER_URL", "http://127.0.0.1:3000"),
             ("OIDC_CLIENT_ID", "portail-dev"),
-            (secret.0, &secret.1),
+            ("OIDC_SECRETS_DIR", &secrets_dir),
             ("OIDC_REDIRECT_URI", "http://localhost:5173/callback"),
             ("APP_URL", "http://localhost:5173"),
             ("BIND_ADDR", "0.0.0.0:3000"),
@@ -299,7 +309,7 @@ mod tests {
         let vars = [
             "OIDC_ISSUER_URL",
             "OIDC_CLIENT_ID",
-            "OIDC_CLIENT_SECRET",
+            "OIDC_SECRETS_DIR",
             "OIDC_REDIRECT_URI",
             "APP_URL",
             "BIND_ADDR",
@@ -354,11 +364,13 @@ mod tests {
             std::env::var("LDAP_GROUPS_OU").ok(),
             std::env::var("LDAP_ADMIN_PW").ok(),
             std::env::var("LDAP_TLS_CA").ok(),
+            std::env::var("OIDC_KEY_BITS").ok(),
         );
         unsafe { std::env::remove_var("LDAP_PEOPLE_OU") };
         unsafe { std::env::remove_var("LDAP_GROUPS_OU") };
         unsafe { std::env::remove_var("LDAP_ADMIN_PW") };
         unsafe { std::env::remove_var("LDAP_TLS_CA") };
+        unsafe { std::env::remove_var("OIDC_KEY_BITS") };
 
         let env = super::Env::create().unwrap();
 
@@ -366,6 +378,11 @@ mod tests {
         assert_eq!(env.ldap_groups_ou, "groups", "default groups OU expected");
         assert_eq!(env.ldap_admin_pw, "admin", "default admin pw expected");
         assert_eq!(env.ldap_tls_ca, "", "default empty TLS CA expected");
+        assert_eq!(
+            env.oidc_key_bits,
+            super::DEFAULT_KEY_BITS,
+            "default RSA key size expected"
+        );
 
         if let Some(v) = saved.0 {
             unsafe { std::env::set_var("LDAP_PEOPLE_OU", v) };
@@ -378,6 +395,9 @@ mod tests {
         }
         if let Some(v) = saved.3 {
             unsafe { std::env::set_var("LDAP_TLS_CA", v) };
+        }
+        if let Some(v) = saved.4 {
+            unsafe { std::env::set_var("OIDC_KEY_BITS", v) };
         }
     }
 
@@ -416,51 +436,70 @@ mod tests {
     }
 
     #[test]
-    fn secret_vars_read_file_content() {
+    fn required_oidc_secrets_dir_is_reported() {
         let _g = LOCK.lock().unwrap();
-        let secret_file =
-            std::env::temp_dir().join(format!("portail-oidc-secret-{}", std::process::id()));
+        let saved = std::env::var("OIDC_SECRETS_DIR").ok();
+        unsafe { std::env::remove_var("OIDC_SECRETS_DIR") };
+
+        let err = super::Env::create().unwrap_err();
+
+        assert!(
+            err.0.contains("OIDC_SECRETS_DIR"),
+            "missing secrets dir should be reported: {err}"
+        );
+
+        if let Some(v) = saved {
+            unsafe { std::env::set_var("OIDC_SECRETS_DIR", v) };
+        }
+    }
+
+    #[test]
+    fn oidc_key_bits_custom_and_invalid() {
+        let _g = LOCK.lock().unwrap();
+        let saved = std::env::var("OIDC_KEY_BITS").ok();
+        unsafe { std::env::set_var("OIDC_KEY_BITS", "4096") };
+
+        let env = super::Env::create().unwrap();
+
+        assert_eq!(env.oidc_key_bits, 4096, "custom key size expected");
+
+        unsafe { std::env::set_var("OIDC_KEY_BITS", "not-a-number") };
+        let err = super::Env::create().unwrap_err();
+
+        assert!(
+            err.0.contains("OIDC_KEY_BITS"),
+            "non-numeric value should be reported: {err}"
+        );
+
+        match saved {
+            Some(v) => unsafe { std::env::set_var("OIDC_KEY_BITS", v) },
+            None => unsafe { std::env::remove_var("OIDC_KEY_BITS") },
+        }
+    }
+
+    #[test]
+    fn optional_secret_reads_file_content_and_reports_broken_file() {
+        let _g = LOCK.lock().unwrap();
         let pw_file = std::env::temp_dir().join(format!("portail-ldap-pw-{}", std::process::id()));
-        std::fs::write(&secret_file, "portail-dev-secret\n").unwrap();
         std::fs::write(&pw_file, "p4ss\n").unwrap();
-        let saved = save_and_set_all((
-            "OIDC_CLIENT_SECRET",
-            secret_file.to_str().unwrap().to_string(),
-        ));
+        let saved = save_and_set_all();
         unsafe { std::env::set_var("LDAP_ADMIN_PW", pw_file.to_str().unwrap()) };
 
         let env = super::Env::create().unwrap();
 
         assert_eq!(
-            env.oidc_client_secret, "portail-dev-secret",
-            "file content (newline trimmed) should be the secret"
-        );
-        assert_eq!(
             env.ldap_admin_pw, "p4ss",
-            "optional secret file read expected"
+            "optional secret file content (newline trimmed) expected"
         );
 
-        restore_env(saved);
-        let _ = std::fs::remove_file(&secret_file);
-        let _ = std::fs::remove_file(&pw_file);
-    }
-
-    #[test]
-    fn secret_file_error_is_reported() {
-        let _g = LOCK.lock().unwrap();
-        let missing_path = std::env::temp_dir().join("portail-no-such-secret-file");
-        let saved = save_and_set_all((
-            "OIDC_CLIENT_SECRET",
-            missing_path.to_str().unwrap().to_string(),
-        ));
-
+        unsafe { std::env::set_var("LDAP_ADMIN_PW", "/tmp/portail-no-such-secret-file") };
         let err = super::Env::create().unwrap_err();
-
         assert!(
-            err.0.contains("OIDC_CLIENT_SECRET") && err.0.contains("cannot read secret file"),
+            err.0.contains("LDAP_ADMIN_PW") && err.0.contains("cannot read secret file"),
             "unreadable secret file should be reported: {err}"
         );
 
         restore_env(saved);
+        let _ = std::fs::remove_file(&pw_file);
     }
 }

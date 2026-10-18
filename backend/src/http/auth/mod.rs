@@ -7,6 +7,7 @@ use crate::{auth::middleware::AuthUser, env::Env};
 
 pub mod callback;
 pub mod config;
+pub mod oidc_test;
 
 pub fn auth_router(env: Env) -> Router<Env> {
     Router::new()
@@ -16,7 +17,9 @@ pub fn auth_router(env: Env) -> Router<Env> {
 }
 
 pub fn protected_auth_router() -> Router<Env> {
-    Router::new().route("/me", get(me))
+    Router::new()
+        .route("/me", get(me))
+        .route("/oidc-test", post(oidc_test::oidc_test))
 }
 
 pub async fn me(Extension(AuthUser(claims)): Extension<AuthUser>) -> Json<serde_json::Value> {

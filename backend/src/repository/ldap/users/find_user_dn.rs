@@ -6,9 +6,9 @@ use crate::{
     repository::ldap::{MapLdap, people_search_base},
 };
 
-/// Retourne le DN reel de l'entree portant `uid=<uid>` sous `ou=people`.
-/// Les entrees heritees peuvent avoir un RDN `cn=...` : seul un search
-/// retrouve le DN exact, d'ou cette fonction au lieu de construire le DN.
+/// Returns the real DN of the entry holding `uid=<uid>` under `ou=people`.
+/// Inherited entries may have a `cn=...` RDN: only a search
+/// finds the exact DN, hence this function instead of building the DN.
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn find_user_dn(ldap: &mut ldap3::Ldap, uid: &Uid) -> Result<String, AppError> {
     let filter = format!("(uid={})", uid.as_str());
@@ -56,7 +56,7 @@ mod tests {
     #[tokio::test]
     async fn find_user_dn_not_found_for_missing_uid() {
         let Ok(mut ldap) = connect().await else {
-            return; // LDAP indisponible => skip
+            return; // LDAP unavailable => skip
         };
         let uid = gen_uid("fdnko");
 
@@ -82,7 +82,7 @@ mod tests {
     #[tokio::test]
     async fn find_user_dn_finds_entry_with_cn_rdn() {
         let Ok(mut ldap) = connect().await else {
-            return; // LDAP indisponible => skip
+            return; // LDAP unavailable => skip
         };
         let uid = gen_uid("fdncn");
         let dn = format!(
@@ -113,7 +113,7 @@ mod tests {
 
         if ldap.add(&dn, attrs).await.is_err() {
             let _ = ldap.unbind().await;
-            return; // add impossible (contraintes) => skip
+            return; // add impossible (constraints) => skip
         }
 
         let found = find_user_dn(&mut ldap, &uid).await;

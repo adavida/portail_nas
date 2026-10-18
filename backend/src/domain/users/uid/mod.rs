@@ -9,19 +9,19 @@ pub struct Uid(String);
 
 impl Uid {
     pub fn try_new(raw: String) -> Result<Self, UidError> {
-        let s = raw.trim().to_string();
-        if s.is_empty() {
+        let trimmed = raw.trim().to_string();
+        if trimmed.is_empty() {
             return Err(UidError::Empty);
         }
-        if s.len() < 2 || s.len() > 32 {
+        if trimmed.len() < 2 || trimmed.len() > 32 {
             return Err(UidError::InvalidFormat);
         }
-        if !s.chars().all(|c| {
+        if !trimmed.chars().all(|c| {
             c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '_' || c == '-'
         }) {
             return Err(UidError::InvalidFormat);
         }
-        Ok(Self(s))
+        Ok(Self(trimmed))
     }
 
     pub fn as_str(&self) -> &str {
@@ -31,8 +31,8 @@ impl Uid {
 
 impl<'de> Deserialize<'de> for Uid {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        Self::try_new(s).map_err(serde::de::Error::custom)
+        let raw = String::deserialize(deserializer)?;
+        Self::try_new(raw).map_err(serde::de::Error::custom)
     }
 }
 

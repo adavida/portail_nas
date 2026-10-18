@@ -7,9 +7,9 @@ test("loading then apps list", async () => {
   globalThis.fetch = mockFetchByUrl({
     "/apps.json": [
       {
-        name: "Authelia",
-        url: "https://127.0.0.1:9091/",
-        description: "SSO",
+        name: "Nextcloud",
+        url: "https://cloud.example/",
+        description: "Files",
         icon: null,
       },
     ],
@@ -21,8 +21,8 @@ test("loading then apps list", async () => {
 
   const link = await screen.findByTestId("app-link-0");
 
-  expect(link).toHaveTextContent("Authelia");
-  expect(link).toHaveAttribute("href", "https://127.0.0.1:9091/");
+  expect(link).toHaveTextContent("Nextcloud");
+  expect(link).toHaveAttribute("href", "https://cloud.example/");
 });
 
 test("empty shows message", async () => {

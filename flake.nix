@@ -1,5 +1,5 @@
 {
-  description = "Portail — backend Rust axum + frontend React Vite, NixOS module (backend service only — nginx/OpenLDAP/Authelia provisioned by the host)";
+  description = "Portail — backend Rust axum + frontend React Vite, NixOS module (backend service only — nginx/OpenLDAP provisioned by the host)";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 

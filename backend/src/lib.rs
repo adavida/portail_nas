@@ -162,8 +162,8 @@ mod tests {
             assert_eq!(apitest1["name"], "Api Test1");
             assert_eq!(apitest1["email"], "apitest1@example.com");
 
-            // Cleanup: la base test reste propre après la run
-            // (les seeds ne passeront pas par la purge du binaire lib).
+            // Cleanup: the test base stays clean after the run
+            // (the seeds won't go through the lib binary purge).
             if let Ok((conn, mut l2)) = ldap3::LdapConnAsync::new(&url).await {
                 ldap3::drive!(conn);
                 let _ = l2.simple_bind(&format!("cn=admin,{base}"), "admin").await;

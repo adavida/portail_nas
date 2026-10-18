@@ -1,0 +1,95 @@
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use jsonwebtoken::{DecodingKey, EncodingKey};
+use rsa::{
+    RsaPrivateKey,
+    pkcs1::{DecodeRsaPrivateKey, EncodeRsaPrivateKey},
+    pkcs8::DecodePrivateKey,
+    traits::PublicKeyParts,
+};
+use std::sync::OnceLock;
+
+pub const KID: &str = "portail-1";
+
+/// OIDC provider RSA key — private to sign, public to verify
+/// and expose in the JWKS.
+#[derive(Debug)]
+pub struct SigningKey {
+    encoding: EncodingKey,
+    decoding: DecodingKey,
+    pub kid: String,
+    pub n: String,
+    pub e: String,
+}
+
+impl SigningKey {
+    pub fn from_pem(pem: &str) -> Result<Self, String> {
+        let key = RsaPrivateKey::from_pkcs8_pem(pem)
+            .or_else(|_| RsaPrivateKey::from_pkcs1_pem(pem))
+            .map_err(|e| format!("invalid RSA signing key: {e}"))?;
+        let der = key
+            .to_pkcs1_der()
+            .map_err(|e| format!("cannot encode signing key: {e}"))?;
+        let n = URL_SAFE_NO_PAD.encode(key.n().to_bytes_be());
+        let e = URL_SAFE_NO_PAD.encode(key.e().to_bytes_be());
+        Ok(Self {
+            encoding: EncodingKey::from_rsa_der(der.as_bytes()),
+            decoding: DecodingKey::from_rsa_components(&n, &e)
+                .map_err(|err| format!("invalid RSA components: {err}"))?,
+            kid: KID.to_string(),
+            n,
+            e,
+        })
+    }
+
+    pub fn encoding(&self) -> &EncodingKey {
+        &self.encoding
+    }
+
+    pub fn decoding(&self) -> &DecodingKey {
+        &self.decoding
+    }
+}
+
+static KEY: OnceLock<Option<SigningKey>> = OnceLock::new();
+
+/// Global key: generated if absent (`secrets::ensure`), read from the
+/// `OIDC_SECRETS_DIR` directory. `None` = inaccessible directory or invalid
+/// PEM.
+pub fn global() -> Option<&'static SigningKey> {
+    KEY.get_or_init(
+        || match crate::auth::secrets::read_key(crate::env::Env::global()) {
+            Ok(pem) => SigningKey::from_pem(&pem).ok(),
+            Err(e) => {
+                tracing::error!("{e}");
+                None
+            }
+        },
+    )
+    .as_ref()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_pem_rejects_garbage() {
+        let err = SigningKey::from_pem("not a pem").unwrap_err();
+
+        assert!(
+            err.contains("invalid RSA signing key"),
+            "garbage pem should be rejected: {err}"
+        );
+    }
+
+    #[test]
+    fn global_key_exposes_rsa_components() {
+        let Some(key) = global() else {
+            return;
+        };
+
+        assert_eq!(key.kid, KID, "kid should be the fixed provider kid");
+        assert!(!key.n.is_empty(), "modulus n should be base64url");
+        assert!(!key.e.is_empty(), "exponent e should be base64url");
+    }
+}

@@ -23,4 +23,3 @@ frontend/dist/
 
 # Docker secrets (générés par docker/gen-secrets.sh)
 docker/secrets/
-docker/authelia/config.yml

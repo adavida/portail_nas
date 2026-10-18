@@ -1,0 +1,27 @@
+@use "../styles/tokens" as *;
+
+.login {
+  display: grid;
+  place-content: center;
+  min-height: $viewport-h;
+  padding: $s-16;
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  gap: $s-12;
+  width: min($pct, $modal-w);
+
+  h3 {
+    margin: 0;
+    font-size: $fs-lg;
+    font-weight: $fw-bold;
+  }
+}
+
+.login-error {
+  margin: 0;
+  color: var(--c-danger);
+  font-size: $fs-sm;
+}

@@ -7,7 +7,7 @@
 Le README est court et strict: français d'abord, anglais ensuite (`**Français** | [English](#english)`), toujours les mêmes 3 sections dans cet ordre, dans chaque langue:
 
 1. **Une ligne** — le but, non technique: gérer les utilisateurs du NAS NixOS et afficher une page regroupant ses applications. Jamais plus d'une phrase d'intro, pas de stack dans cette ligne.
-2. **Déploiement NixOS (flake)** — snippet `flake.nix`/config hôte minimal utilisant `nixosModules.default` (`services.portail`), tableau des options, note secrets/Authelia en 1-2 phrases, checks `nix build` + `nix flake check`. Pas de provisioning Authelia/OpenLDAP complet ni de génération de secrets: la source de vérité reste `nixos/portail.nix` et `devenv.nix`.
+2. **Déploiement NixOS (flake)** — snippet `flake.nix`/config hôte minimal utilisant `nixosModules.default` (`services.portail`), tableau des options, note secrets générés (OIDC) en 1-2 phrases, checks `nix build` + `nix flake check`. Pas de provisioning OpenLDAP complet ni de génération de secrets: la source de vérité reste `nixos/portail.nix` et `devenv.nix`.
 3. **Développement** — un seul bloc de commandes: `devenv up`/`devenv down` + ports, scripts devenv (`openfrontend`, `resetUsers`), `just test`, `treefmt` (sans préfixe `devenv shell --`, l'environnement dev est déjà actif).
 
 ## Règles
@@ -19,7 +19,7 @@ Le README est court et strict: français d'abord, anglais ensuite (`**Français*
 
 ## Interdits
 
-- Bloc Authelia/OpenLDAP/secrets `openssl` complet dupliqué FR+EN.
+- Bloc OpenLDAP/secrets `openssl` complet dupliqué FR+EN.
 - Divergence FR ↔ EN (une section, option ou commande présente dans une seule langue).
 - Plus d'une ligne d'introduction.
 

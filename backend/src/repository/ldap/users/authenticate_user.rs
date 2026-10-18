@@ -16,13 +16,16 @@ pub async fn authenticate_user(uid: &Uid, password: Password) -> Result<bool, Ap
         Err(e) => return Err(e),
     };
 
-    let res = ldap.simple_bind(&dn, password.as_str()).await.map_ldap()?;
-    let rc = res.rc;
+    let bind_result = ldap.simple_bind(&dn, password.as_str()).await.map_ldap()?;
+    let rc = bind_result.rc;
     let _ = ldap.unbind().await;
     match rc {
         0 => Ok(true),
         49 => Ok(false),
-        _ => Err(AppError::Ldap(format!("bind rc {rc}: {}", res.text))),
+        _ => Err(AppError::Ldap(format!(
+            "bind rc {rc}: {}",
+            bind_result.text
+        ))),
     }
 }
 

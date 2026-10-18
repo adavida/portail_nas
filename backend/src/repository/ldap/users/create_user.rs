@@ -38,7 +38,7 @@ mod tests {
         let new = new_user(&uid, "Create Test", "c@ex.com", "pw");
         let created = create_user(new).await;
 
-        // LDAP indisponible => skip
+        // LDAP unavailable => skip
         let created = match created {
             Ok(u) => u,
             Err(AppError::Ldap(_)) => return,

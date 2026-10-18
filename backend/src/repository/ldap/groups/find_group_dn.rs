@@ -6,10 +6,10 @@ use crate::{
     repository::ldap::{MapLdap, groups_search_base},
 };
 
-/// Retourne le DN reel de l'entree portant `cn=<gid>` sous `ou=groups`.
-/// Les entrees heritees peuvent avoir un RDN different (ex: `o=...`) :
-/// seul un search retrouve le DN exact, d'ou cette fonction au lieu de
-/// construire le DN.
+/// Returns the real DN of the entry holding `cn=<gid>` under `ou=groups`.
+/// Inherited entries may have a different RDN (e.g. `o=...`):
+/// only a search finds the exact DN, hence this function instead of
+/// building the DN.
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn find_group_dn(ldap: &mut ldap3::Ldap, gid: &Gid) -> Result<String, AppError> {
     let filter = format!("(cn={})", gid.as_str());
@@ -62,7 +62,7 @@ mod tests {
     #[tokio::test]
     async fn find_group_dn_not_found_for_missing_gid() {
         let Ok(mut ldap) = connect().await else {
-            return; // LDAP indisponible => skip
+            return; // LDAP unavailable => skip
         };
         let gid = gen_gid("fgnko");
 
@@ -92,7 +92,7 @@ mod tests {
             None => return,
         };
         let Ok(mut ldap) = connect().await else {
-            return; // LDAP indisponible => skip
+            return; // LDAP unavailable => skip
         };
         let gid = gen_gid("fgl");
         let dn = format!("o={},{}", gid.as_str(), groups_search_base());
@@ -117,7 +117,7 @@ mod tests {
         if !matches!(&added, Ok(res) if res.rc == 0) {
             let _ = ldap.unbind().await;
             cleanup(&gid, &[]).await;
-            return; // add impossible (contraintes) => skip
+            return; // add impossible (constraints) => skip
         }
 
         let found = find_group_dn(&mut ldap, &gid).await;

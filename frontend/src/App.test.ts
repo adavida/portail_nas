@@ -17,7 +17,7 @@ beforeEach(() => {
     const u = String(url);
     if (u.includes("/api/auth/config"))
       return mockJson({
-        issuer: "https://127.0.0.1:9091",
+        issuer: "http://127.0.0.1:3000",
         client_id: "portail-dev",
         redirect_uri: "http://localhost:5173/callback",
       });

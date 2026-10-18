@@ -2,6 +2,7 @@
   import Callback from "./pages/Callback.svelte";
   import Groups from "./pages/Groups.svelte";
   import Home from "./pages/Home.svelte";
+  import Login from "./pages/Login.svelte";
   import Users from "./pages/Users.svelte";
   import Toaster from "./components/Toaster.svelte";
   import { whoami } from "./api/auth";
@@ -12,6 +13,7 @@
   type Theme = "light" | "dark";
 
   const isCallback = window.location.pathname === "/callback";
+  const isLogin = window.location.pathname === "/login";
 
   function initialTheme(): Theme {
     const saved = localStorage.getItem("theme");
@@ -34,8 +36,9 @@
   });
 
   $effect(() => {
-    if (isCallback) return;
-    if (sessionStorage.getItem("login_in_progress") === "1") return;
+    // isLogin: never auto-login here, otherwise authorize → /login → effect →
+    // login() loops forever.
+    if (isCallback || isLogin) return;
     if (!token) {
       if (sessionStorage.getItem("logged_out") === "1") return;
       sessionStorage.setItem("login_in_progress", "1");
@@ -58,6 +61,8 @@
 
 {#if isCallback}
   <Callback />
+{:else if isLogin}
+  <Login />
 {:else if !token}
   {#if sessionStorage.getItem("logged_out") === "1"}
     <div class="logged-out">

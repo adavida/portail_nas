@@ -10,6 +10,7 @@ pub async fn inject_admin(mut req: Request, next: Next) -> Result<Response, Stat
         groups: vec!["admin".into()],
         email: Some("admin@example.com".into()),
         preferred_username: Some("admin".into()),
+        nonce: None,
     };
     req.extensions_mut().insert(AuthUser(claims));
     Ok(next.run(req).await)

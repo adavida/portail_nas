@@ -228,7 +228,7 @@ async fn delete_unknown_gid_is_404() {
 
     let (status, body) = send(Method::DELETE, &format!("/api/groups/apinobody{n}"), None).await;
     if status == StatusCode::INTERNAL_SERVER_ERROR {
-        return; // LDAP indisponible => skip
+        return; // LDAP unavailable => skip
     }
 
     assert_eq!(

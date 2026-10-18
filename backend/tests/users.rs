@@ -198,7 +198,7 @@ async fn update_unknown_uid_is_404() {
     )
     .await;
     if status == StatusCode::INTERNAL_SERVER_ERROR {
-        return; // LDAP indisponible => skip
+        return; // LDAP unavailable => skip
     }
 
     assert_eq!(

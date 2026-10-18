@@ -12,7 +12,7 @@ let
 in
 {
   options.services.portail = {
-    enable = lib.mkEnableOption "Portail backend (Rust axum) — frontend (nginx vhost), OpenLDAP and Authelia must be provisioned outside this module.";
+    enable = lib.mkEnableOption "Portail backend (Rust axum, embedded OIDC provider) — frontend (nginx vhost) and OpenLDAP must be provisioned outside this module.";
 
     package = lib.mkOption {
       type = lib.types.package;
@@ -21,14 +21,8 @@ in
 
     appUrl = lib.mkOption {
       type = lib.types.str;
-      description = "Public URL of the portal (APP_URL of the backend, OIDC redirect URI = appUrl + /callback). Also used to bake VITE_* into `lib.mkFrontend` for the nginx vhost root.";
+      description = "Public URL of the portal — also the OIDC issuer (the backend is its own provider). APP_URL, OIDC_ISSUER_URL, and redirect URI = appUrl + /callback. Used to bake VITE_* into `lib.mkFrontend` for the nginx vhost root.";
       example = "http://portail.nas.local";
-    };
-
-    issuerUrl = lib.mkOption {
-      type = lib.types.str;
-      description = "Public URL of Authelia (OIDC_ISSUER_URL).";
-      example = "http://auth.portail.nas.local";
     };
 
     lang = lib.mkOption {
@@ -46,7 +40,7 @@ in
     oidcClientId = lib.mkOption {
       type = lib.types.str;
       default = "portail";
-      description = "OIDC client_id declared at Authelia and used by the backend.";
+      description = "OIDC client_id used by the backend (the portal is a client of its own provider). Added with a generated secret to `oidc.secretsDir/clients.json` on first start.";
     };
 
     ldap = {
@@ -94,9 +88,16 @@ in
     };
 
     oidc = {
-      clientSecretFile = lib.mkOption {
-        type = lib.types.path;
-        description = "File with the OIDC client_secret shared backend/Authelia — passed to the backend as `OIDC_CLIENT_SECRET` = path (read at startup, trailing newline trimmed).";
+      secretsDir = lib.mkOption {
+        type = lib.types.str;
+        default = "/var/lib/portail/oidc";
+        description = ''
+          Directory holding the OIDC secrets (mode 0700, owned by `portail`).
+          The backend **generates** the RSA signing key and a default
+          `clients.json` (portal client with a random secret) on first start,
+          then reads `clients.json` on every request — adding a client is a
+          file edit, no restart. Pass paths via `OIDC_SECRETS_DIR`.
+        '';
       };
     };
 
@@ -159,9 +160,9 @@ in
       description = "Applications listed on the portal home page — rendered statically into apps.json served at /apps.json by the nginx vhost (no backend involved).";
       example = [
         {
-          name = "Authelia";
-          url = "http://auth.portail.nas.local";
-          description = "SSO";
+          name = "Nextcloud";
+          url = "https://cloud.nas.local";
+          description = "Files";
           icon = null;
         }
       ];
@@ -191,8 +192,8 @@ in
           LDAP_GROUPS_OU = cfg.ldap.groupsOu;
           LDAP_ADMIN_PW = toString cfg.ldap.adminPasswordFile;
           OIDC_CLIENT_ID = cfg.oidcClientId;
-          OIDC_ISSUER_URL = cfg.issuerUrl;
-          OIDC_CLIENT_SECRET = toString cfg.oidc.clientSecretFile;
+          OIDC_ISSUER_URL = cfg.appUrl;
+          OIDC_SECRETS_DIR = cfg.oidc.secretsDir;
           OIDC_REDIRECT_URI = "${cfg.appUrl}/callback";
         }
         // cfg.extraBackendEnvironment
@@ -203,6 +204,7 @@ in
           ExecStart = "${cfg.package}/bin/portail-backend";
           User = "portail";
           Group = "portail";
+          StateDirectory = "portail";
           Restart = "on-failure";
           RestartSec = "60s";
         };
@@ -223,7 +225,7 @@ in
         {
           root = (pkgs.callPackage ../nix/frontend.nix { }) {
             appUrl = cfg.appUrl;
-            oidcIssuerUrl = cfg.issuerUrl;
+            oidcIssuerUrl = cfg.appUrl;
             oidcRedirectUri = "${cfg.appUrl}/callback";
             appLang = cfg.lang;
           };
@@ -231,6 +233,9 @@ in
           locations."/".tryFiles = "$uri /index.html";
           locations."= /apps.json".alias = toString appsFile;
           locations."/api".proxyPass = "http://${cfg.bindAddress}";
+          locations."= /jwks.json".proxyPass = "http://${cfg.bindAddress}";
+          locations."= /.well-known/openid-configuration".proxyPass = "http://${cfg.bindAddress}";
+          locations."= /logout".proxyPass = "http://${cfg.bindAddress}";
         }
         (lib.mkIf cfg.vhost.forceSSL {
           forceSSL = true;

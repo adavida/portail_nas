@@ -6,7 +6,7 @@ FROM docker.io/library/node:22-alpine AS build
 WORKDIR /app
 
 ARG VITE_APP_URL=https://portail.localhost
-ARG VITE_OIDC_ISSUER_URL=https://authelia.localhost
+ARG VITE_OIDC_ISSUER_URL=https://portail.localhost
 ARG VITE_OIDC_REDIRECT_URI=https://portail.localhost/callback
 ENV VITE_APP_URL=$VITE_APP_URL \
     VITE_OIDC_ISSUER_URL=$VITE_OIDC_ISSUER_URL \

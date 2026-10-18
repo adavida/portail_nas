@@ -9,14 +9,14 @@ pub struct Name(String);
 
 impl Name {
     pub fn try_new(raw: String) -> Result<Self, NameError> {
-        let s = raw.trim().to_string();
-        if s.is_empty() {
+        let trimmed = raw.trim().to_string();
+        if trimmed.is_empty() {
             return Err(NameError::Empty);
         }
-        if s.len() > 100 {
+        if trimmed.len() > 100 {
             return Err(NameError::Empty);
         }
-        Ok(Self(s))
+        Ok(Self(trimmed))
     }
 
     pub fn as_str(&self) -> &str {
@@ -26,8 +26,8 @@ impl Name {
 
 impl<'de> Deserialize<'de> for Name {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        Self::try_new(s).map_err(serde::de::Error::custom)
+        let raw = String::deserialize(deserializer)?;
+        Self::try_new(raw).map_err(serde::de::Error::custom)
     }
 }
 
@@ -37,16 +37,16 @@ mod tests {
 
     #[test]
     fn accepts_valid() {
-        let n = Name::try_new("Devs".into()).unwrap();
+        let name = Name::try_new("Devs".into()).unwrap();
 
-        assert_eq!(n.as_str(), "Devs", "valid name should be kept as is");
+        assert_eq!(name.as_str(), "Devs", "valid name should be kept as is");
     }
 
     #[test]
     fn trims_whitespace() {
-        let n = Name::try_new("  Devs  ".into()).unwrap();
+        let name = Name::try_new("  Devs  ".into()).unwrap();
 
-        assert_eq!(n.as_str(), "Devs", "name should be trimmed");
+        assert_eq!(name.as_str(), "Devs", "name should be trimmed");
     }
 
     #[test]
@@ -72,9 +72,9 @@ mod tests {
 
     #[test]
     fn deserialize_validates() {
-        let n: Name = serde_json::from_str("\"Devs\"").unwrap();
+        let name: Name = serde_json::from_str("\"Devs\"").unwrap();
 
-        assert_eq!(n.as_str(), "Devs");
+        assert_eq!(name.as_str(), "Devs");
     }
 
     #[test]

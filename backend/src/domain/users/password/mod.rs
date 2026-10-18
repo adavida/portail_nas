@@ -21,8 +21,8 @@ impl Password {
 
 impl<'de> Deserialize<'de> for Password {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        Self::try_new(s).map_err(serde::de::Error::custom)
+        let raw = String::deserialize(deserializer)?;
+        Self::try_new(raw).map_err(serde::de::Error::custom)
     }
 }
 

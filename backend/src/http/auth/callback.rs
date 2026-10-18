@@ -1,27 +1,24 @@
 use axum::{Json, extract::State};
-use base64::{Engine as _, engine::general_purpose::STANDARD};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-use crate::{env::Env, error::AppError};
+use crate::{
+    auth::tokens::{self, TokenResponse, exchange},
+    domain::oidc::Client,
+    env::Env,
+    error::AppError,
+};
 
 #[derive(Deserialize)]
 pub struct CallbackRequest {
     pub code: String,
     pub redirect_uri: Option<String>,
-    // PKCE verifier generated at `login()` (frontend) — required by Authelia
-    // for the authorization_code flow.
+    // PKCE verifier generated at `login()` (frontend) — required for the
+    // authorization_code flow.
     pub code_verifier: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct TokenResponse {
-    access_token: String,
-    id_token: Option<String>,
-    refresh_token: Option<String>,
-    token_type: Option<String>,
-    expires_in: Option<u64>,
-}
-
+/// Exchanges code -> tokens for the portal itself (client of its own
+/// provider) — same logic as `/api/oidc/token`, credentials from the env.
 pub async fn callback(
     State(env): State<Env>,
     Json(payload): Json<CallbackRequest>,
@@ -31,49 +28,24 @@ pub async fn callback(
         payload.code.len(),
         payload.redirect_uri
     );
-    let issuer = env.oidc_issuer_url.clone();
-    let client_id = env.oidc_client_id.clone();
-    let client_secret = env.oidc_client_secret.clone();
     let redirect_uri = payload
         .redirect_uri
         .unwrap_or_else(|| env.oidc_redirect_uri.clone());
-
-    let token_url = format!("{issuer}/api/oidc/token");
-    let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .build()
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-
-    let credentials = STANDARD.encode(format!("{client_id}:{client_secret}"));
-    let mut params = vec![
-        ("grant_type", "authorization_code"),
-        ("code", payload.code.as_str()),
-        ("redirect_uri", redirect_uri.as_str()),
-    ];
-    if let Some(v) = &payload.code_verifier {
-        params.push(("code_verifier", v.as_str()));
-    }
-
-    let resp = client
-        .post(&token_url)
-        .header("Authorization", format!("Basic {credentials}"))
-        .form(&params)
-        .send()
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let txt = resp.text().await.unwrap_or_default();
-        tracing::warn!("token exchange failed {}: {}", status, txt);
-        return Err(AppError::Internal(format!("token exchange failed: {txt}")));
-    }
+    let clients = tokens::clients(&env)?;
+    let client = Client::find_in(&clients, &env.oidc_client_id).ok_or_else(|| {
+        AppError::Internal(format!(
+            "portal client '{}' not found in clients file",
+            env.oidc_client_id
+        ))
+    })?;
+    let tokens = exchange(
+        &env,
+        client.id.as_str(),
+        client.secret.as_str(),
+        &payload.code,
+        &redirect_uri,
+        payload.code_verifier.as_deref(),
+    )?;
     tracing::info!("token exchange ok for code len={}", payload.code.len());
-
-    let token = resp
-        .json::<TokenResponse>()
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-
-    Ok(Json(token))
+    Ok(Json(tokens))
 }
