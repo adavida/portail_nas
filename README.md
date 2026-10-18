@@ -50,12 +50,23 @@ Le flake expose `packages.portail-backend`, `packages.portail-frontend` et `nixo
 
 ### Applications affichées
 
-`services.portail.apps` alimente la page d'accueil : chaque entrée = un lien (nom + URL, description et icône optionnelles), trié par nom. Le module le rend dans un `/apps.json` statique servi par le vhost nginx — le backend n'intervient pas. En dev, la liste vient de `frontend/public/apps.json` (servie par vite, modifiable à chaud).
+`services.portail.apps` alimente la page d'accueil : chaque entrée = un lien (nom + URL, description et icône optionnelles), trié par nom. Le module le rend dans un `/apps.json` statique servi par le vhost nginx — le backend n'intervient pas. En dev, la liste vient de `frontend/public/apps.json` (servie par vite, modifiable à chaud). Chaque entrée accepte un sous-objet `oidc` désactivé par défaut : `oidc.enable = true` enregistre l'application comme client OIDC du portail dans `clients.json` (relu à chaud, sans redémarrage), avec `clientId` (défaut : nom en minuscules), `redirectUris`, `scopes`, et soit `secretFile` soit `public = true`.
 
 ```nix
 services.portail.apps = [
   { name = "Vaultwarden"; url = "https://vault.portail.example.com"; description = "Mots de passe"; }
   { name = "Syncthing"; url = "https://sync.portail.example.com"; icon = "https://syncthing.net/img/logo.png"; }
+  {
+    name = "Nextcloud";
+    url = "https://cloud.portail.example.com";
+    description = "Files";
+    oidc = {
+      enable = true;
+      clientId = "nextcloud";
+      redirectUris = [ "https://cloud.portail.example.com/apps/oauth2/redirect_ui" ];
+      secretFile = /etc/secrets/nextcloud-oidc;
+    };
+  }
 ];
 ```
 
@@ -137,12 +148,23 @@ The flake exposes `packages.portail-backend`, `packages.portail-frontend` and `n
 
 #### Listed applications
 
-`services.portail.apps` feeds the home page: each entry = a link (name + URL, optional description and icon), sorted by name. The module renders it into a static `/apps.json` served by the nginx vhost — the backend is not involved. In dev, the list comes from `frontend/public/apps.json` (served by vite, hot-editable).
+`services.portail.apps` feeds the home page: each entry = a link (name + URL, optional description and icon), sorted by name. The module renders it into a static `/apps.json` served by the nginx vhost — the backend is not involved. In dev, the list comes from `frontend/public/apps.json` (served by vite, hot-editable). Each entry accepts an `oidc` sub-object, disabled by default: `oidc.enable = true` registers the app as an OIDC client of the portal in `clients.json` (re-read live, no restart), with `clientId` (default: lowercased name), `redirectUris`, `scopes`, and either `secretFile` or `public = true`.
 
 ```nix
 services.portail.apps = [
   { name = "Vaultwarden"; url = "https://vault.portail.example.com"; description = "Mots de passe"; }
   { name = "Syncthing"; url = "https://sync.portail.example.com"; icon = "https://syncthing.net/img/logo.png"; }
+  {
+    name = "Nextcloud";
+    url = "https://cloud.portail.example.com";
+    description = "Files";
+    oidc = {
+      enable = true;
+      clientId = "nextcloud";
+      redirectUris = [ "https://cloud.portail.example.com/apps/oauth2/redirect_ui" ];
+      secretFile = /etc/secrets/nextcloud-oidc;
+    };
+  }
 ];
 ```
 

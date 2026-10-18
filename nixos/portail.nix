@@ -6,8 +6,49 @@
 }:
 let
   cfg = config.services.portail;
+  sortedApps = lib.sort (a: b: a.name < b.name) cfg.apps;
+  # The public /apps.json must never leak the `oidc` sub-object (paths, scopes).
   appsFile = pkgs.writeText "portail-apps.json" (
-    builtins.toJSON (lib.sort (a: b: a.name < b.name) cfg.apps)
+    builtins.toJSON (
+      map (a: {
+        inherit (a)
+          name
+          url
+          description
+          icon
+          ;
+      }) sortedApps
+    )
+  );
+  oidcClients = map (a: {
+    id = if a.oidc.clientId != "" then a.oidc.clientId else lib.strings.toLower a.name;
+    public = a.oidc.public;
+    redirectUris = a.oidc.redirectUris;
+    scopes = a.oidc.scopes;
+    secretFile = a.oidc.secretFile;
+  }) (lib.filter (a: a.oidc.enable) cfg.apps);
+  mergeClient = c: ''
+    id='${c.id}'
+    redirects='${builtins.toJSON c.redirectUris}'
+    scopes='${builtins.toJSON c.scopes}'
+    secret="${if c.public then "" else "$(cat '${toString c.secretFile}' | tr -d '[:space:]')"}"
+    jq --arg id "$id" --arg secret "$secret" --argjson redirects "$redirects" --argjson scopes "$scopes" 'if any(.[]; .id == $id) then map(if .id == $id then .secret = $secret | .redirect_uris = $redirects | .scopes = $scopes else . end) else . + [{"id": $id, "secret": $secret, "redirect_uris": $redirects, "scopes": $scopes}] end' "$clients" > "$clients.tmp" && mv "$clients.tmp" "$clients" && chmod 600 "$clients"
+  '';
+  # Runs after the backend started (it creates clients.json on first boot);
+  # clients.json is re-read on every request, so the upsert needs no restart.
+  registerOidcClients = pkgs.writeShellScript "portail-oidc-clients" (
+    ''
+      export PATH="${
+        lib.makeBinPath [
+          pkgs.coreutils
+          pkgs.jq
+        ]
+      }:$PATH"
+      clients="${cfg.oidc.secretsDir}/clients.json"
+      for i in $(seq 30); do [ -f "$clients" ] && break; sleep 1; done
+      if [ ! -f "$clients" ]; then echo "clients.json not found after 30s - skipping OIDC client registration" >&2; exit 0; fi
+    ''
+    + lib.concatMapStringsSep "\n" mergeClient oidcClients
   );
 in
 {
@@ -154,6 +195,45 @@ in
               default = null;
               description = "Icon URL, optional.";
             };
+            oidc = lib.mkOption {
+              type = lib.types.submodule {
+                options = {
+                  enable = lib.mkEnableOption "OIDC client registration for this app";
+                  clientId = lib.mkOption {
+                    type = lib.types.str;
+                    default = "";
+                    description = "client_id in `clients.json` — defaults to the lowercased app `name`.";
+                  };
+                  redirectUris = lib.mkOption {
+                    type = with lib.types; listOf str;
+                    default = [ ];
+                    description = "Registered redirect_uris (exact match required by the provider).";
+                  };
+                  scopes = lib.mkOption {
+                    type = with lib.types; listOf str;
+                    default = [
+                      "openid"
+                      "profile"
+                      "email"
+                      "groups"
+                    ];
+                    description = "Scopes granted to this client.";
+                  };
+                  public = lib.mkOption {
+                    type = lib.types.bool;
+                    default = false;
+                    description = "Public client: empty secret in `clients.json`, PKCE mandatory, no `secretFile`.";
+                  };
+                  secretFile = lib.mkOption {
+                    type = with lib.types; nullOr path;
+                    default = null;
+                    description = "File holding the client secret (agenix/sops), read at activation — required unless `public = true`. Must be readable by the `portail` user.";
+                  };
+                };
+              };
+              default = { };
+              description = "Optional `oidc` sub-object (disabled by default): registers the app as an OIDC client of the portal, upserted into `clients.json` at activation (re-read live, no restart).";
+            };
           };
         });
       default = [ ];
@@ -175,6 +255,13 @@ in
     };
   };
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = lib.all (c: c.redirectUris != [ ] && (c.public || c.secretFile != null)) oidcClients;
+        message = "each services.portail.apps entry with oidc.enable = true needs non-empty oidc.redirectUris and either oidc.secretFile or oidc.public = true";
+      }
+    ];
+
     systemd.services.portail-backend = lib.mkMerge [
       {
         description = "Portail backend (Rust axum)";
@@ -207,6 +294,9 @@ in
           StateDirectory = "portail";
           Restart = "on-failure";
           RestartSec = "60s";
+        }
+        // lib.optionalAttrs (oidcClients != [ ]) {
+          ExecStartPost = registerOidcClients;
         };
       }
     ];
