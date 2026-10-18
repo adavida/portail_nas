@@ -21,11 +21,17 @@ pub struct TokenForm {
     pub redirect_uri: Option<String>,
     #[serde(default)]
     pub code_verifier: Option<String>,
+    #[serde(default)]
+    pub client_id: Option<String>,
+    #[serde(default)]
+    pub client_secret: Option<String>,
 }
 
 /// Standard token endpoint (`client_secret_basic` + `authorization_code` +
 /// PKCE). The portal itself goes through `/api/auth/callback` (same logic,
-/// credentials from the env).
+/// credentials from the env). Clients may also post `client_id`/
+/// `client_secret` as form fields (`client_secret_post`) — what the OAuth
+/// debugger does for public clients (empty secret, PKCE mandatory).
 pub async fn token(
     State(env): State<Env>,
     headers: HeaderMap,
@@ -38,8 +44,13 @@ pub async fn token(
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    let (client_id, client_secret) =
-        basic_credentials(auth).ok_or_else(|| AppError::BadRequest("invalid_client".into()))?;
+    let (client_id, client_secret) = match basic_credentials(auth) {
+        Some(credentials) => credentials,
+        None => match f.client_id {
+            Some(id) => (id, f.client_secret.unwrap_or_default()),
+            None => return Err(AppError::BadRequest("invalid_client".into())),
+        },
+    };
     let tokens = tokens::exchange(
         &env,
         &client_id,

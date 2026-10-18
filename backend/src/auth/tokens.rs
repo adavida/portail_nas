@@ -40,7 +40,9 @@ pub fn clients(env: &Env) -> Result<Vec<Client>, AppError> {
 
 /// `authorization_code` grant: code one-shot, client + redirect_uri + PKCE
 /// verified, then signed tokens. Errors in OAuth format (`invalid_client`,
-/// `invalid_grant`).
+/// `invalid_grant`). Confidential clients must present their secret; public
+/// clients (empty secret, e.g. the OAuth debugger) skip it but must have
+/// sent a PKCE S256 challenge at authorize.
 pub fn exchange(
     env: &Env,
     client_id: &str,
@@ -53,7 +55,11 @@ pub fn exchange(
     let Some(client) = Client::find_in(&clients, client_id) else {
         return Err(AppError::BadRequest("invalid_client".into()));
     };
-    if client.secret.as_str() != client_secret {
+    if client.secret.is_public() {
+        if !client_secret.is_empty() {
+            return Err(AppError::BadRequest("invalid_client".into()));
+        }
+    } else if client.secret.as_str() != client_secret {
         return Err(AppError::BadRequest("invalid_client".into()));
     }
     let Some(flow) = store::take_code(code) else {
@@ -61,6 +67,11 @@ pub fn exchange(
     };
     if flow.client_id != client.id.as_str() || flow.redirect_uri != redirect_uri {
         return Err(AppError::BadRequest("invalid_grant".into()));
+    }
+    if client.secret.is_public() && flow.challenge.is_none() {
+        return Err(AppError::BadRequest(
+            "invalid_grant: public clients must use PKCE".into(),
+        ));
     }
     if !check_pkce(verifier, flow.challenge.as_deref()) {
         return Err(AppError::BadRequest("invalid_grant".into()));
@@ -116,16 +127,29 @@ pub fn tokens_for(env: &Env, flow: &store::AuthFlow) -> Result<TokenResponse, Ap
 
 /// Local verification (provider key) — issuer, portal audience, expiry.
 pub fn verify(env: &Env, token: &str) -> Result<Claims, AppError> {
-    verify_with_aud(env, token, &env.oidc_client_id)
+    decode_token(env, token, Some(&env.oidc_client_id))
 }
 
 /// Like `verify` with an explicit audience (self-test for another client).
 pub fn verify_with_aud(env: &Env, token: &str, aud: &str) -> Result<Claims, AppError> {
+    decode_token(env, token, Some(aud))
+}
+
+/// Verification for the standard `/userinfo` endpoint: any audience, the
+/// audience check stays on each resource server (portal middleware).
+pub fn verify_any_aud(env: &Env, token: &str) -> Result<Claims, AppError> {
+    decode_token(env, token, None)
+}
+
+fn decode_token(env: &Env, token: &str, aud: Option<&str>) -> Result<Claims, AppError> {
     let key = key::global().ok_or_else(|| {
         AppError::Internal("signing key not available: generate it in the OIDC secrets dir".into())
     })?;
     let mut validation = Validation::new(Algorithm::RS256);
-    validation.set_audience(&[aud]);
+    match aud {
+        Some(aud) => validation.set_audience(&[aud]),
+        None => validation.validate_aud = false,
+    }
     validation.set_issuer(&[&env.oidc_issuer_url]);
     decode::<Claims>(token, key.decoding(), &validation)
         .map(|data| data.claims)
@@ -143,6 +167,41 @@ pub fn basic_credentials(header: &str) -> Option<(String, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const PUBLIC_ID: &str = "oauth-debugger";
+    const PUBLIC_REDIRECT: &str = "http://127.0.0.1:3030/callback";
+
+    fn env_with_public_client(tag: &str) -> Env {
+        let mut env = crate::env::Env::global().clone();
+        env.oidc_secrets_dir = format!(
+            "{}/portail-public-test-{tag}-{}",
+            std::env::temp_dir().display(),
+            std::process::id()
+        );
+        std::fs::create_dir_all(&env.oidc_secrets_dir).unwrap();
+        std::fs::write(
+            crate::auth::secrets::clients_path(&env),
+            format!(
+                r#"[{{"id":"{PUBLIC_ID}","secret":"","redirect_uris":["{PUBLIC_REDIRECT}"],"scopes":["openid","profile","email","groups"]}}]"#
+            ),
+        )
+        .unwrap();
+        env
+    }
+
+    fn public_flow(challenge: Option<&str>) -> store::AuthFlow {
+        store::AuthFlow {
+            client_id: PUBLIC_ID.into(),
+            redirect_uri: PUBLIC_REDIRECT.into(),
+            state: None,
+            nonce: None,
+            scopes: vec!["openid".into()],
+            challenge: challenge.map(String::from),
+            sub: "tester".into(),
+            groups: vec![],
+            email: None,
+        }
+    }
 
     #[test]
     fn pkce_rfc7636_vector() {
@@ -212,6 +271,59 @@ mod tests {
         assert!(
             matches!(&err, AppError::BadRequest(m) if m == "invalid_grant"),
             "unknown code should be invalid_grant, got {err}"
+        );
+    }
+
+    #[test]
+    fn exchange_public_client_exchanges_form_credentials_with_pkce() {
+        let env = env_with_public_client("ok");
+        let code = store::save_code(public_flow(Some(
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+        )))
+        .unwrap();
+
+        let tokens = exchange(
+            &env,
+            PUBLIC_ID,
+            "",
+            &code,
+            PUBLIC_REDIRECT,
+            Some("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+        );
+
+        let tokens = tokens.expect("public client with PKCE should get tokens");
+        assert!(
+            !tokens.access_token.is_empty(),
+            "access_token must be issued to a public client"
+        );
+        let claims = verify_any_aud(&env, &tokens.access_token)
+            .expect("token for another audience must verify for userinfo");
+        assert_eq!(claims.sub, "tester", "userinfo verification keeps sub");
+    }
+
+    #[test]
+    fn exchange_public_client_without_pkce_is_rejected() {
+        let env = env_with_public_client("nopkce");
+        let code = store::save_code(public_flow(None)).unwrap();
+
+        let err = exchange(&env, PUBLIC_ID, "", &code, PUBLIC_REDIRECT, None).unwrap_err();
+
+        assert!(
+            matches!(&err, AppError::BadRequest(m) if m.contains("PKCE")),
+            "public client without challenge must be refused, got {err}"
+        );
+    }
+
+    #[test]
+    fn exchange_public_client_rejects_presented_secret() {
+        let env = env_with_public_client("secret");
+        let code = store::save_code(public_flow(Some("chal"))).unwrap();
+
+        let err = exchange(&env, PUBLIC_ID, "not-empty", &code, PUBLIC_REDIRECT, None).unwrap_err();
+
+        assert!(
+            matches!(&err, AppError::BadRequest(m) if m == "invalid_client"),
+            "public client must refuse a presented secret, got {err}"
         );
     }
 }

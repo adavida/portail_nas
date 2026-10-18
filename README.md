@@ -69,13 +69,21 @@ nix flake check
 ## Développement
 
 ```bash
-devenv up                    # lance tout : backend 3000 (OIDC inclus), frontend 5173, LDAP 3890/3891
+devenv up                    # lance tout : backend 3000 (OIDC inclus), frontend 5173, LDAP 3890/3891, oauth debugger 3030
 openfrontend                 # ouvre le portail http://127.0.0.1:5173
 resetUsers                   # réinitialise les comptes LDAP dev (admin/admin, user/user)
 devenv down                  # arrêt
 just test                    # backend (cargo test --features test-api) + frontend (vitest)
 treefmt                      # format (nixfmt + rustfmt + prettier)
 ```
+
+### Tester le service OIDC (oauth debugger)
+
+`devenv up` lance aussi `oauthdebugger` (`uvx oauth2-debugger`, `http://127.0.0.1:3030`). Au démarrage il enregistre le client **public** `oauth-debugger` (secret vide, `redirect_uri http://127.0.0.1:3030/callback`, scopes `openid profile email groups`) dans `$OIDC_SECRETS_DIR/clients.json` — relu à chaud, sans redémarrage.
+
+Ouvrir `http://127.0.0.1:3030`, laisser les champs pré-remplis (`--issuer $OIDC_ISSUER_URL`, `--client-id oauth-debugger`), puis dérouler le flux Authorization Code + PKCE : `/api/oidc/authorization` → page de login (comptes LDAP dev `admin`/`admin` ou `user`/`user` via `resetUsers`) → callback avec `code` → `POST /api/oidc/token` (les clients publics n'envoient pas de secret, PKCE obligatoire) → `id_token`/`access_token` décodés + vérifiés contre `/jwks.json`, puis appel `/api/oidc/userinfo`.
+
+Un client public n'a pas besoin de secret ; un client confidentiel (ex: `portail-dev`) doit le lire dans `clients.json` pour `client_secret_basic` — l'éditeur pour l'ajouter, pas de redémarrage.
 
 ---
 
@@ -148,10 +156,18 @@ nix flake check
 ### Development
 
 ```bash
-devenv up                    # starts everything: backend 3000 (incl. OIDC), frontend 5173, LDAP 3890/3891
+devenv up                    # starts everything: backend 3000 (incl. OIDC), frontend 5173, LDAP 3890/3891, oauth debugger 3030
 openfrontend                 # opens the portal http://127.0.0.1:5173
 resetUsers                   # reseed dev LDAP accounts (admin/admin, user/user)
 devenv down                  # stop
 just test                    # backend (cargo test --features test-api) + frontend (vitest)
 treefmt                      # formatting (nixfmt + rustfmt + prettier)
 ```
+
+### Test the OIDC service (oauth debugger)
+
+`devenv up` also starts `oauthdebugger` (`uvx oauth2-debugger`, `http://127.0.0.1:3030`). On startup it registers the **public** client `oauth-debugger` (empty secret, `redirect_uri http://127.0.0.1:3030/callback`, scopes `openid profile email groups`) into `$OIDC_SECRETS_DIR/clients.json` — re-read live, no restart.
+
+Open `http://127.0.0.1:3030`, keep the prefilled fields (`--issuer $OIDC_ISSUER_URL`, `--client-id oauth-debugger`), then run the Authorization Code + PKCE flow: `/api/oidc/authorization` → login page (dev LDAP accounts `admin`/`admin` or `user`/`user` via `resetUsers`) → callback with `code` → `POST /api/oidc/token` (public clients send no secret, PKCE mandatory) → decoded `id_token`/`access_token` verified against `/jwks.json`, then call `/api/oidc/userinfo`.
+
+A public client needs no secret; a confidential client (e.g. `portail-dev`) must read its secret from `clients.json` for `client_secret_basic` — edit the file to add one, no restart.

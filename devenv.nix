@@ -175,6 +175,7 @@ in
     openssl
     pkg-config
     rtk
+    uv
     xdg-utils
   ];
 
@@ -183,6 +184,12 @@ in
     "backend-test".exec = "cargo watch -w backend -x 'test --features test-api --quiet'";
     frontend.exec = "npm --prefix frontend run dev";
     "frontend-test".exec = "npm --prefix frontend run test:watch";
+    oauthdebugger.exec = ''
+      clients="$OIDC_SECRETS_DIR/clients.json"
+      until [ -f "$clients" ]; do sleep 0.5; done
+      jq 'if any(.[]; .id == "oauth-debugger") then . else . + [{"id":"oauth-debugger","secret":"","redirect_uris":["http://127.0.0.1:3030/callback"],"scopes":["openid","profile","email","groups"]}] end' "$clients" > "$clients.tmp" && mv "$clients.tmp" "$clients" && chmod 600 "$clients"
+      exec uvx --from "oauth2-debugger[verify]" oauth2-debugger --port 3030 --issuer "$OIDC_ISSUER_URL" --client-id oauth-debugger --scope "openid profile email groups" --no-browser
+    '';
     openldap.exec = mkSlapd {
       dir = "openldap-dev";
       port = 3890;

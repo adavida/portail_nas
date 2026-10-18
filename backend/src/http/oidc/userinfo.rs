@@ -4,6 +4,8 @@ use serde_json::json;
 use crate::{auth::tokens, env::Env, error::AppError};
 
 /// Standard UserInfo — claims of the access token verified locally.
+/// Any audience accepted (signature + issuer only): each client's own
+/// token works here, audience checks stay on the resource servers.
 pub async fn userinfo(
     State(env): State<Env>,
     headers: HeaderMap,
@@ -16,7 +18,7 @@ pub async fn userinfo(
     if token.is_empty() {
         return Err(AppError::Unauthorized("missing Bearer token".into()));
     }
-    let claims = tokens::verify(&env, token)?;
+    let claims = tokens::verify_any_aud(&env, token)?;
     Ok(Json(json!({
         "sub": claims.sub,
         "preferred_username": claims.preferred_username,

@@ -30,7 +30,7 @@ impl Client {
         scopes: Vec<String>,
     ) -> Result<Self, ClientError> {
         let id = ClientId::try_new(id).map_err(ClientError::Id)?;
-        let secret = ClientSecret::try_new(secret).map_err(ClientError::Secret)?;
+        let secret = ClientSecret::new(secret);
         if redirect_uris.is_empty() {
             return Err(ClientError::NoRedirects);
         }
@@ -102,20 +102,16 @@ mod tests {
     }
 
     #[test]
-    fn try_new_rejects_empty_secret() {
-        let err = Client::try_new(
+    fn try_new_accepts_empty_secret_as_public_client() {
+        let client = Client::try_new(
             "app1".into(),
             "".into(),
             vec!["https://app/cb".into()],
             vec![],
-        )
-        .unwrap_err();
-
-        assert_eq!(
-            err,
-            ClientError::Secret(crate::domain::oidc::ClientSecretError::Empty),
-            "empty secret should be rejected"
         );
+
+        let client = client.expect("empty secret marks a public client, not an error");
+        assert!(client.secret.is_public(), "empty secret must be public");
     }
 
     #[test]
