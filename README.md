@@ -38,6 +38,7 @@ Le flake expose `packages.portail-backend` (= `packages.default`), `packages.por
     enable = true;
     extraBackendEnvironment = { };
     lang = "fr";
+    oidc.logSecretEvents = true;
     oidc.secretsDir = "/var/lib/portail/oidc";
     oidcClientId = "portail";
     package = inputs.portail.packages.x86_64-linux.portail-backend;
@@ -52,6 +53,7 @@ Le flake expose `packages.portail-backend` (= `packages.default`), `packages.por
 | `bindAddress`                | `127.0.0.1:3000`        | BIND_ADDR du backend                                                                        |
 | `oidcClientId`               | `portail`               | client_id du portail (généré dans `clients.json` au 1er start)                              |
 | `oidc.secretsDir`            | `/var/lib/portail/oidc` | répertoire des secrets OIDC générés (clé RSA + clients.json + `<clientId>_secret` des apps) |
+| `oidc.logSecretEvents`       | `true`                  | log INFO backend/ExecStartPost sur les fichiers de secrets OIDC (générer, garder, purger)   |
 | `lang`                       | `en`                    | langue par défaut de l'interface (`fr`/`en`)                                                |
 | `ldap.url`                   | `ldap://127.0.0.1`      | URL du serveur LDAP (`ldap://` ou `ldaps://`)                                               |
 | `ldap.baseDn`                | `dc=example,dc=com`     | suffixe LDAP                                                                                |
@@ -153,6 +155,7 @@ The flake exposes `packages.portail-backend` (= `packages.default`), `packages.p
     enable = true;
     extraBackendEnvironment = { };
     lang = "fr";
+    oidc.logSecretEvents = true;
     oidc.secretsDir = "/var/lib/portail/oidc";
     oidcClientId = "portail";
     package = inputs.portail.packages.x86_64-linux.portail-backend;
@@ -167,6 +170,7 @@ The flake exposes `packages.portail-backend` (= `packages.default`), `packages.p
 | `bindAddress`                | `127.0.0.1:3000`        | backend BIND_ADDR                                                                          |
 | `oidcClientId`               | `portail`               | portal client_id (generated into `clients.json` on first start)                            |
 | `oidc.secretsDir`            | `/var/lib/portail/oidc` | OIDC secrets directory (RSA key + clients.json + app `<clientId>_secret` secrets)          |
+| `oidc.logSecretEvents`       | `true`                  | backend/ExecStartPost INFO logs on OIDC secret files (generate, keep, prune)               |
 | `lang`                       | `en`                    | default UI language (`fr`/`en`)                                                            |
 | `ldap.url`                   | `ldap://127.0.0.1`      | LDAP server URL (`ldap://` or `ldaps://`)                                                  |
 | `ldap.baseDn`                | `dc=example,dc=com`     | LDAP suffix                                                                                |

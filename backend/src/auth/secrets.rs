@@ -28,8 +28,8 @@ pub fn ensure(env: &Env) -> Result<(), String> {
         .map_err(|e| format!("cannot create OIDC secrets dir {dir}: {e}"))?;
     std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
         .map_err(|e| format!("cannot set mode on OIDC secrets dir {dir}: {e}"))?;
-    write_new(&key_path(env), || generate_signing_key(env))?;
-    write_new(&clients_path(env), || default_clients(env))?;
+    write_new(env, &key_path(env), || generate_signing_key(env))?;
+    write_new(env, &clients_path(env), || default_clients(env))?;
     Ok(())
 }
 
@@ -72,7 +72,11 @@ fn default_clients(env: &Env) -> Result<String, String> {
 
 /// Atomic 0600 creation (`O_EXCL`): if the file already exists (placed by
 /// the admin), it is kept as is and `content` is never called.
-fn write_new(path: &Path, content: impl FnOnce() -> Result<String, String>) -> Result<(), String> {
+fn write_new(
+    env: &Env,
+    path: &Path,
+    content: impl FnOnce() -> Result<String, String>,
+) -> Result<(), String> {
     let mut file = match std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -80,7 +84,15 @@ fn write_new(path: &Path, content: impl FnOnce() -> Result<String, String>) -> R
         .open(path)
     {
         Ok(f) => f,
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            if env.oidc_secret_logs {
+                tracing::info!(
+                    "OIDC secret file already exists, kept as-is: {}",
+                    path.display()
+                );
+            }
+            return Ok(());
+        }
         Err(e) => return Err(format!("cannot create {}: {e}", path.display())),
     };
     let content = match content() {
@@ -92,7 +104,11 @@ fn write_new(path: &Path, content: impl FnOnce() -> Result<String, String>) -> R
         }
     };
     file.write_all(content.as_bytes())
-        .map_err(|e| format!("cannot write {}: {e}", path.display()))
+        .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
+    if env.oidc_secret_logs {
+        tracing::info!("generated OIDC secret file: {}", path.display());
+    }
+    Ok(())
 }
 
 #[cfg(test)]

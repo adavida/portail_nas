@@ -48,11 +48,19 @@ let
       if c.public then
         ''
           secret=""
+          log "$id is a public client, no secret file"
         ''
       else
         ''
           secret_file='${c.secretPath}'
-          if [ ! -f "$secret_file" ]; then umask 077; head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$secret_file"; fi
+          if [ -f "$secret_file" ]; then
+            log "secret file kept as-is: $secret_file"
+          else
+            umask 077
+            head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$secret_file" \
+              && log "generated secret file: $secret_file" \
+              || echo "portail OIDC: FAILED to generate secret file: $secret_file" >&2
+          fi
           secret="$(cat "$secret_file" | tr -d '[:space:]')"
         ''
     )
@@ -72,11 +80,14 @@ let
           pkgs.jq
         ]
       }:$PATH"
+      log() {
+        if [ "$OIDC_SECRET_LOGS" != "false" ]; then echo "portail OIDC: $*"; fi
+      }
       clients="${cfg.oidc.secretsDir}/clients.json"
       for i in $(seq 30); do [ -f "$clients" ] && break; sleep 1; done
       if [ ! -f "$clients" ]; then echo "clients.json not found after 30s - skipping OIDC client registration" >&2; exit 0; fi
       ids='${builtins.toJSON (map (c: c.id) oidcClients)}'
-      jq -r --argjson ids "$ids" '.[] | select(.managed == true and (.id | IN($ids[]) | not)) | .id' "$clients" | while read -r gone; do rm -f "${cfg.oidc.secretsDir}/$gone"_secret; done
+      jq -r --argjson ids "$ids" '.[] | select(.managed == true and (.id | IN($ids[]) | not)) | .id' "$clients" | while read -r gone; do rm -f "${cfg.oidc.secretsDir}/$gone"_secret; echo "portail OIDC: pruned client, deleted secret: $gone"; done
       jq --argjson ids "$ids" 'map(select(.managed != true or (.id | IN($ids[]))))' "$clients" > "$clients.tmp" && mv "$clients.tmp" "$clients" && chmod 600 "$clients"
     ''
     + lib.concatMapStringsSep "\n" mergeClient oidcClients
@@ -170,6 +181,16 @@ in
           then reads `clients.json` on every request — adding a client is a
           file edit, no restart. Confidential app clients get their secret
           generated here as `<client_id>_secret` on first activation. Pass paths via `OIDC_SECRETS_DIR`.
+        '';
+      };
+
+      logSecretEvents = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          INFO-log every OIDC secret file action (generation, keep-as-is, pruning).
+          Passed to the backend as `OIDC_SECRET_LOGS` and read by the ExecStartPost
+          client-registration script; `false` silences both (errors stay logged).
         '';
       };
     };
@@ -318,6 +339,7 @@ in
           OIDC_CLIENT_ID = cfg.oidcClientId;
           OIDC_ISSUER_URL = cfg.appUrl;
           OIDC_SECRETS_DIR = cfg.oidc.secretsDir;
+          OIDC_SECRET_LOGS = toString cfg.oidc.logSecretEvents;
           OIDC_REDIRECT_URI = "${cfg.appUrl}/callback";
         }
         // cfg.extraBackendEnvironment

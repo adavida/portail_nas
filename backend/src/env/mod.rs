@@ -10,6 +10,9 @@ pub struct Env {
     pub oidc_redirect_uri: String,
     pub oidc_secrets_dir: String,
     pub oidc_key_bits: usize,
+    /// INFO logging of OIDC secret file events (`OIDC_SECRET_LOGS`).
+    /// `false` = silent; errors stay logged either way.
+    pub oidc_secret_logs: bool,
     pub app_url: String,
     pub bind_addr: String,
     pub ldap_url: String,
@@ -100,6 +103,7 @@ impl Env {
                 }
             };
         let oidc_redirect_uri = take("OIDC_REDIRECT_URI", &mut missing);
+        let oidc_secret_logs = !take_opt("OIDC_SECRET_LOGS", "true").eq_ignore_ascii_case("false");
         let app_url = take("APP_URL", &mut missing);
         let bind_addr = take("BIND_ADDR", &mut missing);
         let ldap_url = take("LDAP_URL", &mut missing);
@@ -134,6 +138,7 @@ impl Env {
             oidc_redirect_uri,
             oidc_secrets_dir,
             oidc_key_bits,
+            oidc_secret_logs,
             app_url,
             bind_addr,
             ldap_url,
@@ -153,6 +158,7 @@ impl Env {
             oidc_client_id = %self.oidc_client_id,
             oidc_secrets_dir = %self.oidc_secrets_dir,
             oidc_key_bits = %self.oidc_key_bits,
+            oidc_secret_logs = %self.oidc_secret_logs,
             oidc_redirect_uri = %self.oidc_redirect_uri,
             app_url = %self.app_url,
             bind_addr = %self.bind_addr,
@@ -217,6 +223,9 @@ impl Env {
             oidc_key_bits: option_env!("OIDC_KEY_BITS")
                 .and_then(|s| s.trim().parse::<usize>().ok())
                 .unwrap_or(DEFAULT_KEY_BITS),
+            oidc_secret_logs: option_env!("OIDC_SECRET_LOGS")
+                .map(|s| !s.trim().eq_ignore_ascii_case("false"))
+                .unwrap_or(true),
             app_url: option_env!("APP_URL")
                 .unwrap_or("http://localhost:5173")
                 .to_string(),
@@ -475,6 +484,27 @@ mod tests {
         match saved {
             Some(v) => unsafe { std::env::set_var("OIDC_KEY_BITS", v) },
             None => unsafe { std::env::remove_var("OIDC_KEY_BITS") },
+        }
+    }
+
+    #[test]
+    fn oidc_secret_logs_false_disables_and_absent_defaults_on() {
+        let _g = LOCK.lock().unwrap();
+        let saved = std::env::var("OIDC_SECRET_LOGS").ok();
+        unsafe { std::env::set_var("OIDC_SECRET_LOGS", "false") };
+
+        let env = super::Env::create().unwrap();
+
+        assert!(!env.oidc_secret_logs, "false should disable secret logs");
+
+        unsafe { std::env::remove_var("OIDC_SECRET_LOGS") };
+        let env = super::Env::create().unwrap();
+
+        assert!(env.oidc_secret_logs, "absent should default to enabled");
+
+        match saved {
+            Some(v) => unsafe { std::env::set_var("OIDC_SECRET_LOGS", v) },
+            None => unsafe { std::env::remove_var("OIDC_SECRET_LOGS") },
         }
     }
 
