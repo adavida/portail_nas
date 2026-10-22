@@ -1,7 +1,7 @@
 import { derived, get, writable } from "svelte/store";
 import { env } from "./env";
 
-export type Lang = "fr" | "en";
+type Lang = "fr" | "en";
 
 const locales: Record<Lang, Record<string, string>> = {
   fr: {

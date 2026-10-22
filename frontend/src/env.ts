@@ -1,4 +1,4 @@
-export interface Env {
+interface Env {
   appLang: string;
   appUrl: string;
   oidcIssuerUrl: string;

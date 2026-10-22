@@ -44,11 +44,6 @@ async fn protected_endpoints_return_401_without_token() {
         ),
         (Method::DELETE, "/api/groups/somegid/members/someuid", None),
         (Method::GET, "/api/auth/me", None),
-        (
-            Method::POST,
-            "/api/auth/oidc-test",
-            Some(json!({ "client_id": "portail-dev" })),
-        ),
     ];
 
     for (method, uri, body) in protected {
@@ -113,6 +108,22 @@ async fn authenticate_endpoint_is_protected() {
         status,
         StatusCode::UNAUTHORIZED,
         "POST /api/users/:uid/authenticate should be 401 without token"
+    );
+}
+
+#[cfg(feature = "test-api")]
+#[tokio::test]
+async fn oidc_test_endpoint_is_protected() {
+    let status = req(
+        Method::POST,
+        "/api/auth/oidc-test",
+        Some(json!({ "client_id": "portail-dev" })),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::UNAUTHORIZED,
+        "POST /api/auth/oidc-test should be 401 without token"
     );
 }
 

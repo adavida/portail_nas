@@ -8,8 +8,3 @@ pub fn redirect_ldap_env_to_test() {
         std::env::var("LDAP_TEST_BASE_DN").unwrap_or_else(|_| "dc=test,dc=example,dc=com".into()),
     );
 }
-
-#[ctor::ctor(unsafe)]
-fn redirect_ldap_env() {
-    redirect_ldap_env_to_test();
-}

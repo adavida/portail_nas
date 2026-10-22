@@ -34,7 +34,7 @@ let
         if a.oidc.secretFile != null then
           toString a.oidc.secretFile
         else
-          "${cfg.oidc.secretsDir}/${id}_oidc";
+          "${cfg.oidc.secretsDir}/${id}_secret";
     }
   ) (lib.filter (a: a.oidc.enable) cfg.apps);
   mergeClient =
@@ -57,10 +57,13 @@ let
         ''
     )
     + ''
-      jq --arg id "$id" --arg secret "$secret" --argjson redirects "$redirects" --argjson scopes "$scopes" 'if any(.[]; .id == $id) then map(if .id == $id then .secret = $secret | .redirect_uris = $redirects | .scopes = $scopes else . end) else . + [{"id": $id, "secret": $secret, "redirect_uris": $redirects, "scopes": $scopes}] end' "$clients" > "$clients.tmp" && mv "$clients.tmp" "$clients" && chmod 600 "$clients"
+      jq --arg id "$id" --arg secret "$secret" --argjson redirects "$redirects" --argjson scopes "$scopes" 'if any(.[]; .id == $id) then map(if .id == $id then .secret = $secret | .redirect_uris = $redirects | .scopes = $scopes | .managed = true else . end) else . + [{"id": $id, "secret": $secret, "redirect_uris": $redirects, "scopes": $scopes, "managed": true}] end' "$clients" > "$clients.tmp" && mv "$clients.tmp" "$clients" && chmod 600 "$clients"
     '';
   # Runs after the backend started (it creates clients.json on first boot);
   # clients.json is re-read on every request, so the upsert needs no restart.
+  # Entries the module wrote (`.managed = true`) but that are no longer in
+  # `apps` are pruned, along with their generated `<clientId>_secret` file;
+  # manually added entries and the portal client are never touched.
   registerOidcClients = pkgs.writeShellScript "portail-oidc-clients" (
     ''
       export PATH="${
@@ -72,6 +75,9 @@ let
       clients="${cfg.oidc.secretsDir}/clients.json"
       for i in $(seq 30); do [ -f "$clients" ] && break; sleep 1; done
       if [ ! -f "$clients" ]; then echo "clients.json not found after 30s - skipping OIDC client registration" >&2; exit 0; fi
+      ids='${builtins.toJSON (map (c: c.id) oidcClients)}'
+      jq -r --argjson ids "$ids" '.[] | select(.managed == true and (.id | IN($ids[]) | not)) | .id' "$clients" | while read -r gone; do rm -f "${cfg.oidc.secretsDir}/$gone"_secret; done
+      jq --argjson ids "$ids" 'map(select(.managed != true or (.id | IN($ids[]))))' "$clients" > "$clients.tmp" && mv "$clients.tmp" "$clients" && chmod 600 "$clients"
     ''
     + lib.concatMapStringsSep "\n" mergeClient oidcClients
   );
@@ -163,7 +169,7 @@ in
           `clients.json` (portal client with a random secret) on first start,
           then reads `clients.json` on every request — adding a client is a
           file edit, no restart. Confidential app clients get their secret
-          generated here as `<client_id>_oidc` on first activation. Pass paths via `OIDC_SECRETS_DIR`.
+          generated here as `<client_id>_secret` on first activation. Pass paths via `OIDC_SECRETS_DIR`.
         '';
       };
     };
@@ -256,14 +262,14 @@ in
                     description = ''
                       File holding the client secret (agenix/sops), read at activation — optional override.
                       When null and `public = false`, the portal generates a random secret at
-                      `oidc.secretsDir/<client_id>_oidc` (0600, never overwritten) on first activation.
+                      `oidc.secretsDir/<client_id>_secret` (0600, never overwritten) on first activation.
                       A provided file must be readable by the `portail` user.
                     '';
                   };
                 };
               };
               default = { };
-              description = "Optional `oidc` sub-object (disabled by default): registers the app as an OIDC client of the portal, upserted into `clients.json` at activation (re-read live, no restart).";
+              description = "Optional `oidc` sub-object (disabled by default): registers the app as an OIDC client of the portal, upserted into `clients.json` at activation (re-read live, no restart). Entries added by the module and removed from `apps` are pruned, along with their generated `<clientId>_secret` file; manually added entries are kept.";
             };
           };
         });
@@ -325,8 +331,8 @@ in
           StateDirectory = "portail";
           Restart = "on-failure";
           RestartSec = "60s";
-        }
-        // lib.optionalAttrs (oidcClients != [ ]) {
+          # Always runs: also when `apps` becomes empty, so managed clients
+          # from the previous config get pruned from clients.json.
           ExecStartPost = registerOidcClients;
         };
       }

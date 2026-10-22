@@ -2,8 +2,7 @@
 // Returns the redirect URI on success, or the error + status so the page can
 // translate the 401 credentials case itself (rule: no silent failure).
 
-export type LoginResponse =
-  { redirect: string } | { error: string; status: number };
+type LoginResponse = { redirect: string } | { error: string; status: number };
 
 export async function loginWithPassword(
   req: string,

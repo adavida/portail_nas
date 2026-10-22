@@ -1,6 +1,5 @@
 <script lang="ts">
   import { deleteUser, updatePassword, updateUser, type User } from "../api/users";
-  import { addMember, createGroup, removeMember } from "../api/groups";
   import EditableCell from "./EditableCell.svelte";
   import GroupsEditor from "./GroupsEditor.svelte";
   import UserModal from "./UserModal.svelte";
@@ -8,6 +7,7 @@
   import ConfirmModal from "./ConfirmModal.svelte";
   import { t, translate } from "../i18n";
   import { toast } from "./toast";
+  import { createGroupWithMember, saveGroups } from "./user_groups";
 
   type Props = {
     users: User[];
@@ -41,43 +41,6 @@
   );
   let passwords = $state<Record<string, string>>({});
   let creating = $state(false);
-
-  async function saveGroups(user: User, next: string[]): Promise<boolean> {
-    const groups = user.groups ?? [];
-    const adds = next.filter((gid) => !groups.includes(gid));
-    const removes = groups.filter((gid) => !next.includes(gid));
-    try {
-      for (const gid of adds) await addMember(gid, user.uid);
-      for (const gid of removes) await removeMember(gid, user.uid);
-    } catch (e) {
-      toast((e as Error).message, true);
-      return false;
-    }
-    toast(translate("common.saved"));
-    onUpdated?.();
-    return true;
-  }
-
-  async function createGroupWithMember(
-    user: User,
-    gid: string,
-  ): Promise<{ ok: boolean; error?: string }> {
-    try {
-      await createGroup({
-        gid,
-        name: gid,
-        description: "",
-        members: [user.uid],
-      });
-    } catch (e) {
-      const error = (e as Error).message;
-      toast(error, true);
-      return { ok: false, error };
-    }
-    toast(translate("groups.created", { gid }));
-    onUpdated?.();
-    return { ok: true };
-  }
 
   async function submitPassword(user: User) {
     const password = passwords[user.uid] ?? "";
@@ -241,8 +204,8 @@
                     uid={u.uid}
                     {groups}
                     allGroups={allGroups}
-                    onSave={(next) => saveGroups(u, next)}
-                    onCreateGroup={(gid) => createGroupWithMember(u, gid)}
+                    onSave={(next) => saveGroups(u.uid, u.groups ?? [], next, onUpdated)}
+                    onCreateGroup={(gid) => createGroupWithMember(u.uid, gid, onUpdated)}
                     onCancel={() => (editingGroupsUid = null)}
                     hideActions
                   />

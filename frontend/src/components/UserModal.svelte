@@ -6,12 +6,12 @@
     updateUser,
     type User,
   } from "../api/users";
-  import { addMember, createGroup, removeMember } from "../api/groups";
   import GroupsEditor from "./GroupsEditor.svelte";
   import FieldRow from "./FieldRow.svelte";
   import ConfirmModal from "./ConfirmModal.svelte";
   import { t, translate } from "../i18n";
   import { toast } from "./toast";
+  import { createGroupWithMember, saveGroups } from "./user_groups";
 
   type Props = {
     user: User;
@@ -69,42 +69,6 @@
     onDeleted?.();
     onClose();
     toast(translate("users.deleted", { uid: user.uid }));
-  }
-
-  async function saveGroups(next: string[]): Promise<boolean> {
-    const groups = user.groups ?? [];
-    const adds = next.filter((gid) => !groups.includes(gid));
-    const removes = groups.filter((gid) => !next.includes(gid));
-    try {
-      for (const gid of adds) await addMember(gid, user.uid);
-      for (const gid of removes) await removeMember(gid, user.uid);
-    } catch (e) {
-      toast((e as Error).message, true);
-      return false;
-    }
-    toast(translate("common.saved"));
-    onUpdated?.();
-    return true;
-  }
-
-  async function createGroupWithMember(
-    gid: string,
-  ): Promise<{ ok: boolean; error?: string }> {
-    try {
-      await createGroup({
-        gid,
-        name: gid,
-        description: "",
-        members: [user.uid],
-      });
-    } catch (e) {
-      const error = (e as Error).message;
-      toast(error, true);
-      return { ok: false, error };
-    }
-    toast(translate("groups.created", { gid }));
-    onUpdated?.();
-    return { ok: true };
   }
 </script>
 
@@ -170,8 +134,8 @@
       uid={user.uid}
       groups={user.groups ?? []}
       {allGroups}
-      onSave={(next) => saveGroups(next)}
-      onCreateGroup={(gid) => createGroupWithMember(gid)}
+      onSave={(next) => saveGroups(user.uid, user.groups ?? [], next, onUpdated)}
+      onCreateGroup={(gid) => createGroupWithMember(user.uid, gid, onUpdated)}
       onCancel={onClose}
     />
 
