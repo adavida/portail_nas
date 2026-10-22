@@ -14,6 +14,7 @@ Le README est court et strict: français d'abord, anglais ensuite (`**Français*
 
 - Section 3 = commandes exactes, synchronisées avec `justfile`, `devenv.nix` (`processes`) et la règle `03-backend-frontend.md`. Changer un port/script ⇒ changer le README dans les deux langues.
 - Section 2 = options strictement alignées sur `nixos/portail.nix` (`options.portail`). Ajouter/retirer une option du module ⇒ mettre à jour le tableau FR + EN.
+- Exemples nix (`services.portail`): blocs groupés (`ldap = { ... }`, `vhost = { ... }`) en premier, puis options simples — tout en ordre alphabétique, clés internes de chaque bloc incluses. Identique FR/EN.
 - Titres FR/EN: `Développement` ↔ `Development`, `Déploiement NixOS (flake)` ↔ `NixOS deployment (flake)`.
 - Contenu hors de ces 3 sections (layout, architecture, tutoriels) ⇒ pas dans le README, mais dans `.opencode/rules/` ou AGENTS.md.
 

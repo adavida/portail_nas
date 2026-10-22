@@ -17,15 +17,19 @@ Le flake expose `packages.portail-backend`, `packages.portail-frontend` et `nixo
   imports = [ inputs.portail.nixosModules.default ];
 
   services.portail = {
-    enable = true;
-    package = inputs.portail.packages.x86_64-linux.portail-backend;
+    ldap = {
+      adminPasswordFile = "/etc/portail/ldap-admin-pw";
+      baseDn = "dc=example,dc=com";
+    };
+    vhost = {
+      hostName = "portail.example.com";
+      sslCertificate = "/etc/portail/ssl/fullchain.pem";
+      sslCertificateKey = "/etc/portail/ssl/key.pem";
+    };
     appUrl = "https://portail.example.com";
-    vhost.hostName = "portail.example.com";
-    vhost.sslCertificate = "/etc/portail/ssl/fullchain.pem";
-    vhost.sslCertificateKey = "/etc/portail/ssl/key.pem";
-    ldap.baseDn = "dc=example,dc=com";
-    ldap.adminPasswordFile = "/etc/portail/ldap-admin-pw";
+    enable = true;
     lang = "fr";
+    package = inputs.portail.packages.x86_64-linux.portail-backend;
   };
 }
 ```
@@ -40,6 +44,9 @@ Le flake expose `packages.portail-backend`, `packages.portail-frontend` et `nixo
 | `lang`                       | `en`                    | langue par défaut de l'interface (`fr`/`en`)                                                |
 | `ldap.url`                   | `ldap://127.0.0.1`      | URL du serveur LDAP (`ldap://` ou `ldaps://`)                                               |
 | `ldap.baseDn`                | `dc=example,dc=com`     | suffixe LDAP                                                                                |
+| `ldap.peopleOu`              | `people`                | OU des entrées utilisateurs (`LDAP_PEOPLE_OU`)                                              |
+| `ldap.groupsOu`              | `groups`                | OU des entrées groupes (`LDAP_GROUPS_OU`)                                                   |
+| `ldap.caCertificateFile`     | `null`                  | bundle CA PEM validant le endpoint `ldaps://` (`SSL_CERT_FILE`)                             |
 | `ldap.adminPasswordFile`     | (requis)                | mot de passe `cn=admin,<baseDn>`                                                            |
 | `vhost.enable`               | `true`                  | vhost nginx (frontend en `root` + proxy `/api`, `/jwks.json`, `/.well-known/*`, `/logout`)  |
 | `vhost.hostName`             | (si vhost)              | server_name nginx + CN du certificat                                                        |
@@ -114,15 +121,19 @@ The flake exposes `packages.portail-backend`, `packages.portail-frontend` and `n
   imports = [ inputs.portail.nixosModules.default ];
 
   services.portail = {
-    enable = true;
-    package = inputs.portail.packages.x86_64-linux.portail-backend;
+    ldap = {
+      adminPasswordFile = "/etc/portail/ldap-admin-pw";
+      baseDn = "dc=example,dc=com";
+    };
+    vhost = {
+      hostName = "portail.example.com";
+      sslCertificate = "/etc/portail/ssl/fullchain.pem";
+      sslCertificateKey = "/etc/portail/ssl/key.pem";
+    };
     appUrl = "https://portail.example.com";
-    vhost.hostName = "portail.example.com";
-    vhost.sslCertificate = "/etc/portail/ssl/fullchain.pem";
-    vhost.sslCertificateKey = "/etc/portail/ssl/key.pem";
-    ldap.baseDn = "dc=example,dc=com";
-    ldap.adminPasswordFile = "/etc/portail/ldap-admin-pw";
+    enable = true;
     lang = "fr";
+    package = inputs.portail.packages.x86_64-linux.portail-backend;
   };
 }
 ```
@@ -137,6 +148,9 @@ The flake exposes `packages.portail-backend`, `packages.portail-frontend` and `n
 | `lang`                       | `en`                    | default UI language (`fr`/`en`)                                                            |
 | `ldap.url`                   | `ldap://127.0.0.1`      | LDAP server URL (`ldap://` or `ldaps://`)                                                  |
 | `ldap.baseDn`                | `dc=example,dc=com`     | LDAP suffix                                                                                |
+| `ldap.peopleOu`              | `people`                | OU holding user entries (`LDAP_PEOPLE_OU`)                                                 |
+| `ldap.groupsOu`              | `groups`                | OU holding group entries (`LDAP_GROUPS_OU`)                                                |
+| `ldap.caCertificateFile`     | `null`                  | PEM CA bundle validating the `ldaps://` endpoint (`SSL_CERT_FILE`)                         |
 | `ldap.adminPasswordFile`     | (required)              | password of `cn=admin,<baseDn>`                                                            |
 | `vhost.enable`               | `true`                  | nginx vhost (frontend as `root` + `/api`, `/jwks.json`, `/.well-known/*`, `/logout` proxy) |
 | `vhost.hostName`             | (with vhost)            | nginx server_name + certificate CN                                                         |
