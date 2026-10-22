@@ -7,14 +7,14 @@
 Le README est court et strict: français d'abord, anglais ensuite (`**Français** | [English](#english)`), toujours les mêmes 3 sections dans cet ordre, dans chaque langue:
 
 1. **Une ligne** — le but, non technique: gérer les utilisateurs du NAS NixOS et afficher une page regroupant ses applications. Jamais plus d'une phrase d'intro, pas de stack dans cette ligne.
-2. **Déploiement NixOS (flake)** — snippet `flake.nix`/config hôte minimal utilisant `nixosModules.default` (`services.portail`), tableau des options, note secrets générés (OIDC) en 1-2 phrases, checks `nix build` + `nix flake check`. Pas de provisioning OpenLDAP complet ni de génération de secrets: la source de vérité reste `nixos/portail.nix` et `devenv.nix`.
+2. **Déploiement NixOS (flake)** — snippet `flake.nix`/config hôte **exhaustif** utilisant `nixosModules.default` (`services.portail`: toutes les options du module, défauts explicites), tableau des options, note secrets générés (OIDC) en 1-2 phrases, checks `nix build` + `nix flake check`. Pas de provisioning OpenLDAP complet ni de génération de secrets: la source de vérité reste `nixos/portail.nix` et `devenv.nix`.
 3. **Développement** — un seul bloc de commandes: `devenv up`/`devenv down` + ports, scripts devenv (`openfrontend`, `resetUsers`), `just test`, `treefmt` (sans préfixe `devenv shell --`, l'environnement dev est déjà actif).
 
 ## Règles
 
 - Section 3 = commandes exactes, synchronisées avec `justfile`, `devenv.nix` (`processes`) et la règle `03-backend-frontend.md`. Changer un port/script ⇒ changer le README dans les deux langues.
 - Section 2 = options strictement alignées sur `nixos/portail.nix` (`options.portail`). Ajouter/retirer une option du module ⇒ mettre à jour le tableau FR + EN.
-- Exemples nix (`services.portail`): blocs groupés (`ldap = { ... }`, `vhost = { ... }`) en premier, puis options simples — tout en ordre alphabétique, clés internes de chaque bloc incluses. Identique FR/EN.
+- Exemple nix principal (`services.portail`): **toutes** les options de `nixos/portail.nix` avec leur défaut (`apps = [ ]`, `extraBackendEnvironment = { }`, `caCertificateFile = null`…) — blocs groupés (`ldap = { ... }`, `vhost = { ... }`) en premier, puis options simples (`oidc.secretsDir` en notation point), tout en ordre alphabétique, clés internes de chaque bloc incluses. Les sous-options `apps.*`/`apps.oidc.*` restent documentées en prose (section Applications affichées). Identique FR/EN.
 - Titres FR/EN: `Développement` ↔ `Development`, `Déploiement NixOS (flake)` ↔ `NixOS deployment (flake)`.
 - Contenu hors de ces 3 sections (layout, architecture, tutoriels) ⇒ pas dans le README, mais dans `.opencode/rules/` ou AGENTS.md.
 

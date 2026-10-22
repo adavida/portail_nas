@@ -6,7 +6,7 @@ Portail perso pour gérer les utilisateurs de mon NAS NixOS et afficher une page
 
 ## Déploiement NixOS (flake)
 
-Le flake expose `packages.portail-backend`, `packages.portail-frontend` et `nixosModules.default` (module `services.portail` : service systemd du backend + vhost nginx du frontend, proxy `/api`, `forceSSL` par défaut). OpenLDAP est provisionné par la config hôte. Le backend est **son propre fournisseur OIDC** (`/.well-known/openid-configuration`, `/jwks.json`, `/api/oidc/*`, `/logout` servis sur `appUrl`) : il génère au premier démarrage la clé de signature et `clients.json` dans `oidc.secretsDir` — ajouter un client = éditer le fichier, sans redémarrage.
+Le flake expose `packages.portail-backend` (= `packages.default`), `packages.portail-frontend` et `nixosModules.default` (module `services.portail` : service systemd du backend + vhost nginx du frontend, proxy `/api`, `forceSSL` par défaut). OpenLDAP est provisionné par la config hôte. Le backend est **son propre fournisseur OIDC** (`/.well-known/openid-configuration`, `/jwks.json`, `/api/oidc/*`, `/logout` servis sur `appUrl`) : il génère au premier démarrage la clé de signature et `clients.json` dans `oidc.secretsDir` — ajouter un client = éditer le fichier, sans redémarrage.
 
 ```nix
 { inputs, ... }:
@@ -20,15 +20,26 @@ Le flake expose `packages.portail-backend`, `packages.portail-frontend` et `nixo
     ldap = {
       adminPasswordFile = "/etc/portail/ldap-admin-pw";
       baseDn = "dc=example,dc=com";
+      caCertificateFile = null;
+      groupsOu = "groups";
+      peopleOu = "people";
+      url = "ldap://127.0.0.1";
     };
     vhost = {
+      enable = true;
+      forceSSL = true;
       hostName = "portail.example.com";
       sslCertificate = "/etc/portail/ssl/fullchain.pem";
       sslCertificateKey = "/etc/portail/ssl/key.pem";
     };
     appUrl = "https://portail.example.com";
+    apps = [ ];
+    bindAddress = "127.0.0.1:3000";
     enable = true;
+    extraBackendEnvironment = { };
     lang = "fr";
+    oidc.secretsDir = "/var/lib/portail/oidc";
+    oidcClientId = "portail";
     package = inputs.portail.packages.x86_64-linux.portail-backend;
   };
 }
@@ -110,7 +121,7 @@ Personal portal to manage the users of my NixOS NAS and show a page gathering it
 
 ### NixOS deployment (flake)
 
-The flake exposes `packages.portail-backend`, `packages.portail-frontend` and `nixosModules.default` (the `services.portail` module: backend systemd service + frontend nginx vhost, `/api` proxy, `forceSSL` by default). OpenLDAP is provisioned by the host config. The backend is **its own OIDC provider** (`/.well-known/openid-configuration`, `/jwks.json`, `/api/oidc/*`, `/logout` served on `appUrl`): on first start it generates the signing key and `clients.json` in `oidc.secretsDir` — adding a client = edit the file, no restart.
+The flake exposes `packages.portail-backend` (= `packages.default`), `packages.portail-frontend` and `nixosModules.default` (the `services.portail` module: backend systemd service + frontend nginx vhost, `/api` proxy, `forceSSL` by default). OpenLDAP is provisioned by the host config. The backend is **its own OIDC provider** (`/.well-known/openid-configuration`, `/jwks.json`, `/api/oidc/*`, `/logout` served on `appUrl`): on first start it generates the signing key and `clients.json` in `oidc.secretsDir` — adding a client = edit the file, no restart.
 
 ```nix
 { inputs, ... }:
@@ -124,15 +135,26 @@ The flake exposes `packages.portail-backend`, `packages.portail-frontend` and `n
     ldap = {
       adminPasswordFile = "/etc/portail/ldap-admin-pw";
       baseDn = "dc=example,dc=com";
+      caCertificateFile = null;
+      groupsOu = "groups";
+      peopleOu = "people";
+      url = "ldap://127.0.0.1";
     };
     vhost = {
+      enable = true;
+      forceSSL = true;
       hostName = "portail.example.com";
       sslCertificate = "/etc/portail/ssl/fullchain.pem";
       sslCertificateKey = "/etc/portail/ssl/key.pem";
     };
     appUrl = "https://portail.example.com";
+    apps = [ ];
+    bindAddress = "127.0.0.1:3000";
     enable = true;
+    extraBackendEnvironment = { };
     lang = "fr";
+    oidc.secretsDir = "/var/lib/portail/oidc";
+    oidcClientId = "portail";
     package = inputs.portail.packages.x86_64-linux.portail-backend;
   };
 }
