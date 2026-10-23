@@ -12,8 +12,8 @@ Tous les messages destinés aux logs, builds ou réponses JSON sont en anglais: 
 Vérif:
 
 ```bash
-rg -n "manquant|définis" backend/src frontend/src        # vide hors commentaires
-rg -n "expect\(.*manquant|panic!\(.*manquant" backend/src # vide
+rg -n "manquant|définis" backend/*/src frontend/src        # vide hors commentaires
+rg -n "expect\(.*manquant|panic!\(.*manquant" backend/*/src # vide
 devenv shell -- cargo clippy -- -D warnings
 devenv shell -- bash -c 'cd frontend && npx tsc --noEmit'
 ```

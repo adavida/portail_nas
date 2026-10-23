@@ -1209,21 +1209,65 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
-name = "portail-backend"
+name = "portail-core"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "portail-directory"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "ctor",
+ "ldap3",
+ "native-tls",
+ "portail-core",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "portail-oidc"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64 0.23.1",
+ "ctor",
+ "exacl",
+ "http-body-util",
+ "jsonwebtoken",
+ "libc",
+ "portail-core",
+ "portail-directory",
+ "rand",
+ "rsa",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tokio",
+ "tower",
+ "tracing",
+]
+
+[[package]]
+name = "portail-server"
 version = "0.1.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
  "ctor",
  "dtor",
- "exacl",
  "http-body-util",
- "jsonwebtoken",
  "ldap3",
- "libc",
- "native-tls",
- "rand",
- "rsa",
+ "portail-core",
+ "portail-directory",
+ "portail-oidc",
  "serde",
  "serde_json",
  "sha2 0.11.1",

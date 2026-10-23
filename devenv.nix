@@ -190,7 +190,7 @@ in
           > "$OIDC_CLIENTS_FILE"
         chmod 600 "$OIDC_CLIENTS_FILE"
       fi
-      cargo watch -w backend -x 'run -p portail-backend'
+      cargo watch -w backend -x 'run -p portail-server'
     '';
     "backend-test".exec = "cargo watch -w backend -x 'test --features test-api --quiet'";
     frontend.exec = "npm --prefix frontend run dev";

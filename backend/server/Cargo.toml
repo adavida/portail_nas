@@ -1,0 +1,33 @@
+[package]
+name = "portail-server"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+[[bin]]
+name = "portail-backend"
+path = "src/main.rs"
+
+[dependencies]
+portail-core = { path = "../core" }
+portail-directory = { path = "../directory" }
+portail-oidc = { path = "../oidc" }
+axum = "0.8.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "macros"] }
+tower-http = { version = "0.7.1", features = ["trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+base64 = "0.23.1"
+sha2 = "0.11.1"
+ctor = "1.0.13"
+dtor = "1"
+http-body-util = "0.1"
+ldap3 = { version = "0.12", default-features = false, features = ["tls-native"] }
+tower = "0.5"
+
+[features]
+test-api = ["portail-directory/test-api", "portail-oidc/test-api"]

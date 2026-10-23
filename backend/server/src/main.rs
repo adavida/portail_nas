@@ -1,0 +1,22 @@
+use portail_core::env::Env;
+use portail_server::app;
+
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("info".parse().unwrap()),
+        )
+        .init();
+    tracing::info!("start ... ... portail");
+    let env = Env::create().unwrap_or_else(|e| panic!("{e}"));
+    env.log_summary();
+    portail_oidc::auth::secrets::ensure(&env).unwrap_or_else(|e| panic!("{e}"));
+    let bind = env.bind_addr.clone();
+    Env::set(env);
+    let app = app();
+    let listener = tokio::net::TcpListener::bind(bind).await.unwrap();
+    tracing::info!("listening on {}", listener.local_addr().unwrap());
+    axum::serve(listener, app).await.unwrap();
+}

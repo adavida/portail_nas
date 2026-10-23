@@ -1,6 +1,6 @@
 # 05 — Value Objects
 
-> Skills: `backend-structure` (trigger `backend/src/domain/`), `backend-format` (trigger `*.rs`), `08-struct-folder.md` pour le layout fichiers.
+> Skills: `backend-structure` (trigger `backend/*/src/domain/`), `backend-format` (trigger `*.rs`), `08-struct-folder.md` pour le layout fichiers.
 
 ## Objectif
 
@@ -50,7 +50,7 @@ Variantes: `Email` → `try_new("") == Ok`. VO secret (`Password`) → pas de `S
 
 ## Interdits
 
-- `String` pour un concept couvert par VO (vérif): `rg -n ": String" backend/src/{domain,controllers,http,repository}` vide hors `pub struct Foo(String)` interne au VO et `#[cfg(test)]`.
+- `String` pour un concept couvert par VO (vérif): `rg -n ": String" backend/*/src/{domain,controllers,http,repository}` vide hors `pub struct Foo(String)` interne au VO et `#[cfg(test)]`.
 - `validate()` libre hors VO; `unwrap()`/`expect()` hors `main.rs`/`#[cfg(test)]`.
 
 ## Tests & vérif
@@ -59,5 +59,5 @@ Chaque `<vo>/mod.rs` a `#[cfg(test)]` AAA (valid/invalid/trim/len).
 
 ```bash
 devenv shell -- cargo test && devenv shell -- cargo clippy -- -D warnings
-rg -n ": String" backend/src/domain backend/src/controllers backend/src/http backend/src/repository
+rg -n ": String" backend/*/src/domain backend/*/src/controllers backend/*/src/http backend/*/src/repository
 ```

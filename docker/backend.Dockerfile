@@ -22,10 +22,10 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY backend/Cargo.toml backend/Cargo.toml
 RUN mkdir -p backend/src && printf 'fn main() {}\n' > backend/src/main.rs \
-    && cargo build --release -p portail-backend
+    && cargo build --release -p portail-server
 
 COPY backend/src backend/src
-RUN touch backend/src/main.rs && cargo build --release -p portail-backend
+RUN touch backend/server/src/main.rs && cargo build --release -p portail-server
 
 FROM docker.io/library/debian:bookworm-slim
 

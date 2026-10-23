@@ -30,8 +30,8 @@ Un nom de variable/fonction/paramètre/struct/VO s'exprime en **anglais, complet
 
 ```bash
 # candidats "répètent le code" — examiner chaque hit manuellement
-rg -n "^\s*// (Arrange|TODO|FIXME|validate|parse|create|get|set|return|init|check|cleanup|Optional|Calls?|Sets?|Gets?)\b" backend/src frontend/src -i
+rg -n "^\s*// (Arrange|TODO|FIXME|validate|parse|create|get|set|return|init|check|cleanup|Optional|Calls?|Sets?|Gets?)\b" backend/*/src frontend/src -i
 # pas de nom court hors boucle/ fermetures
-rg -n "let (x|tmp|val|res|obj|foo|bar)\b" backend/src frontend/src
+rg -n "let (x|tmp|val|res|obj|foo|bar)\b" backend/*/src frontend/src
 devenv shell -- cargo clippy --all-targets -- -D warnings
 ```

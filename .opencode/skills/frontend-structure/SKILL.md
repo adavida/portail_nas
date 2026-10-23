@@ -28,7 +28,7 @@ Source of truth: `.opencode/rules/08-struct-folder.md` § Frontend — un fichie
 2. `components/Foo.svelte`: `let { bar }: { bar: string } = $props();` + `<div data-testid="foo">{bar}</div>`
 3. `pages/FooPage.svelte`: `onMount` + `listFoos()` de `../api/foo` → `<Foo {bar} />`
 4. `App.svelte` → `import FooPage from './pages/FooPage.svelte'` + compose
-5. Ne pas déplacer `/api/health` sans MAJ `backend/src/lib.rs` + `vite.config.ts` proxy
+5. Ne pas déplacer `/api/health` sans MAJ `backend/server/src/lib.rs` + `vite.config.ts` proxy
 
 ### Tests collocalisés
 
