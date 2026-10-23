@@ -40,9 +40,10 @@ pub fn clients(env: &Env) -> Result<Vec<Client>, AppError> {
 
 /// `authorization_code` grant: code one-shot, client + redirect_uri + PKCE
 /// verified, then signed tokens. Errors in OAuth format (`invalid_client`,
-/// `invalid_grant`). Confidential clients must present their secret; public
-/// clients (empty secret, e.g. the OAuth debugger) skip it but must have
-/// sent a PKCE S256 challenge at authorize.
+/// `invalid_grant`). Confidential clients must present the secret read from
+/// their `secret_file`; public clients (no `secret_file`, e.g. the OAuth
+/// debugger) skip it but must have sent a PKCE S256 challenge at authorize.
+/// Disabled clients (`enabled: false` in the file) are rejected as if unknown.
 pub fn exchange(
     env: &Env,
     client_id: &str,
@@ -55,11 +56,14 @@ pub fn exchange(
     let Some(client) = Client::find_in(&clients, client_id) else {
         return Err(AppError::BadRequest("invalid_client".into()));
     };
-    if client.secret.is_public() {
-        if !client_secret.is_empty() {
-            return Err(AppError::BadRequest("invalid_client".into()));
-        }
-    } else if client.secret.as_str() != client_secret {
+    if !client.enabled {
+        return Err(AppError::BadRequest("invalid_client".into()));
+    }
+    let stored = crate::auth::secrets::stored_secret(env, client)
+        .map_err(AppError::Internal)?
+        .map(|s| s.as_str().to_string())
+        .unwrap_or_default();
+    if stored != client_secret {
         return Err(AppError::BadRequest("invalid_client".into()));
     }
     let Some(flow) = store::take_code(code) else {
@@ -68,7 +72,7 @@ pub fn exchange(
     if flow.client_id != client.id.as_str() || flow.redirect_uri != redirect_uri {
         return Err(AppError::BadRequest("invalid_grant".into()));
     }
-    if client.secret.is_public() && flow.challenge.is_none() {
+    if client.is_public() && flow.challenge.is_none() {
         return Err(AppError::BadRequest(
             "invalid_grant: public clients must use PKCE".into(),
         ));
@@ -178,11 +182,12 @@ mod tests {
             std::env::temp_dir().display(),
             std::process::id()
         );
+        env.oidc_clients_file = format!("{}/clients.json", env.oidc_secrets_dir);
         std::fs::create_dir_all(&env.oidc_secrets_dir).unwrap();
         std::fs::write(
             crate::auth::secrets::clients_path(&env),
             format!(
-                r#"[{{"id":"{PUBLIC_ID}","secret":"","redirect_uris":["{PUBLIC_REDIRECT}"],"scopes":["openid","profile","email","groups"]}}]"#
+                r#"[{{"id":"{PUBLIC_ID}","enabled":true,"redirect_uris":["{PUBLIC_REDIRECT}"],"scopes":["openid","profile","email","groups"]}}]"#
             ),
         )
         .unwrap();
@@ -254,14 +259,18 @@ mod tests {
     fn exchange_unknown_code_is_invalid_grant() {
         let env = crate::env::Env::global();
         let Ok(clients) = clients(env) else { return };
-        let Some(client) = clients.first() else {
+        let Some(client) = clients.iter().find(|c| c.enabled) else {
             return;
         };
+        let Ok(stored) = crate::auth::secrets::stored_secret(env, client) else {
+            return;
+        };
+        let presented = stored.map(|s| s.as_str().to_string()).unwrap_or_default();
 
         let err = exchange(
             env,
             client.id.as_str(),
-            client.secret.as_str(),
+            &presented,
             "no-such-code",
             client.redirect_uris[0].as_str(),
             None,
@@ -325,5 +334,72 @@ mod tests {
             matches!(&err, AppError::BadRequest(m) if m == "invalid_client"),
             "public client must refuse a presented secret, got {err}"
         );
+    }
+
+    fn env_with_secret_client(tag: &str, enabled: bool) -> Env {
+        let mut env = crate::env::Env::global().clone();
+        env.oidc_secrets_dir = format!(
+            "{}/portail-confid-test-{tag}-{}",
+            std::env::temp_dir().display(),
+            std::process::id()
+        );
+        env.oidc_clients_file = format!("{}/clients.json", env.oidc_secrets_dir);
+        std::fs::create_dir_all(&env.oidc_secrets_dir).unwrap();
+        std::fs::write(
+            crate::auth::secrets::clients_path(&env),
+            format!(
+                r#"[{{"id":"confid","secret_file":"confid_secret","enabled":{enabled},"redirect_uris":["{PUBLIC_REDIRECT}"],"scopes":["openid"]}}]"#
+            ),
+        )
+        .unwrap();
+        std::fs::write(
+            crate::auth::secrets::secret_path(&env, "confid_secret"),
+            "s3cr3t\n",
+        )
+        .unwrap();
+        env
+    }
+
+    #[test]
+    fn exchange_confidential_client_reads_secret_from_file() {
+        let env = env_with_secret_client("ok", true);
+        let flow = store::AuthFlow {
+            client_id: "confid".into(),
+            redirect_uri: PUBLIC_REDIRECT.into(),
+            state: None,
+            nonce: None,
+            scopes: vec!["openid".into()],
+            challenge: None,
+            sub: "tester".into(),
+            groups: vec![],
+            email: None,
+        };
+        let code = store::save_code(flow).unwrap();
+
+        let err =
+            exchange(&env, "confid", "wrong-secret", &code, PUBLIC_REDIRECT, None).unwrap_err();
+
+        assert!(
+            matches!(&err, AppError::BadRequest(m) if m == "invalid_client"),
+            "wrong secret must be invalid_client, got {err}"
+        );
+        let tokens = exchange(&env, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None)
+            .expect("secret from the file must authenticate the client");
+        assert!(!tokens.access_token.is_empty(), "tokens expected");
+        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+    }
+
+    #[test]
+    fn exchange_disabled_client_is_invalid_client() {
+        let env = env_with_secret_client("disabled", false);
+        let code = store::save_code(public_flow(Some("chal"))).unwrap();
+
+        let err = exchange(&env, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None).unwrap_err();
+
+        assert!(
+            matches!(&err, AppError::BadRequest(m) if m == "invalid_client"),
+            "disabled client must be invalid_client, got {err}"
+        );
+        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
     }
 }

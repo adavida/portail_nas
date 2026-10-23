@@ -9,6 +9,9 @@ pub struct Env {
     pub oidc_client_id: String,
     pub oidc_redirect_uri: String,
     pub oidc_secrets_dir: String,
+    /// Full path of the OIDC clients file (`OIDC_CLIENTS_FILE`). Written by
+    /// nix only — the backend reads it and never modifies it.
+    pub oidc_clients_file: String,
     pub oidc_key_bits: usize,
     /// INFO logging of OIDC secret file events (`OIDC_SECRET_LOGS`).
     /// `false` = silent; errors stay logged either way.
@@ -23,6 +26,11 @@ pub struct Env {
     /// Optional TLS trust for LDAPS: PEM file path of the CA / self-signed
     /// server cert. Empty (default) = system trust store only.
     pub ldap_tls_ca: String,
+    /// JSON map `{ "<clientId>": {"user": "...", "group": "..."} }`
+    /// (`OIDC_CLIENT_OWNERS`) declaring the Linux owner of each generated
+    /// `<clientId>_secret`. Empty (default) = no ownership enforcement; the
+    /// files stay owned by the service user.
+    pub oidc_client_owners: String,
 }
 
 static ENV: OnceLock<Env> = OnceLock::new();
@@ -94,6 +102,7 @@ impl Env {
         let oidc_issuer_url = take("OIDC_ISSUER_URL", &mut missing);
         let oidc_client_id = take("OIDC_CLIENT_ID", &mut missing);
         let oidc_secrets_dir = take("OIDC_SECRETS_DIR", &mut missing);
+        let oidc_clients_file = take("OIDC_CLIENTS_FILE", &mut missing);
         let oidc_key_bits =
             match take_opt("OIDC_KEY_BITS", &DEFAULT_KEY_BITS.to_string()).parse::<usize>() {
                 Ok(n) => n,
@@ -112,6 +121,7 @@ impl Env {
         let ldap_groups_ou = take_opt("LDAP_GROUPS_OU", "groups");
         let ldap_admin_pw = take_secret_opt("LDAP_ADMIN_PW", "admin", &mut file_errors);
         let ldap_tls_ca = take_opt("LDAP_TLS_CA", "");
+        let oidc_client_owners = take_opt("OIDC_CLIENT_OWNERS", "");
 
         if !missing.is_empty() {
             return Err(EnvError(format!(
@@ -137,6 +147,7 @@ impl Env {
             oidc_client_id,
             oidc_redirect_uri,
             oidc_secrets_dir,
+            oidc_clients_file,
             oidc_key_bits,
             oidc_secret_logs,
             app_url,
@@ -147,6 +158,7 @@ impl Env {
             ldap_groups_ou,
             ldap_admin_pw,
             ldap_tls_ca,
+            oidc_client_owners,
         })
     }
 
@@ -157,6 +169,7 @@ impl Env {
             oidc_issuer_url = %self.oidc_issuer_url,
             oidc_client_id = %self.oidc_client_id,
             oidc_secrets_dir = %self.oidc_secrets_dir,
+            oidc_clients_file = %self.oidc_clients_file,
             oidc_key_bits = %self.oidc_key_bits,
             oidc_secret_logs = %self.oidc_secret_logs,
             oidc_redirect_uri = %self.oidc_redirect_uri,
@@ -198,8 +211,22 @@ impl Env {
 
     fn from_compile_fallback() -> Self {
         // ponytail: test fallback outside devenv — the secrets dir points to a
-        // temp path where `secrets::ensure` creates key + clients file at
-        // startup (main) or when the test app is built.
+        // temp path where the test helpers write the clients file and
+        // `secrets::ensure` creates the signing key + secret files.
+        let oidc_secrets_dir = option_env!("OIDC_SECRETS_DIR")
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| {
+                format!(
+                    "{}/portail-oidc-secrets-{}",
+                    std::env::temp_dir().display(),
+                    std::process::id()
+                )
+            });
+        let oidc_clients_file = option_env!("OIDC_CLIENTS_FILE")
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| format!("{oidc_secrets_dir}/clients.json"));
         Self {
             oidc_issuer_url: option_env!("OIDC_ISSUER_URL")
                 .unwrap_or("http://127.0.0.1:3000")
@@ -210,16 +237,8 @@ impl Env {
             oidc_redirect_uri: option_env!("OIDC_REDIRECT_URI")
                 .unwrap_or("http://localhost:5173/callback")
                 .to_string(),
-            oidc_secrets_dir: option_env!("OIDC_SECRETS_DIR")
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .unwrap_or_else(|| {
-                    format!(
-                        "{}/portail-oidc-secrets-{}",
-                        std::env::temp_dir().display(),
-                        std::process::id()
-                    )
-                }),
+            oidc_secrets_dir,
+            oidc_clients_file,
             oidc_key_bits: option_env!("OIDC_KEY_BITS")
                 .and_then(|s| s.trim().parse::<usize>().ok())
                 .unwrap_or(DEFAULT_KEY_BITS),
@@ -246,6 +265,7 @@ impl Env {
                 .to_string(),
             ldap_admin_pw: option_env!("LDAP_ADMIN_PW").unwrap_or("admin").to_string(),
             ldap_tls_ca: option_env!("LDAP_TLS_CA").unwrap_or("").to_string(),
+            oidc_client_owners: option_env!("OIDC_CLIENT_OWNERS").unwrap_or("").to_string(),
         }
     }
 }
@@ -275,6 +295,7 @@ mod tests {
             "OIDC_ISSUER_URL",
             "OIDC_CLIENT_ID",
             "OIDC_SECRETS_DIR",
+            "OIDC_CLIENTS_FILE",
             "OIDC_REDIRECT_URI",
             "APP_URL",
             "BIND_ADDR",
@@ -287,10 +308,12 @@ mod tests {
             .map(|k| (k.to_string(), std::env::var(k).ok()))
             .collect();
         let secrets_dir = format!("/tmp/portail-test-env-{}", std::process::id());
+        let clients_file = format!("{secrets_dir}/clients.json");
         for (k, v) in [
             ("OIDC_ISSUER_URL", "http://127.0.0.1:3000"),
             ("OIDC_CLIENT_ID", "portail-dev"),
             ("OIDC_SECRETS_DIR", &secrets_dir),
+            ("OIDC_CLIENTS_FILE", &clients_file),
             ("OIDC_REDIRECT_URI", "http://localhost:5173/callback"),
             ("APP_URL", "http://localhost:5173"),
             ("BIND_ADDR", "0.0.0.0:3000"),
@@ -320,6 +343,7 @@ mod tests {
             "OIDC_ISSUER_URL",
             "OIDC_CLIENT_ID",
             "OIDC_SECRETS_DIR",
+            "OIDC_CLIENTS_FILE",
             "OIDC_REDIRECT_URI",
             "APP_URL",
             "BIND_ADDR",
@@ -375,12 +399,14 @@ mod tests {
             std::env::var("LDAP_ADMIN_PW").ok(),
             std::env::var("LDAP_TLS_CA").ok(),
             std::env::var("OIDC_KEY_BITS").ok(),
+            std::env::var("OIDC_CLIENT_OWNERS").ok(),
         );
         unsafe { std::env::remove_var("LDAP_PEOPLE_OU") };
         unsafe { std::env::remove_var("LDAP_GROUPS_OU") };
         unsafe { std::env::remove_var("LDAP_ADMIN_PW") };
         unsafe { std::env::remove_var("LDAP_TLS_CA") };
         unsafe { std::env::remove_var("OIDC_KEY_BITS") };
+        unsafe { std::env::remove_var("OIDC_CLIENT_OWNERS") };
 
         let env = super::Env::create().unwrap();
 
@@ -392,6 +418,10 @@ mod tests {
             env.oidc_key_bits,
             super::DEFAULT_KEY_BITS,
             "default RSA key size expected"
+        );
+        assert_eq!(
+            env.oidc_client_owners, "",
+            "default empty client owners expected"
         );
 
         if let Some(v) = saved.0 {
@@ -408,6 +438,9 @@ mod tests {
         }
         if let Some(v) = saved.4 {
             unsafe { std::env::set_var("OIDC_KEY_BITS", v) };
+        }
+        if let Some(v) = saved.5 {
+            unsafe { std::env::set_var("OIDC_CLIENT_OWNERS", v) };
         }
     }
 
@@ -460,6 +493,24 @@ mod tests {
 
         if let Some(v) = saved {
             unsafe { std::env::set_var("OIDC_SECRETS_DIR", v) };
+        }
+    }
+
+    #[test]
+    fn required_oidc_clients_file_is_reported() {
+        let _g = LOCK.lock().unwrap();
+        let saved = std::env::var("OIDC_CLIENTS_FILE").ok();
+        unsafe { std::env::remove_var("OIDC_CLIENTS_FILE") };
+
+        let err = super::Env::create().unwrap_err();
+
+        assert!(
+            err.0.contains("OIDC_CLIENTS_FILE"),
+            "missing clients file path should be reported: {err}"
+        );
+
+        if let Some(v) = saved {
+            unsafe { std::env::set_var("OIDC_CLIENTS_FILE", v) };
         }
     }
 

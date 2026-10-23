@@ -7,7 +7,10 @@ pkgs.rustPlatform.buildRustPackage {
   cargoLock.lockFile = ../Cargo.lock;
   #ldap3 tls-native → openssl-sys
   nativeBuildInputs = [ pkgs.pkg-config ];
-  buildInputs = [ pkgs.openssl ];
+  buildInputs = [
+    pkgs.acl
+    pkgs.openssl
+  ];
   # Integration tests = test LDAP (3891) — outside the nix sandbox.
   doCheck = false;
 }

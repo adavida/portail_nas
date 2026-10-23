@@ -26,10 +26,12 @@
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
+          acl
           cargo
           clippy
           openssl
           pkg-config
+          rtk
           rustc
           rustfmt
         ];

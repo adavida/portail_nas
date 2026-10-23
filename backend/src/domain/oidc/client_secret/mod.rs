@@ -1,8 +1,5 @@
-use serde::Deserialize;
-
-/// Client secret — never serialized (never exposed in a response).
-/// An empty secret marks a **public client** (OAuth debugger, native apps):
-/// no secret at the token endpoint, PKCE S256 is then mandatory.
+/// Client secret as loaded from its `secret_file` — never stored in the
+/// clients JSON, never exposed in a response.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientSecret(String);
 
@@ -13,17 +10,6 @@ impl ClientSecret {
 
     pub fn as_str(&self) -> &str {
         &self.0
-    }
-
-    pub fn is_public(&self) -> bool {
-        self.0.is_empty()
-    }
-}
-
-impl<'de> Deserialize<'de> for ClientSecret {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let raw = String::deserialize(deserializer)?;
-        Ok(Self::new(raw))
     }
 }
 
@@ -36,20 +22,5 @@ mod tests {
         let secret = ClientSecret::new("  s3cr3t  ".into());
 
         assert_eq!(secret.as_str(), "s3cr3t", "valid secret trimmed");
-        assert!(!secret.is_public(), "non-empty secret is confidential");
-    }
-
-    #[test]
-    fn empty_secret_marks_public_client() {
-        let secret = ClientSecret::new("".into());
-
-        assert!(secret.is_public(), "empty secret must mark a public client");
-    }
-
-    #[test]
-    fn blank_secret_trims_to_public() {
-        let secret = ClientSecret::new("   ".into());
-
-        assert!(secret.is_public(), "blank secret trims to public client");
     }
 }

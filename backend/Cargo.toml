@@ -16,6 +16,8 @@ jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
 rand = "0.8"
 rsa = { version = "0.9", features = ["pem"] }
 sha2 = "0.11.1"
+libc = "0.2"
+exacl = "0.13"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tower-http = { version = "0.7.1", features = ["trace"] }

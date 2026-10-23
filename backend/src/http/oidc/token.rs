@@ -74,6 +74,8 @@ mod tests {
 
     fn app() -> axum::Router {
         crate::env::Env::ensure_init();
+        crate::test_helpers::app::bootstrap_clients_file(crate::env::Env::global());
+        crate::auth::secrets::ensure(crate::env::Env::global()).unwrap();
         let env = crate::env::Env::global().clone();
         super::super::oidc_router(env.clone()).with_state(env)
     }

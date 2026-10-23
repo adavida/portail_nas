@@ -46,6 +46,11 @@ pub async fn authorize(
     let clients = tokens::clients(&env)?;
     let client = Client::find_in(&clients, &client_id)
         .ok_or_else(|| AppError::BadRequest("unknown client_id".into()))?;
+    if !client.enabled {
+        return Err(AppError::BadRequest(format!(
+            "client is disabled: {client_id}"
+        )));
+    }
     if !client.allows_redirect(&redirect_uri) {
         return Err(AppError::BadRequest("redirect_uri not registered".into()));
     }
@@ -106,6 +111,8 @@ mod tests {
 
     fn app() -> axum::Router {
         crate::env::Env::ensure_init();
+        crate::test_helpers::app::bootstrap_clients_file(crate::env::Env::global());
+        crate::auth::secrets::ensure(crate::env::Env::global()).unwrap();
         let env = crate::env::Env::global().clone();
         oidc::oidc_router(env.clone()).with_state(env)
     }

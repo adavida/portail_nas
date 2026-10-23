@@ -38,10 +38,14 @@ pub async fn callback(
             env.oidc_client_id
         ))
     })?;
+    let secret = crate::auth::secrets::stored_secret(&env, client)
+        .map_err(AppError::Internal)?
+        .map(|s| s.as_str().to_string())
+        .unwrap_or_default();
     let tokens = exchange(
         &env,
         client.id.as_str(),
-        client.secret.as_str(),
+        &secret,
         &payload.code,
         &redirect_uri,
         payload.code_verifier.as_deref(),

@@ -56,10 +56,14 @@ pub fn test_client(client_id: ClientId) -> Result<OidcTestReport, AppError> {
         userinfo_ok: false,
         error: None,
     };
+    let secret = crate::auth::secrets::stored_secret(env, client)
+        .map_err(AppError::Internal)?
+        .map(|s| s.as_str().to_string())
+        .unwrap_or_default();
     let report = match tokens::exchange(
         env,
         base.client_id.as_str(),
-        client.secret.as_str(),
+        &secret,
         &code,
         &redirect_uri,
         None,
@@ -89,6 +93,8 @@ mod tests {
 
     #[test]
     fn test_unknown_client_reports_not_found() {
+        crate::env::Env::ensure_init();
+        crate::test_helpers::app::bootstrap_clients_file(crate::env::Env::global());
         let Ok(client_id) = ClientId::try_new("no-such-client".into()) else {
             return;
         };

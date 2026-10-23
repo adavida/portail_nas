@@ -133,6 +133,7 @@ in
     LDAP_TLS_CA = "${config.env.DEVENV_STATE}/openldap-dev/ldap.crt";
     LDAP_URL = "ldaps://127.0.0.1:6360";
     OIDC_CLIENT_ID = "portail-dev";
+    OIDC_CLIENTS_FILE = "${config.env.DEVENV_STATE}/secrets/clients.json";
     OIDC_ISSUER_URL = "http://127.0.0.1:3000";
     OIDC_REDIRECT_URI = "http://localhost:5173/callback";
     OIDC_SECRETS_DIR = "${config.env.DEVENV_STATE}/secrets";
@@ -165,6 +166,7 @@ in
   };
 
   packages = with pkgs; [
+    acl
     cargo-watch
     # codiumWithExt
     curl
@@ -180,14 +182,22 @@ in
   ];
 
   processes = {
-    backend.exec = "cargo watch -w backend -x 'run -p portail-backend'";
+    backend.exec = ''
+      if [ ! -f "$OIDC_CLIENTS_FILE" ]; then
+        mkdir -p "$(dirname "$OIDC_CLIENTS_FILE")"
+        jq -n --arg id "$OIDC_CLIENT_ID" --arg redirect "$OIDC_REDIRECT_URI" \
+          '[{id: $id, secret_file: ($id + "_secret"), enabled: true, redirect_uris: [$redirect], scopes: ["openid","profile","email","groups"]}]' \
+          > "$OIDC_CLIENTS_FILE"
+        chmod 600 "$OIDC_CLIENTS_FILE"
+      fi
+      cargo watch -w backend -x 'run -p portail-backend'
+    '';
     "backend-test".exec = "cargo watch -w backend -x 'test --features test-api --quiet'";
     frontend.exec = "npm --prefix frontend run dev";
     "frontend-test".exec = "npm --prefix frontend run test:watch";
     oauthdebugger.exec = ''
-      clients="$OIDC_SECRETS_DIR/clients.json"
-      until [ -f "$clients" ]; do sleep 0.5; done
-      jq 'if any(.[]; .id == "oauth-debugger") then . else . + [{"id":"oauth-debugger","secret":"","redirect_uris":["http://127.0.0.1:3030/callback"],"scopes":["openid","profile","email","groups"]}] end' "$clients" > "$clients.tmp" && mv "$clients.tmp" "$clients" && chmod 600 "$clients"
+      until [ -f "$OIDC_CLIENTS_FILE" ]; do sleep 0.5; done
+      jq 'if any(.[]; .id == "oauth-debugger") then . else . + [{"id":"oauth-debugger","secret_file":null,"enabled":false,"redirect_uris":["http://127.0.0.1:3030/callback"],"scopes":["openid","profile","email","groups"]}] end' "$OIDC_CLIENTS_FILE" > "$OIDC_CLIENTS_FILE.tmp" && mv "$OIDC_CLIENTS_FILE.tmp" "$OIDC_CLIENTS_FILE" && chmod 600 "$OIDC_CLIENTS_FILE"
       exec uvx --from "oauth2-debugger[verify]" oauth2-debugger --port 3030 --issuer "$OIDC_ISSUER_URL" --client-id oauth-debugger --scope "openid profile email groups" --no-browser
     '';
     openldap.exec = mkSlapd {
