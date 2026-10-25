@@ -66,7 +66,7 @@ let
         ];
       }
     ]
-    + map (
+    ++ map (
       c:
       {
         inherit (c)
