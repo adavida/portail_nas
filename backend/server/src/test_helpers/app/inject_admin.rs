@@ -6,7 +6,7 @@ use portail_oidc::auth::{Claims, middleware::AuthUser};
 pub(crate) async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCode> {
     let claims = Claims {
         sub: "admin".into(),
-        aud: serde_json::json!(Config::global().oidc_client_id.as_str()),
+        aud: Config::global().oidc_client_id.clone(),
         iss: Config::global().oidc_issuer_url.clone(),
         exp: 9999999999,
         groups: vec!["admin".into()],

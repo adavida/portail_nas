@@ -1,5 +1,10 @@
 use axum::{Json, http::StatusCode, response::IntoResponse};
-use serde_json::json;
+use serde::Serialize;
+
+#[derive(Serialize)]
+pub struct ApiError {
+    error: String,
+}
 
 #[derive(Debug)]
 pub enum AppError {
@@ -28,33 +33,28 @@ impl std::error::Error for AppError {}
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
-        let msg = match self {
+        let (status, msg) = match self {
             Self::NotFound(m) => {
                 tracing::warn!("404 {}", m);
-                let body = Json(json!({"error": m}));
-                return (StatusCode::NOT_FOUND, body).into_response();
+                (StatusCode::NOT_FOUND, m)
             }
             Self::BadRequest(m) => {
                 tracing::warn!("400 {}", m);
-                let body = Json(json!({"error": m}));
-                return (StatusCode::BAD_REQUEST, body).into_response();
+                (StatusCode::BAD_REQUEST, m)
             }
             Self::Unauthorized(m) => {
                 tracing::warn!("401 {}", m);
-                let body = Json(json!({"error": m}));
-                return (StatusCode::UNAUTHORIZED, body).into_response();
+                (StatusCode::UNAUTHORIZED, m)
             }
             Self::Forbidden(m) => {
                 tracing::warn!("403 {}", m);
-                let body = Json(json!({"error": m}));
-                return (StatusCode::FORBIDDEN, body).into_response();
+                (StatusCode::FORBIDDEN, m)
             }
             Self::Ldap(m) | Self::Internal(m) => {
                 tracing::error!("500 {}", m);
-                m
+                (StatusCode::INTERNAL_SERVER_ERROR, m)
             }
         };
-        let body = Json(json!({"error": msg}));
-        (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
+        (status, Json(ApiError { error: msg })).into_response()
     }
 }

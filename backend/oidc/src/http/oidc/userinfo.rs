@@ -1,14 +1,22 @@
 use axum::{Json, extract::State, http::HeaderMap};
-use serde_json::json;
+use serde::Serialize;
 
 use crate::auth::tokens;
 use portail_core::config::Config;
 use portail_core::error::AppError;
 
+#[derive(Serialize)]
+pub struct Userinfo {
+    pub(crate) sub: String,
+    pub(crate) preferred_username: Option<String>,
+    pub(crate) email: Option<String>,
+    pub(crate) groups: Vec<String>,
+}
+
 pub async fn userinfo(
     State(config): State<Config>,
     headers: HeaderMap,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<Userinfo>, AppError> {
     let auth = headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())
@@ -18,12 +26,12 @@ pub async fn userinfo(
         return Err(AppError::Unauthorized("missing Bearer token".into()));
     }
     let claims = tokens::verify_any_aud(&config, token)?;
-    Ok(Json(json!({
-        "sub": claims.sub,
-        "preferred_username": claims.preferred_username,
-        "email": claims.email,
-        "groups": claims.groups,
-    })))
+    Ok(Json(Userinfo {
+        sub: claims.sub,
+        preferred_username: claims.preferred_username,
+        email: claims.email,
+        groups: claims.groups,
+    }))
 }
 
 #[cfg(test)]

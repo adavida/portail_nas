@@ -4,6 +4,7 @@ use axum::{
 };
 
 use crate::auth::middleware::AuthUser;
+use crate::http::oidc::userinfo::Userinfo;
 use portail_core::config::Config;
 
 pub mod callback;
@@ -26,11 +27,11 @@ pub fn protected_auth_router() -> Router<Config> {
     r
 }
 
-pub async fn me(Extension(AuthUser(claims)): Extension<AuthUser>) -> Json<serde_json::Value> {
-    Json(serde_json::json!({
-        "sub": claims.sub,
-        "groups": claims.groups,
-        "email": claims.email,
-        "preferred_username": claims.preferred_username,
-    }))
+pub async fn me(Extension(AuthUser(claims)): Extension<AuthUser>) -> Json<Userinfo> {
+    Json(Userinfo {
+        sub: claims.sub,
+        preferred_username: claims.preferred_username,
+        email: claims.email,
+        groups: claims.groups,
+    })
 }

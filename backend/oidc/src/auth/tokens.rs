@@ -85,7 +85,7 @@ fn now() -> usize {
 fn claims(config: &Config, flow: &store::AuthFlow) -> Claims {
     Claims {
         sub: flow.sub.clone(),
-        aud: serde_json::json!(flow.client_id),
+        aud: flow.client_id.clone(),
         iss: config.oidc_issuer_url.clone(),
         exp: now() + ACCESS_TOKEN_TTL as usize,
         groups: flow.groups.clone(),

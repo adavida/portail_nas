@@ -4,11 +4,9 @@ use portail_oidc::auth::{Claims, middleware::AuthUser};
 pub async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCode> {
     let claims = Claims {
         sub: "admin".into(),
-        aud: serde_json::json!(
-            portail_core::config::Config::global()
-                .oidc_client_id
-                .as_str()
-        ),
+        aud: portail_core::config::Config::global()
+            .oidc_client_id
+            .clone(),
         iss: portail_core::config::Config::global()
             .oidc_issuer_url
             .as_str()

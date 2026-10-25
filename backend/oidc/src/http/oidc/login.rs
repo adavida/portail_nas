@@ -3,13 +3,17 @@ use axum::{
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };
-use serde::Deserialize;
-use serde_json::json;
+use serde::{Deserialize, Serialize};
 
 use crate::{auth::store, http::oidc};
 use portail_core::config::Config;
 use portail_core::error::AppError;
 use portail_directory::domain::users::{Password, Uid};
+
+#[derive(Serialize)]
+pub struct Login {
+    redirect: String,
+}
 
 #[derive(Deserialize)]
 pub struct LoginCredentials {
@@ -54,7 +58,7 @@ pub async fn login(
     Ok((
         StatusCode::OK,
         [(header::SET_COOKIE, oidc::session_cookie(&config, &sid))],
-        Json(json!({ "redirect": redirect })),
+        Json(Login { redirect }),
     )
         .into_response())
 }

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Claims {
     pub sub: String,
-    pub aud: serde_json::Value,
+    pub aud: String,
     pub iss: String,
     pub exp: usize,
     #[serde(default)]

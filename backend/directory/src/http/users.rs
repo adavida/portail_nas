@@ -1,5 +1,5 @@
 use axum::{Json, Router, extract::Path, http::StatusCode, routing::get, routing::put};
-use serde_json::json;
+use serde::Serialize;
 
 use crate::{
     controllers::users::{authenticate, create, delete, list, update, update_password},
@@ -55,10 +55,15 @@ pub async fn update_user(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Serialize)]
+pub struct AuthenticateOk {
+    ok: bool,
+}
+
 pub async fn authenticate_user(
     Path(uid): Path<Uid>,
     Json(payload): Json<UpdatePassword>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<AuthenticateOk>, AppError> {
     let ok = authenticate(uid, payload.password).await?;
-    Ok(Json(json!({ "ok": ok })))
+    Ok(Json(AuthenticateOk { ok }))
 }
