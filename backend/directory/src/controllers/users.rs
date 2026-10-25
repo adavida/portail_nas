@@ -41,7 +41,6 @@ async fn ensure_user_group(uid: &Uid) -> Result<(), AppError> {
     if ldap_repo::create_group(new).await.is_ok() {
         return Ok(());
     }
-    // Lost the race against a concurrent create: the group now exists, join it.
     ldap_repo::add_member(gid, uid.clone()).await
 }
 

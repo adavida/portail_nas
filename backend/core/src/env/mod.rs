@@ -8,12 +8,8 @@ pub struct Env {
     pub oidc_client_id: String,
     pub oidc_redirect_uri: String,
     pub oidc_secrets_dir: String,
-    /// Full path of the OIDC clients file (`OIDC_CLIENTS_FILE`). Written by
-    /// nix only — the backend reads it and never modifies it.
     pub oidc_clients_file: String,
     pub oidc_key_bits: usize,
-    /// INFO logging of OIDC secret file events (`OIDC_SECRET_LOGS`).
-    /// `false` = silent; errors stay logged either way.
     pub oidc_secret_logs: bool,
     pub app_url: String,
     pub bind_addr: String,
@@ -22,21 +18,13 @@ pub struct Env {
     pub ldap_people_ou: String,
     pub ldap_groups_ou: String,
     pub ldap_admin_pw: String,
-    /// Optional TLS trust for LDAPS: PEM file path of the CA / self-signed
-    /// server cert. Empty (default) = system trust store only.
     pub ldap_tls_ca: String,
-    /// JSON map `{ "<clientId>": {"user": "...", "group": "..."} }`
-    /// (`OIDC_CLIENT_OWNERS`) declaring the Linux owner of each generated
-    /// `<clientId>_secret`. Empty (default) = no ownership enforcement; the
-    /// files stay owned by the service user.
     pub oidc_client_owners: String,
 }
 
 pub const DEFAULT_KEY_BITS: usize = 2048;
 
-/// Secret vars (`LDAP_ADMIN_PW`) hold the **path** of a file whose content is
-/// the secret. Trims whitespace/newline around the content.
-fn read_secret(name: &'static str) -> Option<Result<String, String>> {
+fn read_secret_file(name: &'static str) -> Option<Result<String, String>> {
     let path = std::env::var(name).ok()?;
     let path = path.trim();
     if path.is_empty() {
@@ -57,10 +45,6 @@ fn read_secret(name: &'static str) -> Option<Result<String, String>> {
 }
 
 impl Env {
-    /// Reads all required vars from `std::env`; collects every missing/empty
-    /// name and returns a single error listing them all.
-    /// Secret vars contain the path of a file whose content is the secret.
-    /// Optional vars fall back to documented defaults (see field docs).
     pub fn create() -> Result<Self, EnvError> {
         let mut missing: Vec<&'static str> = Vec::new();
         let mut file_errors: Vec<String> = Vec::new();
@@ -86,7 +70,7 @@ impl Env {
 
         let take_secret_opt =
             |name: &'static str, default: &str, file_errors: &mut Vec<String>| -> String {
-                match read_secret(name) {
+                match read_secret_file(name) {
                     Some(Ok(v)) => v,
                     Some(Err(e)) => {
                         file_errors.push(e);
@@ -159,8 +143,6 @@ impl Env {
         })
     }
 
-    /// Logs the non-secret values at startup for production debugging. Secret
-    /// contents are never logged, only the paths that hold them.
     pub fn log_summary(&self) {
         tracing::info!(
             oidc_issuer_url = %self.oidc_issuer_url,
@@ -201,8 +183,6 @@ mod tests {
     use std::sync::Mutex;
     static LOCK: Mutex<()> = Mutex::new(());
 
-    /// Set all required vars to fixed values (secrets dir = fresh temp path).
-    /// Returns the saved values to restore afterwards.
     fn save_and_set_all() -> Vec<(String, Option<String>)> {
         let names = [
             "OIDC_ISSUER_URL",

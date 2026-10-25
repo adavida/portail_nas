@@ -77,7 +77,7 @@ mod tests {
     async fn list_users_sorted_by_uid() {
         let users = match list_users().await {
             Ok(u) => u,
-            Err(AppError::Ldap(_)) => return, // LDAP unavailable => skip
+            Err(AppError::Ldap(_)) => return,
             Err(e) => panic!("list_users should succeed, got {e}"),
         };
 

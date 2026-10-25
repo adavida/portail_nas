@@ -4,8 +4,6 @@ use serde_json::json;
 use crate::auth::key;
 use portail_core::error::AppError;
 
-/// JWKS — the provider public key, exposed for verification by
-/// third-party clients (`{issuer}/jwks.json`).
 pub async fn jwks() -> Result<Json<serde_json::Value>, AppError> {
     let key = key::global().ok_or_else(|| {
         AppError::Internal("signing key not available: generate it in the OIDC secrets dir".into())

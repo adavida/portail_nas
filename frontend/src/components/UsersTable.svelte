@@ -17,7 +17,6 @@
     onDeleted?: () => void;
   };
 
-  // $bp-narrow from tokens — must stay in sync
   const MOBILE_QUERY = "(max-width: 720px)";
 
   let { users, allGroups = [], onCreated, onUpdated, onDeleted }: Props =

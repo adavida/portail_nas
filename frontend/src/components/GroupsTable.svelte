@@ -12,7 +12,6 @@
     onDeleted?: () => void;
   };
 
-  // $bp-narrow from tokens — must stay in sync
   const MOBILE_QUERY = "(max-width: 720px)";
   const PROTECTED_GIDS = ["admin", "user"];
   const isProtected = (gid: string) => PROTECTED_GIDS.includes(gid);

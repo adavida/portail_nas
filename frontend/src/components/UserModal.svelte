@@ -23,7 +23,6 @@
 
   let { user, allGroups = [], onClose, onUpdated, onDeleted }: Props = $props();
 
-  // draft initialized once: the modal is remounted on each opening
   let name = $state(untrack(() => user.name));
   let email = $state(untrack(() => user.email));
   let password = $state("");

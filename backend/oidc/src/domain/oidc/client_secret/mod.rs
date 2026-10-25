@@ -1,5 +1,3 @@
-/// Client secret as loaded from its `secret_file` — never stored in the
-/// clients JSON, never exposed in a response.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientSecret(String);
 

@@ -21,9 +21,6 @@ pub(crate) fn ldap_base() -> &'static String {
     &portail_core::env::Env::global().ldap_base_dn
 }
 
-/// Adds a trusted root certificate to the connection settings when
-/// `LDAP_TLS_CA` points to a PEM file (self-signed server cert or CA).
-/// Empty path = system trust store only.
 pub(crate) fn with_tls_ca(
     settings: ldap3::LdapConnSettings,
     ca_path: &str,
@@ -117,8 +114,6 @@ impl<T> MapLdap<T> for Result<T, ldap3::LdapError> {
 mod tests {
     #[test]
     fn ldap_url_reads_env() {
-        // Env::create is called once; ldap_url reflects the global Env, not a
-        // dynamic env var after init.
         let url = super::ldap_url();
         assert!(!url.is_empty(), "ldap_url should be non-empty");
         assert!(

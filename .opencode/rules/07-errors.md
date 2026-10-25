@@ -2,7 +2,7 @@
 
 > Backend: `error.rs`, `http/error.rs`, `auth/*`, `env/` — Frontend: `auth/oidc.ts`, `pages/*`, `env.ts`
 
-Tous les messages destinés aux logs, builds ou réponses JSON sont en anglais: `panic!`, `expect`, `unwrap_or_else`, `tracing::warn/error/info`, `AppError`, `Display`/`Error`, `serde::de::Error::custom`, `throw new Error`. Les commentaires et la doc restent en français.
+Tous les messages destinés aux logs, builds ou réponses JSON sont en anglais: `panic!`, `expect`, `unwrap_or_else`, `tracing::warn/error/info`, `AppError`, `Display`/`Error`, `serde::de::Error::custom`, `throw new Error`. Commentaires interdits (règle 12) — seuls les messages runtime portent la langue.
 
 - `expect("OIDC_ISSUER_URL missing: set ...")` — pas `manquant: définis ...`
 - `AppError::Internal("token exchange failed: ...")` — pas `échec d'échange`
@@ -12,7 +12,7 @@ Tous les messages destinés aux logs, builds ou réponses JSON sont en anglais: 
 Vérif:
 
 ```bash
-rg -n "manquant|définis" backend/*/src frontend/src        # vide hors commentaires
+rg -n "manquant|définis" backend/*/src frontend/src        # vide
 rg -n "expect\(.*manquant|panic!\(.*manquant" backend/*/src # vide
 devenv shell -- cargo clippy -- -D warnings
 devenv shell -- bash -c 'cd frontend && npx tsc --noEmit'

@@ -1,7 +1,6 @@
 use super::Gid;
 use crate::domain::users::{Uid, User};
 
-/// `gid` -> members association, as reported by LDAP (cn + member DNs).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GroupUids {
     pub gid: Gid,
@@ -24,7 +23,6 @@ impl Members {
 }
 
 impl GroupUids {
-    /// `None` when the entry has no valid `cn` (invalid gid).
     pub fn from_attrs(cn: Option<String>, member_dns: &[String]) -> Option<Self> {
         let gid = Gid::try_new(cn?).ok()?;
         Some(Self {
@@ -41,8 +39,6 @@ impl GroupUids {
     }
 }
 
-/// member DNs -> `Members` (`uid=...` -> `Uid`, `cn=...` -> `Cn`),
-/// anything the `Uid`/`Gid` VOs reject is dropped.
 pub fn member_uids(member_dns: &[String]) -> Vec<Members> {
     member_dns
         .iter()

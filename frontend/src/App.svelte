@@ -21,8 +21,6 @@
   const token = getToken();
 
   $effect(() => {
-    // isLogin: never auto-login here, otherwise authorize → /login → effect →
-    // login() loops forever.
     if (isCallback || isLogin) return;
     if (!token) {
       if (sessionStorage.getItem("logged_out") === "1") return;

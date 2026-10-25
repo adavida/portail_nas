@@ -11,8 +11,6 @@ pub struct OidcTestRequest {
     pub client_id: Option<String>,
 }
 
-/// POST /api/auth/oidc-test — checks that a configured OIDC client can
-/// connect to the portal provider (without touching LDAP or the apps).
 pub async fn oidc_test(
     State(env): State<Env>,
     Json(payload): Json<OidcTestRequest>,

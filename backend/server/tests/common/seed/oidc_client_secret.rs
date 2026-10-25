@@ -1,8 +1,5 @@
 use serde_json::Value;
 
-/// Reads the portal's real `(client_id, secret)` pair from
-/// `OIDC_CLIENTS_FILE` + its `secret_file` — files written by the nix /
-/// devenv bootstrap. `None` if either is inaccessible.
 pub fn oidc_client_secret() -> Option<(String, String)> {
     let clients = std::env::var("OIDC_CLIENTS_FILE")
         .ok()

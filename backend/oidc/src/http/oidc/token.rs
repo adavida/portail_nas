@@ -25,11 +25,6 @@ pub struct TokenForm {
     pub client_secret: Option<String>,
 }
 
-/// Standard token endpoint (`client_secret_basic` + `authorization_code` +
-/// PKCE). The portal itself goes through `/api/auth/callback` (same logic,
-/// credentials from the env). Clients may also post `client_id`/
-/// `client_secret` as form fields (`client_secret_post`) — what the OAuth
-/// debugger does for public clients (empty secret, PKCE mandatory).
 pub async fn token(
     State(env): State<Env>,
     headers: HeaderMap,

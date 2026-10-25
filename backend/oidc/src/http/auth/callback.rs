@@ -12,13 +12,9 @@ use portail_core::error::AppError;
 pub struct CallbackRequest {
     pub code: String,
     pub redirect_uri: Option<String>,
-    // PKCE verifier generated at `login()` (frontend) — required for the
-    // authorization_code flow.
     pub code_verifier: Option<String>,
 }
 
-/// Exchanges code -> tokens for the portal itself (client of its own
-/// provider) — same logic as `/api/oidc/token`, credentials from the env.
 pub async fn callback(
     State(env): State<Env>,
     Json(payload): Json<CallbackRequest>,

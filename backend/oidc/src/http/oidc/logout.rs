@@ -14,8 +14,6 @@ pub struct LogoutQuery {
     pub rd: Option<String>,
 }
 
-/// Provider logout: purges the server session + cookie, then
-/// `rd` only if it points to the portal app (anti open-redirect).
 pub async fn logout(
     State(env): State<Env>,
     headers: HeaderMap,

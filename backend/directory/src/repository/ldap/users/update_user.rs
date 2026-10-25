@@ -105,7 +105,7 @@ mod tests {
     async fn update_user_fails_for_missing_uid() {
         let uid = gen_uid("updnx");
         if list_users().await.is_err() {
-            return; // LDAP unavailable => skip
+            return;
         }
 
         let req: UpdateUser = serde_json::from_str(r#"{"name":"Ghost","email":""}"#).unwrap();

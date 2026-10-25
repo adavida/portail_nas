@@ -5,12 +5,6 @@ use serde::Deserialize;
 
 use crate::domain::oidc::{ClientId, RedirectUri};
 
-/// OIDC client declared in the clients file. The secret is **never stored in
-/// the JSON**: `secret_file` names the file holding it (relative to the
-/// clients file directory, or absolute). `None` marks a **public client**
-/// (OAuth debugger, native apps): no secret at the token endpoint, PKCE S256
-/// is then mandatory. `enabled` defaults to `false` — the file is written by
-/// nix only, so activating a client is a manual edit of the JSON.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Client {
     pub id: ClientId,
@@ -60,8 +54,6 @@ impl Client {
         })
     }
 
-    /// Reads the clients file content (JSON) — re-read on each request, so
-    /// adding a client does not require a restart.
     pub fn parse_all(raw: &str) -> Result<Vec<Self>, ClientError> {
         let parsed: Vec<RawClient> =
             serde_json::from_str(raw).map_err(|e| ClientError::Json(e.to_string()))?;
@@ -75,7 +67,6 @@ impl Client {
         clients.iter().find(|c| c.id.as_str() == id)
     }
 
-    /// Public client: no secret file, PKCE S256 mandatory at the token endpoint.
     pub fn is_public(&self) -> bool {
         self.secret_file.is_none()
     }

@@ -10,8 +10,6 @@ vi.mock("../auth/oidc", () => ({ handleCallback: mocks.handleCallback }));
 
 const originalLocation = window.location;
 
-// jsdom blocks navigation — stub `location` (same pattern as Login.test.ts):
-// `search` feeds ?code=&state=, `replace` captures the redirect home.
 function stubLocation(search: string) {
   Object.defineProperty(window, "location", {
     configurable: true,

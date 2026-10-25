@@ -1,6 +1,3 @@
-// PKCE: login() must generate + store a code_verifier and set
-// code_challenge/code_challenge_method on the provider's authorization URL;
-// handleCallback() must return the verifier to the backend.
 // @ts-expect-error — node:crypto missing from the DOM tsconfig (jsdom)
 import { webcrypto as nodeCrypto } from "node:crypto";
 import { beforeEach, expect, test } from "vitest";
@@ -9,7 +6,6 @@ import { mockFetch } from "../test/mock_fetch";
 import { redirectTarget } from "../test/redirect_target";
 import { handleCallback } from "./oidc";
 
-// jsdom does not provide WebCrypto — we inject node:crypto/webcrypto.
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
@@ -28,7 +24,6 @@ test("login adds PKCE S256 challenge and stores verifier", async () => {
   expect(verifier, "verifier should be stored in sessionStorage").toBeTruthy();
   expect(url.searchParams.get("code_challenge_method")).toBe("S256");
 
-  // Arrange: expected challenge = base64url(SHA-256(verifier))
   const digest = await nodeCrypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(verifier!),

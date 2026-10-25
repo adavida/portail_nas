@@ -3,7 +3,6 @@ use serde_json::json;
 
 use portail_core::env::Env;
 
-/// OIDC discovery — standard entry point for third-party clients.
 pub async fn discovery(State(env): State<Env>) -> Json<serde_json::Value> {
     let iss = env.oidc_issuer_url.trim_end_matches('/').to_string();
     Json(json!({

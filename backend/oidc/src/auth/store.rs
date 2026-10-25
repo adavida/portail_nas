@@ -3,8 +3,6 @@ use std::io::Read;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-/// Parameters of a pending OIDC authorization request (pre-login) or
-/// of an issued authorization code (post-login).
 #[derive(Debug, Clone)]
 pub struct AuthFlow {
     pub client_id: String,
@@ -29,8 +27,7 @@ struct Store {
     sessions: HashMap<String, (String, Instant)>,
 }
 
-// ponytail: in memory, single-process — restart = session re-login
-// and invalidation of in-flight codes. Switch to a persisted store if multi-process.
+// shortcut: sessions in memory, single-process — restart = re-login, upgrade when multi-process
 static STORE: OnceLock<Mutex<Store>> = OnceLock::new();
 
 fn store() -> &'static Mutex<Store> {

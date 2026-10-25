@@ -4,8 +4,6 @@ import Login from "./Login.svelte";
 
 const originalLocation = window.location;
 
-// jsdom blocks navigation — stub `location` (same pattern as
-// test/redirect_target.ts): `search` feeds ?req=, `href` captures the redirect.
 function stubLocation(search: string) {
   Object.defineProperty(window, "location", {
     configurable: true,

@@ -7,7 +7,7 @@
 Toutes les variables d'environnement via des helpers centralisés — un seul endroit définit les noms. Deux catégories :
 
 - **Obligatoires** (défaut interdit): manquant/vide = erreur agrégée anglais.
-- **Optionnables** (défaut autorisé): valeur personnalizable via env, défaut hard-codé documenté dans `env/mod.rs` — utilisé quand var absente ou vide.
+- **Optionnables** (défaut autorisé): valeur personnalizable via env, défaut hard-codé visible dans l'appel `take_opt(name, default)` / `take_secret_opt(name, default, ...)` dans `env/mod.rs` — utilisé quand var absente ou vide.
 
 ## Backend `backend/core/src/env/` (seul avec `std::env::var`)
 

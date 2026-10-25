@@ -6,10 +6,6 @@ use crate::{
 };
 use portail_core::error::AppError;
 
-/// Returns the real DN of the entry holding `cn=<gid>` under `ou=groups`.
-/// Inherited entries may have a different RDN (e.g. `o=...`):
-/// only a search finds the exact DN, hence this function instead of
-/// building the DN.
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn find_group_dn(ldap: &mut ldap3::Ldap, gid: &Gid) -> Result<String, AppError> {
     let filter = format!("(cn={})", gid.as_str());
@@ -62,7 +58,7 @@ mod tests {
     #[tokio::test]
     async fn find_group_dn_not_found_for_missing_gid() {
         let Ok(mut ldap) = connect().await else {
-            return; // LDAP unavailable => skip
+            return;
         };
         let gid = gen_gid("fgnko");
 
@@ -92,7 +88,7 @@ mod tests {
             None => return,
         };
         let Ok(mut ldap) = connect().await else {
-            return; // LDAP unavailable => skip
+            return;
         };
         let gid = gen_gid("fgl");
         let dn = format!("o={},{}", gid.as_str(), groups_search_base());
@@ -117,7 +113,7 @@ mod tests {
         if !matches!(&added, Ok(res) if res.rc == 0) {
             let _ = ldap.unbind().await;
             cleanup(&gid, &[]).await;
-            return; // add impossible (constraints) => skip
+            return;
         }
 
         let found = find_group_dn(&mut ldap, &gid).await;

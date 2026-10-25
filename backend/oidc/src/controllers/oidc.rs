@@ -17,9 +17,6 @@ pub struct OidcTestReport {
     pub error: Option<String>,
 }
 
-/// End-to-end test of the OIDC connection for a client already configured in
-/// `clients.json`: issues a test code, exchanges tokens (real credentials
-/// from the file), local JWT verification. No LDAP data touched.
 pub fn test_client(client_id: ClientId) -> Result<OidcTestReport, AppError> {
     let env = portail_core::env::Env::global();
     let signing_key_ok = key::global().is_some();

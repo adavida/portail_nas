@@ -52,7 +52,7 @@ frontend/src/components/<Name>.test.ts  # test vitest collocalisé
 
 - `pub enum <Struct>Error` dans le même fichier que `pub struct <Struct>` → toujours `errors.rs`.
 - Plusieurs `pub fn`/`pub async fn` libres dans un même fichier (hors `impl`) → 1 fonction = 1 fichier ; `mod.rs` = déclarations + `pub use` + helpers `pub(crate)` uniquement.
-- `backend/*/src/<module>/<object>/<object>.rs` (même nom que le dossier) → `clippy::module_inception` — si le lint se déclenche, **renommer** (struct → `mod.rs`, error → `errors.rs`), jamais `#[allow(clippy::module_inception)]`. Exception unique: `#[allow(...)]` avec `// ponytail: ...` si le nommage redondant est réellement voulu.
+- `backend/*/src/<module>/<object>/<object>.rs` (même nom que le dossier) → `clippy::module_inception` — si le lint se déclenche, **renommer** (struct → `mod.rs`, error → `errors.rs`), jamais `#[allow(clippy::module_inception)]`. Exception unique: `#[allow(...)]` avec `// shortcut: ...` si le nommage redondant est réellement voulu.
 - Fichiers PascalCase (`Env.rs`, `Group.rs`) → clippy exige minuscules.
 - Sub-module même nom que le parent qui déclenche E0255 → ne **jamais** contourner avec `mod.rs` + `#[path = "Env.rs"] pub mod env_;` : réécrire en `mod.rs` pour la structure + `errors.rs` pour l'error.
 

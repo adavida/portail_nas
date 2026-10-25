@@ -21,9 +21,6 @@ pub struct LoginCredentials {
     pub password: String,
 }
 
-/// JSON login endpoint of the provider (the portal is its own IdP) — the
-/// SPA posts credentials and receives the callback URL to follow. LDAP
-/// bind via the users controller, then session cookie + authorization code.
 pub async fn login(
     State(env): State<Env>,
     Json(f): Json<LoginCredentials>,

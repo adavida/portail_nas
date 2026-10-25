@@ -33,9 +33,6 @@ pub struct AuthorizeParams {
     pub code_challenge_method: Option<String>,
 }
 
-/// Authorization endpoint: client + redirect_uri verified, PKCE S256
-/// stored. Existing session -> direct code (SSO), otherwise the SPA
-/// login page at `{APP_URL}/login?req=...`.
 pub async fn authorize(
     State(env): State<Env>,
     headers: HeaderMap,

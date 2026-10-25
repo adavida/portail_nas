@@ -198,7 +198,7 @@ async fn update_unknown_uid_is_404() {
     )
     .await;
     if status == StatusCode::INTERNAL_SERVER_ERROR {
-        return; // LDAP unavailable => skip
+        return;
     }
 
     assert_eq!(
@@ -244,7 +244,7 @@ async fn created_user_joined_user_group() {
 
     for _ in 0..5 {
         if !uid_exists(&user.uid).await {
-            return; // purged by a concurrent test binary — skip flaky check
+            return;
         }
 
         let (_, users) = send(Method::GET, "/api/users", None).await;

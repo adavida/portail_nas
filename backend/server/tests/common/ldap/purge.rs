@@ -36,9 +36,6 @@ async fn purge_ou(ou: &str) {
     let _ = ldap.unbind().await;
 }
 
-// synchronous purge (ctor/dtor cannot fire-and-forget: a thread is killed
-// at process exit before it finishes). Dedicated thread + join: at exit the
-// main tokio TLSes are destroyed, a fresh thread leaves them intact.
 fn purge_test_ldap() {
     std::thread::spawn(|| {
         let Ok(rt) = tokio::runtime::Builder::new_current_thread()
@@ -57,15 +54,12 @@ fn purge_test_ldap() {
     .ok();
 }
 
-// Purge at test process startup: every run starts from scratch.
 #[ctor::ctor(unsafe)]
 fn purge_test_ldap_at_start() {
     redirect_ldap_env_to_test();
     purge_test_ldap();
 }
 
-// Purge at process shutdown: the test base is clean after the run
-// (LDAP down => silent no-op).
 #[dtor::dtor(unsafe)]
 fn purge_test_ldap_at_exit() {
     purge_test_ldap();

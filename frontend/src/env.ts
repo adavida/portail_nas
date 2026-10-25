@@ -19,7 +19,6 @@ export function createEnv(
     return v;
   };
 
-  // Optional — UI language, defaults to "en" (see i18n.ts).
   const appLangRaw = (get("APP_LANG") ?? "").trim();
   const appLang = appLangRaw || "en";
 
@@ -36,6 +35,5 @@ export function createEnv(
 
 export const env: Env = createEnv();
 
-// Backward-compatible named exports — single source is `env`.
 export const APP_URL = env.appUrl;
 export const OIDC_ISSUER_URL = env.oidcIssuerUrl;

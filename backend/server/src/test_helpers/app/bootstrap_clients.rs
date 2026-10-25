@@ -1,8 +1,5 @@
 use portail_core::env::Env;
 
-/// Test bootstrap: the clients file is written by nix in production, so the
-/// test app builders create a minimal one (enabled portal client) when it is
-/// absent. Idempotent — an existing file is never touched.
 pub(crate) fn bootstrap_clients_file(env: &Env) {
     let path = portail_oidc::auth::secrets::clients_path(env);
     if path.exists() {

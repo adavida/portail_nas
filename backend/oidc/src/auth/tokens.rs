@@ -24,7 +24,6 @@ pub struct TokenResponse {
     pub expires_in: i64,
 }
 
-/// PKCE S256: `challenge == base64url(sha256(verifier))` (RFC 7636).
 pub fn check_pkce(verifier: Option<&str>, challenge: Option<&str>) -> bool {
     match (verifier, challenge) {
         (Some(v), Some(c)) => URL_SAFE_NO_PAD.encode(Sha256::digest(v.as_bytes())) == c,
@@ -38,12 +37,6 @@ pub fn clients(env: &Env) -> Result<Vec<Client>, AppError> {
     Client::parse_all(&raw).map_err(|e| AppError::Internal(e.to_string()))
 }
 
-/// `authorization_code` grant: code one-shot, client + redirect_uri + PKCE
-/// verified, then signed tokens. Errors in OAuth format (`invalid_client`,
-/// `invalid_grant`). Confidential clients must present the secret read from
-/// their `secret_file`; public clients (no `secret_file`, e.g. the OAuth
-/// debugger) skip it but must have sent a PKCE S256 challenge at authorize.
-/// Disabled clients (`enabled: false` in the file) are rejected as if unknown.
 pub fn exchange(
     env: &Env,
     client_id: &str,
@@ -129,18 +122,14 @@ pub fn tokens_for(env: &Env, flow: &store::AuthFlow) -> Result<TokenResponse, Ap
     })
 }
 
-/// Local verification (provider key) — issuer, portal audience, expiry.
 pub fn verify(env: &Env, token: &str) -> Result<Claims, AppError> {
     decode_token(env, token, Some(&env.oidc_client_id))
 }
 
-/// Like `verify` with an explicit audience (self-test for another client).
 pub fn verify_with_aud(env: &Env, token: &str, aud: &str) -> Result<Claims, AppError> {
     decode_token(env, token, Some(aud))
 }
 
-/// Verification for the standard `/userinfo` endpoint: any audience, the
-/// audience check stays on each resource server (portal middleware).
 pub fn verify_any_aud(env: &Env, token: &str) -> Result<Claims, AppError> {
     decode_token(env, token, None)
 }
@@ -160,7 +149,6 @@ fn decode_token(env: &Env, token: &str, aud: Option<&str>) -> Result<Claims, App
         .map_err(|e| AppError::Unauthorized(format!("token invalid: {e}")))
 }
 
-/// Extracts `client_id:secret` from an `Authorization: Basic ...` header.
 pub fn basic_credentials(header: &str) -> Option<(String, String)> {
     let encoded = header.strip_prefix("Basic ")?;
     let decoded = String::from_utf8(STANDARD.decode(encoded).ok()?).ok()?;

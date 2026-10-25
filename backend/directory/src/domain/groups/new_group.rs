@@ -11,8 +11,6 @@ pub struct NewGroup {
 }
 
 impl NewGroup {
-    /// LDAP attrs minus `member`: DNs are repository concern (env-driven OUs),
-    /// `create_group` appends them.
     pub fn to_attrs(&self) -> Vec<(String, std::collections::HashSet<String>)> {
         let mut attrs = vec![
             (

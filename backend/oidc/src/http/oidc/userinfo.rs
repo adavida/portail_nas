@@ -5,9 +5,6 @@ use crate::auth::tokens;
 use portail_core::env::Env;
 use portail_core::error::AppError;
 
-/// Standard UserInfo — claims of the access token verified locally.
-/// Any audience accepted (signature + issuer only): each client's own
-/// token works here, audience checks stay on the resource servers.
 pub async fn userinfo(
     State(env): State<Env>,
     headers: HeaderMap,

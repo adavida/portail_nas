@@ -4,7 +4,6 @@
   import { t, translate } from "../i18n";
   import "./Login.scss";
 
-  // The provider 302s here with ?req=<flow id>; without it there is nothing to post.
   const req = new URLSearchParams(window.location.search).get("req") ?? "";
 
   let username = $state("");
@@ -19,11 +18,9 @@
     try {
       const r = await loginWithPassword(req, username, password);
       if ("redirect" in r) {
-        // Keep `pending` true: the button stays disabled while navigating away.
         window.location.href = r.redirect;
         return;
       }
-      // 401 = wrong credentials (translated); anything else is a generic error.
       error = r.status === 401 ? translate("login.invalid") : r.error;
     } catch (e) {
       error = (e as Error).message;

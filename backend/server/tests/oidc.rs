@@ -38,7 +38,6 @@ fn header_pairs(pairs: &[(&'static str, String)]) -> Vec<(&'static str, String)>
     pairs.to_vec()
 }
 
-/// Extracts `portail_session=` from the Set-Cookie response.
 fn session_cookie(set_cookie: Option<&axum::http::HeaderValue>) -> String {
     set_cookie
         .and_then(|v| v.to_str().ok())
@@ -84,7 +83,6 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
     let redirect_uri = env!("OIDC_REDIRECT_URI");
     let state = "state1234567890";
 
-    // 1. anonymous authorize -> login
     let url = auth_url(env!("OIDC_CLIENT_ID"), redirect_uri, state);
     let (status, headers, _, _) = send_raw(Method::GET, &url, &[], None).await;
     assert_eq!(
@@ -113,7 +111,6 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         .unwrap_or_default()
         .to_string();
 
-    // 2. LDAP login -> 200 JSON {redirect} + session cookie
     let (status, headers, body, _) = send_raw(
         Method::POST,
         "/api/oidc/login",
@@ -152,7 +149,6 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         "state must be echoed back: {redirect}"
     );
 
-    // 3. token exchange (client_secret_basic + PKCE)
     let Some((client_id, secret)) = oidc_client_secret() else {
         return;
     };
@@ -182,7 +178,6 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         .to_string();
     assert!(!access.is_empty(), "access_token must be issued");
 
-    // 4. SSO: authorize with session cookie issues a code without re-login
     let (status, headers, _, _) = send_raw(
         Method::GET,
         &auth_url(env!("OIDC_CLIENT_ID"), redirect_uri, "state2"),
@@ -205,7 +200,6 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         "SSO must return code directly to redirect_uri: {sso_location}"
     );
 
-    // 5. userinfo with the token
     let (status, _, body, _) = send_raw(
         Method::GET,
         "/api/oidc/userinfo",
@@ -224,8 +218,6 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         body["groups"]
     );
 
-    // 6. the token passes the portal middleware (403 non-admin expected, not 401)
-    //    bare router, no admin injection: only the token signature matters.
     let plain = tower::ServiceExt::oneshot(
         portail_server::app(),
         axum::http::Request::builder()
@@ -244,7 +236,6 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         "token must verify (403 non-admin, not 401)"
     );
 
-    // 7. logout invalidates the session
     let (status, headers, _, _) = send_raw(
         Method::GET,
         "/logout",

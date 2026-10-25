@@ -36,7 +36,6 @@ export function installAuthFetch() {
       !String(input).includes("/api/auth/config") &&
       !String(input).includes("/api/auth/callback") &&
       !String(input).includes("/api/auth/me") &&
-      // The login page renders its own inline error on 401 — do not hijack it.
       !String(input).includes("/api/oidc/login")
     ) {
       if (sessionStorage.getItem("login_in_progress") !== "1") {
@@ -66,9 +65,6 @@ function b64url(bytes: Uint8Array): string {
     .replace(/=+$/, "");
 }
 
-// PKCE S256: the provider requires a code_challenge for the authorization_code flow.
-// Stores the verifier in sessionStorage — `login()` creates it, `handleCallback()`
-// sends it to the backend which passes it to the token endpoint.
 async function savePkce(): Promise<string> {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const digest = await crypto.subtle.digest(
@@ -84,7 +80,6 @@ export async function login() {
   const state =
     globalThis.crypto?.randomUUID?.() ??
     Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-  // the provider requires state >= 8 chars
   const safeState = state.replace(/-/g, "").slice(0, 32).padEnd(16, "0");
   sessionStorage.setItem("oidc_state", safeState);
   const challenge = await savePkce();
@@ -123,9 +118,5 @@ export async function logout() {
   const { OIDC_ISSUER_URL, APP_URL } = await import("../env");
   clearTokens();
   sessionStorage.setItem("logged_out", "1");
-  // Top-level navigation to the provider's native /logout: same-site so the
-  // session cookie is sent; the portal POST /api/logout itself (iframe POST
-  // cross-site = SameSite=Lax cookie not sent = session survived).
-  // `rd` must match the cookie domain (127.0.0.1) to come back to the portal.
   window.location.href = `${OIDC_ISSUER_URL}/logout?rd=${encodeURIComponent(`${APP_URL}/`)}`;
 }

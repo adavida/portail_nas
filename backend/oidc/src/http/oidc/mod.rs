@@ -17,8 +17,6 @@ pub mod logout;
 pub mod token;
 pub mod userinfo;
 
-/// OIDC provider routes — mounted outside the auth middleware (they
-/// authenticate themselves: session cookie or Bearer).
 pub fn oidc_router(env: Env) -> Router<Env> {
     Router::new()
         .route(
@@ -44,8 +42,6 @@ pub(crate) fn session_id(headers: &HeaderMap) -> Option<String> {
         .map(|sid| sid.trim().to_string())
 }
 
-/// Session cookie — `Secure` when the issuer is https (prod behind
-/// nginx), absent in dev http localhost.
 pub(crate) fn session_cookie(env: &Env, sid: &str) -> String {
     let secure = if env.oidc_issuer_url.starts_with("https://") {
         "; Secure"
@@ -59,8 +55,6 @@ pub(crate) fn expired_cookie() -> String {
     format!("{SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0")
 }
 
-/// `redirect_uri?code=..&state=..` — state not encoded (alphanumeric
-/// charset on the portal side and in standard clients).
 pub(crate) fn callback_location(redirect_uri: &str, code: &str, state: Option<&str>) -> String {
     match state {
         Some(state) => format!("{redirect_uri}?code={code}&state={state}"),
@@ -68,7 +62,6 @@ pub(crate) fn callback_location(redirect_uri: &str, code: &str, state: Option<&s
     }
 }
 
-/// 302 with optional `Set-Cookie`.
 pub(crate) fn redirect_to(location: &str, cookie: Option<String>) -> Response {
     let mut builder = Response::builder()
         .status(StatusCode::FOUND)
@@ -81,8 +74,6 @@ pub(crate) fn redirect_to(location: &str, cookie: Option<String>) -> Response {
         .unwrap_or_else(|_| Response::new(Body::empty()))
 }
 
-/// Enriches the flow with the subject's LDAP groups/email (token claims).
-/// Values are kept only if the client has the matching scope.
 pub(crate) async fn enrich_flow(flow: &mut crate::auth::store::AuthFlow) -> Result<(), AppError> {
     let user = portail_directory::controllers::users::list()
         .await?

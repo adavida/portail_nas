@@ -60,7 +60,6 @@ async fn protected_endpoints_return_401_without_token() {
 
 #[tokio::test]
 async fn public_endpoints_not_401_without_token() {
-    // health
     let status = req(Method::GET, "/api/health", None).await;
     assert_ne!(
         status,
@@ -69,7 +68,6 @@ async fn public_endpoints_not_401_without_token() {
     );
     assert_eq!(status, StatusCode::OK);
 
-    // auth config
     let status = req(Method::GET, "/api/auth/config", None).await;
     assert_ne!(
         status,
@@ -78,7 +76,6 @@ async fn public_endpoints_not_401_without_token() {
     );
     assert_eq!(status, StatusCode::OK);
 
-    // auth callback with fake code should be 500 (token exchange fails) not 401
     let status = req(
         Method::POST,
         "/api/auth/callback",

@@ -21,9 +21,6 @@ pub fn key_path(env: &Env) -> PathBuf {
     Path::new(&env.oidc_secrets_dir).join(KEY_FILE)
 }
 
-/// Resolves a `secret_file` from the clients JSON: absolute paths are used
-/// as-is (e.g. agenix/sops `secretFile` overrides), relative names live next
-/// to the clients file.
 pub fn secret_path(env: &Env, name: &str) -> PathBuf {
     let path = Path::new(name);
     if path.is_absolute() {
@@ -35,22 +32,12 @@ pub fn secret_path(env: &Env, name: &str) -> PathBuf {
         .unwrap_or_else(|| path.to_path_buf())
 }
 
-/// `{ "<clientId>": {"user": "...", "group": "..."} }` from
-/// `OIDC_CLIENT_OWNERS` (empty = disabled). Only generated secret files are
-/// concerned: `secretFile` overrides belong to their secret manager.
 #[derive(Debug, serde::Deserialize)]
 struct ClientOwner {
     user: String,
     group: String,
 }
 
-/// Ensures the OIDC secrets at startup. The clients file is **read-only** —
-/// written by nix activation / devenv bootstrap, its absence is a startup
-/// error. The RSA signing key (PKCS#8 PEM) and every confidential client's
-/// `secret_file` are **generated on first startup** if missing (`O_EXCL`,
-/// 0600, never overwritten). Declared Linux owners (`OIDC_CLIENT_OWNERS`) get
-/// read access through a POSIX ACL, re-applied on every start. Idempotent.
-/// Called once by `main` and by the test app builders.
 pub fn ensure(env: &Env) -> Result<(), String> {
     let dir = &env.oidc_secrets_dir;
     std::fs::create_dir_all(dir)
@@ -89,9 +76,6 @@ fn parse_owners(env: &Env) -> Result<BTreeMap<String, ClientOwner>, String> {
         .map_err(|e| format!("cannot parse OIDC_CLIENT_OWNERS: {e}"))
 }
 
-/// Grants `user` and `group` read access to the secret file through a POSIX
-/// ACL, keeping the file's mode bits as base entries. The service user owns
-/// the generated files, so no capability is needed.
 fn grant_owner_read(env: &Env, path: &Path, owner: &ClientOwner) -> Result<(), String> {
     ensure_owner_exists("user", &owner.user)?;
     ensure_owner_exists("group", &owner.group)?;
@@ -129,8 +113,6 @@ fn ensure_owner_exists(kind: &str, name: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// The client's real secret, read from its file on every use — the clients
-/// JSON never holds it. `None` = public client.
 pub(crate) fn stored_secret(env: &Env, client: &Client) -> Result<Option<ClientSecret>, String> {
     let Some(name) = &client.secret_file else {
         return Ok(None);
@@ -168,8 +150,6 @@ fn generate_signing_key(env: &Env) -> Result<String, String> {
         .map_err(|e| format!("cannot encode RSA signing key: {e}"))
 }
 
-/// Atomic 0600 creation (`O_EXCL`): if the file already exists (placed by
-/// the admin), it is kept as is and `content` is never called.
 fn write_new(
     env: &Env,
     path: &Path,
@@ -227,8 +207,6 @@ mod tests {
         env
     }
 
-    /// Nom login du user/groupe courant — owner valide pour les tests d'ACL
-    /// (le proprietaire du fichier peut toujours poser son ACL sans capacite).
     fn current_owner() -> (String, String) {
         let user = unsafe {
             let passwd = libc::getpwuid(libc::geteuid());

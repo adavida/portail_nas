@@ -6,9 +6,6 @@ use crate::{
 };
 use portail_core::error::AppError;
 
-/// Returns the real DN of the entry holding `uid=<uid>` under `ou=people`.
-/// Inherited entries may have a `cn=...` RDN: only a search
-/// finds the exact DN, hence this function instead of building the DN.
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn find_user_dn(ldap: &mut ldap3::Ldap, uid: &Uid) -> Result<String, AppError> {
     let filter = format!("(uid={})", uid.as_str());
@@ -56,7 +53,7 @@ mod tests {
     #[tokio::test]
     async fn find_user_dn_not_found_for_missing_uid() {
         let Ok(mut ldap) = connect().await else {
-            return; // LDAP unavailable => skip
+            return;
         };
         let uid = gen_uid("fdnko");
 
@@ -82,7 +79,7 @@ mod tests {
     #[tokio::test]
     async fn find_user_dn_finds_entry_with_cn_rdn() {
         let Ok(mut ldap) = connect().await else {
-            return; // LDAP unavailable => skip
+            return;
         };
         let uid = gen_uid("fdncn");
         let dn = format!(
@@ -113,7 +110,7 @@ mod tests {
 
         if ldap.add(&dn, attrs).await.is_err() {
             let _ = ldap.unbind().await;
-            return; // add impossible (constraints) => skip
+            return;
         }
 
         let found = find_user_dn(&mut ldap, &uid).await;
