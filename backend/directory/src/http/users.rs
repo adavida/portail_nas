@@ -7,8 +7,8 @@ use crate::{
 };
 use portail_core::error::AppError;
 
-pub fn users_router() -> Router<portail_core::env::Env> {
-    let r = Router::<portail_core::env::Env>::new()
+pub fn users_router() -> Router<portail_core::config::Config> {
+    let r = Router::<portail_core::config::Config>::new()
         .route("/", get(list_users).post(create_user))
         .route("/{uid}", put(update_user).delete(delete_user))
         .route("/{uid}/password", put(update_user_password));

@@ -1,14 +1,13 @@
 use axum::{extract::Request, http::StatusCode, middleware::Next, response::Response};
 
-use portail_core::env::Env;
+use portail_core::config::Config;
 use portail_oidc::auth::{Claims, middleware::AuthUser};
 
 pub(crate) async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCode> {
-    Env::ensure_init();
     let claims = Claims {
         sub: "admin".into(),
-        aud: serde_json::json!(Env::global().oidc_client_id.clone()),
-        iss: Env::global().oidc_issuer_url.clone(),
+        aud: serde_json::json!(Config::global().oidc_client_id.as_str()),
+        iss: Config::global().oidc_issuer_url.clone(),
         exp: 9999999999,
         groups: vec!["admin".into()],
         email: Some("admin@example.com".into()),

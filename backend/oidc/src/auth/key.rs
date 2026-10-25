@@ -51,15 +51,15 @@ impl SigningKey {
 static KEY: OnceLock<Option<SigningKey>> = OnceLock::new();
 
 pub fn global() -> Option<&'static SigningKey> {
-    KEY.get_or_init(
-        || match crate::auth::secrets::read_key(portail_core::env::Env::global()) {
+    KEY.get_or_init(|| {
+        match crate::auth::secrets::read_key(portail_core::config::Config::global()) {
             Ok(pem) => SigningKey::from_pem(&pem).ok(),
             Err(e) => {
                 tracing::error!("{e}");
                 None
             }
-        },
-    )
+        }
+    })
     .as_ref()
 }
 

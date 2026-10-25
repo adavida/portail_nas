@@ -9,27 +9,24 @@ use std::path::{Path, PathBuf};
 
 use crate::auth::store;
 use crate::domain::oidc::{Client, ClientSecret};
-use portail_core::env::Env;
+use portail_core::config::Config;
 
 pub const KEY_FILE: &str = "signing-key.pem";
 
-pub fn clients_path(env: &Env) -> PathBuf {
-    PathBuf::from(&env.oidc_clients_file)
+pub fn key_path(config: &Config) -> PathBuf {
+    Path::new(&config.oidc_secrets_dir).join(KEY_FILE)
 }
 
-pub fn key_path(env: &Env) -> PathBuf {
-    Path::new(&env.oidc_secrets_dir).join(KEY_FILE)
-}
-
-pub fn secret_path(env: &Env, name: &str) -> PathBuf {
+pub fn secret_path(config: &Config, name: &str) -> PathBuf {
     let path = Path::new(name);
     if path.is_absolute() {
         return path.to_path_buf();
     }
-    clients_path(env)
-        .parent()
-        .map(|dir| dir.join(path))
-        .unwrap_or_else(|| path.to_path_buf())
+    Path::new(&config.oidc_secrets_dir).join(path)
+}
+
+pub fn clients(config: &Config) -> Result<Vec<Client>, String> {
+    Client::from_entries(&config.oidc_clients).map_err(|e| e.to_string())
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -38,45 +35,37 @@ struct ClientOwner {
     group: String,
 }
 
-pub fn ensure(env: &Env) -> Result<(), String> {
-    let dir = &env.oidc_secrets_dir;
+pub fn ensure(config: &Config) -> Result<(), String> {
+    let dir = &config.oidc_secrets_dir;
     std::fs::create_dir_all(dir)
         .map_err(|e| format!("cannot create OIDC secrets dir {dir}: {e}"))?;
     std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
         .map_err(|e| format!("cannot set mode on OIDC secrets dir {dir}: {e}"))?;
-    let clients = clients_path(env);
-    if !clients.exists() {
-        return Err(format!(
-            "clients file missing: {} — it is written by nix, see README",
-            clients.display()
-        ));
-    }
-    write_new(env, &key_path(env), || generate_signing_key(env))?;
+    write_new(config, &key_path(config), || generate_signing_key(config))?;
 
-    let owners = parse_owners(env)?;
-    let parsed = Client::parse_all(&read_clients(env)?).map_err(|e| e.to_string())?;
-    for client in parsed {
+    let owners = parse_owners(config)?;
+    for client in clients(config)? {
         let Some(name) = &client.secret_file else {
             continue;
         };
-        let path = secret_path(env, name);
-        write_new(env, &path, store::random_id)?;
+        let path = secret_path(config, name);
+        write_new(config, &path, store::random_id)?;
         if let Some(owner) = owners.get(client.id.as_str()) {
-            grant_owner_read(env, &path, owner)?;
+            grant_owner_read(config, &path, owner)?;
         }
     }
     Ok(())
 }
 
-fn parse_owners(env: &Env) -> Result<BTreeMap<String, ClientOwner>, String> {
-    if env.oidc_client_owners.trim().is_empty() {
+fn parse_owners(config: &Config) -> Result<BTreeMap<String, ClientOwner>, String> {
+    if config.oidc_client_owners.trim().is_empty() {
         return Ok(BTreeMap::new());
     }
-    serde_json::from_str(&env.oidc_client_owners)
-        .map_err(|e| format!("cannot parse OIDC_CLIENT_OWNERS: {e}"))
+    serde_json::from_str(&config.oidc_client_owners)
+        .map_err(|e| format!("cannot parse oidc_client_owners: {e}"))
 }
 
-fn grant_owner_read(env: &Env, path: &Path, owner: &ClientOwner) -> Result<(), String> {
+fn grant_owner_read(config: &Config, path: &Path, owner: &ClientOwner) -> Result<(), String> {
     ensure_owner_exists("user", &owner.user)?;
     ensure_owner_exists("group", &owner.group)?;
     let mode = std::fs::metadata(path)
@@ -89,7 +78,7 @@ fn grant_owner_read(env: &Env, path: &Path, owner: &ClientOwner) -> Result<(), S
     entries.push(AclEntry::allow_group(&owner.group, Perm::READ, None));
     setfacl(&[path], &entries, None)
         .map_err(|e| format!("cannot set ACL on {}: {e}", path.display()))?;
-    if env.oidc_secret_logs {
+    if config.oidc_secret_logs {
         tracing::info!(
             "OIDC secret ACL read granted {}:{} on {}",
             owner.user,
@@ -113,36 +102,34 @@ fn ensure_owner_exists(kind: &str, name: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn stored_secret(env: &Env, client: &Client) -> Result<Option<ClientSecret>, String> {
+pub(crate) fn stored_secret(
+    config: &Config,
+    client: &Client,
+) -> Result<Option<ClientSecret>, String> {
     let Some(name) = &client.secret_file else {
         return Ok(None);
     };
-    let path = secret_path(env, name);
+    let path = secret_path(config, name);
     std::fs::read_to_string(&path)
         .map(ClientSecret::new)
         .map(Some)
         .map_err(|e| format!("cannot read client secret file {}: {e}", path.display()))
 }
 
-pub(crate) fn read_clients(env: &Env) -> Result<String, String> {
-    std::fs::read_to_string(clients_path(env)).map_err(|e| {
+pub(crate) fn read_key(config: &Config) -> Result<String, String> {
+    std::fs::read_to_string(key_path(config)).map_err(|e| {
         format!(
-            "cannot read clients file {}: {e}",
-            clients_path(env).display()
+            "cannot read signing key {}: {e}",
+            key_path(config).display()
         )
     })
 }
 
-pub(crate) fn read_key(env: &Env) -> Result<String, String> {
-    std::fs::read_to_string(key_path(env))
-        .map_err(|e| format!("cannot read signing key {}: {e}", key_path(env).display()))
-}
-
-fn generate_signing_key(env: &Env) -> Result<String, String> {
-    let key = RsaPrivateKey::new(&mut rand::rngs::OsRng, env.oidc_key_bits).map_err(|e| {
+fn generate_signing_key(config: &Config) -> Result<String, String> {
+    let key = RsaPrivateKey::new(&mut rand::rngs::OsRng, config.oidc_key_bits).map_err(|e| {
         format!(
             "cannot generate {}-bit RSA signing key: {e}",
-            env.oidc_key_bits
+            config.oidc_key_bits
         )
     })?;
     key.to_pkcs8_pem(LineEnding::LF)
@@ -151,7 +138,7 @@ fn generate_signing_key(env: &Env) -> Result<String, String> {
 }
 
 fn write_new(
-    env: &Env,
+    config: &Config,
     path: &Path,
     content: impl FnOnce() -> Result<String, String>,
 ) -> Result<(), String> {
@@ -163,7 +150,7 @@ fn write_new(
     {
         Ok(f) => f,
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            if env.oidc_secret_logs {
+            if config.oidc_secret_logs {
                 tracing::info!(
                     "OIDC secret file already exists, kept as-is: {}",
                     path.display()
@@ -183,7 +170,7 @@ fn write_new(
     };
     file.write_all(content.as_bytes())
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
-    if env.oidc_secret_logs {
+    if config.oidc_secret_logs {
         tracing::info!("generated OIDC secret file: {}", path.display());
     }
     Ok(())
@@ -193,18 +180,18 @@ fn write_new(
 mod tests {
     use super::*;
     use exacl::getfacl;
+    use portail_core::config::ClientEntry;
 
-    fn test_env(tag: &str) -> Env {
-        let mut env = portail_core::env::Env::global().clone();
+    fn test_env(tag: &str) -> Config {
+        let mut config = Config::global().clone();
         let dir = format!(
             "{}/portail-secrets-test-{}-{}",
             std::env::temp_dir().display(),
             tag,
             std::process::id()
         );
-        env.oidc_secrets_dir = dir.clone();
-        env.oidc_clients_file = format!("{dir}/clients.json");
-        env
+        config.oidc_secrets_dir = dir.clone();
+        config
     }
 
     fn current_owner() -> (String, String) {
@@ -225,76 +212,36 @@ mod tests {
         (user, group)
     }
 
-    fn write_clients(env: &Env, json: &str) {
-        std::fs::create_dir_all(clients_path(env).parent().unwrap()).unwrap();
-        std::fs::write(clients_path(env), json).unwrap();
+    fn entry(id: &str, secret_file: Option<&str>) -> ClientEntry {
+        ClientEntry {
+            id: id.into(),
+            secret_file: secret_file.map(Into::into),
+            enabled: true,
+            redirect_uris: vec!["http://localhost/cb".into()],
+            scopes: vec![],
+        }
     }
 
-    fn secret_file(env: &Env, id: &str) -> PathBuf {
-        secret_path(env, &format!("{id}_secret"))
-    }
-
-    fn confidential_clients(env: &Env, ids: &[&str]) {
-        let entries: Vec<serde_json::Value> = ids
+    fn confidential_clients(config: &Config, ids: &[&str]) -> Config {
+        let mut config = config.clone();
+        config.oidc_clients = ids
             .iter()
-            .map(|id| {
-                serde_json::json!({
-                    "id": id,
-                    "secret_file": format!("{id}_secret"),
-                    "enabled": true,
-                    "redirect_uris": ["http://localhost/cb"],
-                })
-            })
+            .map(|id| entry(id, Some(&format!("{id}_secret"))))
             .collect();
-        write_clients(env, &serde_json::to_string(&entries).unwrap());
+        config
     }
 
-    #[test]
-    fn ensure_fails_when_clients_file_missing() {
-        let env = test_env("missing-clients");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-
-        let err = ensure(&env).unwrap_err();
-
-        assert!(
-            err.contains("clients file missing"),
-            "absent clients JSON must be a startup error: {err}"
-        );
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-    }
-
-    #[test]
-    fn ensure_never_rewrites_clients_file() {
-        let env = test_env("readonly-json");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-        confidential_clients(&env, &["app1"]);
-
-        ensure(&env).unwrap();
-        let first = std::fs::read_to_string(clients_path(&env)).unwrap();
-
-        ensure(&env).unwrap();
-        let second = std::fs::read_to_string(clients_path(&env)).unwrap();
-
-        assert_eq!(
-            first, second,
-            "existing clients file must never be rewritten"
-        );
-        assert!(
-            key_path(&env).exists(),
-            "signing key must be generated in the secrets dir"
-        );
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+    fn secret_file(config: &Config, id: &str) -> PathBuf {
+        secret_path(config, &format!("{id}_secret"))
     }
 
     #[test]
     fn ensure_generates_missing_secret_file_at_0600() {
-        let env = test_env("gen-secret");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-        confidential_clients(&env, &["app1"]);
+        let config = confidential_clients(&test_env("gen-secret"), &["app1"]);
 
-        ensure(&env).unwrap();
+        ensure(&config).unwrap();
 
-        let secret = secret_file(&env, "app1");
+        let secret = secret_file(&config, "app1");
         let generated = std::fs::read_to_string(&secret).unwrap();
         let mode = std::fs::metadata(&secret).unwrap().permissions().mode() & 0o777;
         assert!(
@@ -302,70 +249,89 @@ mod tests {
             "generated secret must be non-empty"
         );
         assert_eq!(mode, 0o600, "generated secret mode must be 0600");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }
 
     #[test]
     fn ensure_keeps_existing_secret_file() {
-        let env = test_env("keep-secret");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-        confidential_clients(&env, &["app1"]);
-        std::fs::create_dir_all(secret_file(&env, "app1").parent().unwrap()).unwrap();
-        std::fs::write(secret_file(&env, "app1"), "admin-placed\n").unwrap();
+        let config = confidential_clients(&test_env("keep-secret"), &["app1"]);
+        std::fs::create_dir_all(secret_file(&config, "app1").parent().unwrap()).unwrap();
+        std::fs::write(secret_file(&config, "app1"), "admin-placed\n").unwrap();
 
-        ensure(&env).unwrap();
+        ensure(&config).unwrap();
 
-        let content = std::fs::read_to_string(secret_file(&env, "app1")).unwrap();
+        let content = std::fs::read_to_string(secret_file(&config, "app1")).unwrap();
         assert_eq!(
             content, "admin-placed\n",
             "existing secret must be kept as-is"
         );
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+    }
+
+    #[test]
+    fn clients_maps_inline_entries() {
+        let config = confidential_clients(&test_env("inline"), &["app1"]);
+
+        let clients = clients(&config).unwrap();
+
+        assert_eq!(clients.len(), 1, "one inline client expected");
+        assert_eq!(clients[0].id.as_str(), "app1");
+        assert!(clients[0].enabled, "inline enabled flag expected");
+    }
+
+    #[test]
+    fn clients_rejects_invalid_entry() {
+        let mut config = test_env("invalid");
+        config.oidc_clients = vec![ClientEntry {
+            id: "app1".into(),
+            secret_file: None,
+            enabled: true,
+            redirect_uris: vec![],
+            scopes: vec![],
+        }];
+
+        let err = clients(&config).unwrap_err();
+
+        assert!(
+            err.contains("redirect"),
+            "client without redirects should be rejected: {err}"
+        );
     }
 
     #[test]
     fn stored_secret_reads_and_trims_file() {
-        let env = test_env("stored");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-        confidential_clients(&env, &["app1"]);
-        std::fs::create_dir_all(secret_file(&env, "app1").parent().unwrap()).unwrap();
-        std::fs::write(secret_file(&env, "app1"), "  s3cr3t\n").unwrap();
-        let clients = Client::parse_all(&read_clients(&env).unwrap()).unwrap();
+        let config = confidential_clients(&test_env("stored"), &["app1"]);
+        std::fs::create_dir_all(secret_file(&config, "app1").parent().unwrap()).unwrap();
+        std::fs::write(secret_file(&config, "app1"), "  s3cr3t\n").unwrap();
+        let clients = clients(&config).unwrap();
 
-        let secret = stored_secret(&env, &clients[0]).unwrap();
+        let secret = stored_secret(&config, &clients[0]).unwrap();
 
         assert_eq!(
             secret.as_ref().map(|s| s.as_str()),
             Some("s3cr3t"),
             "secret must be read from the file, whitespace trimmed"
         );
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }
 
     #[test]
     fn stored_secret_is_none_for_public_client() {
-        let env = test_env("public");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-        write_clients(
-            &env,
-            r#"[{"id":"pub1","enabled":true,"redirect_uris":["http://localhost/cb"]}]"#,
-        );
-        let clients = Client::parse_all(&read_clients(&env).unwrap()).unwrap();
+        let mut config = test_env("public");
+        config.oidc_clients = vec![entry("pub1", None)];
+        let clients = clients(&config).unwrap();
 
-        let secret = stored_secret(&env, &clients[0]).unwrap();
+        let secret = stored_secret(&config, &clients[0]).unwrap();
 
         assert_eq!(secret, None, "public client has no secret file");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
     }
 
     #[test]
     fn generated_key_is_pkcs8_pem_loadable() {
-        let env = test_env("roundtrip");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-        write_clients(&env, "[]");
+        let config = test_env("roundtrip");
 
-        ensure(&env).unwrap();
-        let pem = read_key(&env).unwrap();
+        ensure(&config).unwrap();
+        let pem = read_key(&config).unwrap();
         let key = crate::auth::key::SigningKey::from_pem(&pem).unwrap();
 
         assert!(
@@ -374,20 +340,19 @@ mod tests {
         );
         assert!(!key.n.is_empty(), "modulus should be non-empty");
         assert!(!key.e.is_empty(), "exponent should be non-empty");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }
 
     #[test]
     fn ensure_grants_declared_owner_read_acl() {
-        let mut env = test_env("acl");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
         let (user, group) = current_owner();
-        env.oidc_client_owners = format!(r#"{{"app1": {{"user": "{user}", "group": "{group}"}}}}"#);
-        confidential_clients(&env, &["app1"]);
+        let mut config = confidential_clients(&test_env("acl"), &["app1"]);
+        config.oidc_client_owners =
+            format!(r#"{{"app1": {{"user": "{user}", "group": "{group}"}}}}"#);
 
-        ensure(&env).unwrap();
+        ensure(&config).unwrap();
 
-        let entries = getfacl(secret_file(&env, "app1"), None).unwrap();
+        let entries = getfacl(secret_file(&config, "app1"), None).unwrap();
         let has_user = entries
             .iter()
             .any(|e| e.name == user && e.perms.contains(Perm::READ));
@@ -396,70 +361,63 @@ mod tests {
             .any(|e| e.name == group && e.perms.contains(Perm::READ));
         assert!(has_user, "declared user must have ACL read: {entries:?}");
         assert!(has_group, "declared group must have ACL read: {entries:?}");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }
 
     #[test]
     fn ensure_skips_acl_for_absent_declared_secret() {
-        let mut env = test_env("acl-absent");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-        env.oidc_client_owners =
+        let mut config = test_env("acl-absent");
+        config.oidc_client_owners =
             r#"{"app2": {"user": "no-such-user-zz", "group": "no-such-group-zz"}}"#.to_string();
-        write_clients(&env, "[]");
 
-        let result = ensure(&env);
+        let result = ensure(&config);
 
         assert!(
             result.is_ok(),
-            "owner declared for a client absent from the JSON should be skipped: {result:?}"
+            "owner declared for a client absent from the entries should be skipped: {result:?}"
         );
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }
 
     #[test]
     fn ensure_rejects_unknown_owner_of_existing_secret() {
-        let mut env = test_env("acl-unknown");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-        env.oidc_client_owners =
+        let mut config = confidential_clients(&test_env("acl-unknown"), &["app3"]);
+        config.oidc_client_owners =
             r#"{"app3": {"user": "no-such-user-zz", "group": "portail-no-such-zz"}}"#.to_string();
-        confidential_clients(&env, &["app3"]);
 
-        let err = ensure(&env).unwrap_err();
+        let err = ensure(&config).unwrap_err();
 
         assert!(
             err.contains("unknown OIDC secret owner user"),
             "unknown user should be reported: {err}"
         );
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }
 
     #[test]
     fn ensure_rejects_unparsable_owners() {
-        let mut env = test_env("owners-bad");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
-        env.oidc_client_owners = "not-json".to_string();
-        write_clients(&env, "[]");
+        let mut config = test_env("owners-bad");
+        config.oidc_client_owners = "not-json".to_string();
 
-        let err = ensure(&env).unwrap_err();
+        let err = ensure(&config).unwrap_err();
 
         assert!(
-            err.contains("cannot parse OIDC_CLIENT_OWNERS"),
+            err.contains("cannot parse oidc_client_owners"),
             "invalid JSON should be reported: {err}"
         );
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
     }
 
     #[test]
-    fn secret_path_resolves_relative_next_to_clients_absolute_as_is() {
-        let env = test_env("resolve");
+    fn secret_path_resolves_relative_in_secrets_dir_and_absolute_as_is() {
+        let config = test_env("resolve");
 
-        let relative = secret_path(&env, "app1_secret");
-        let absolute = secret_path(&env, "/run/secrets/app2");
+        let relative = secret_path(&config, "app1_secret");
+        let absolute = secret_path(&config, "/run/secrets/app2");
 
         assert_eq!(
             relative,
-            clients_path(&env).parent().unwrap().join("app1_secret"),
-            "relative secret_file belongs next to the clients file"
+            PathBuf::from(&config.oidc_secrets_dir).join("app1_secret"),
+            "relative secret_file belongs in the secrets dir"
         );
         assert_eq!(
             absolute,

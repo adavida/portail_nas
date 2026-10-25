@@ -4,20 +4,20 @@ use axum::{
 };
 
 use crate::auth::middleware::AuthUser;
-use portail_core::env::Env;
+use portail_core::config::Config;
 
 pub mod callback;
 pub mod config;
 pub mod oidc_test;
 
-pub fn auth_router(env: Env) -> Router<Env> {
+pub fn auth_router(config: Config) -> Router<Config> {
     Router::new()
         .route("/config", get(config::config))
         .route("/callback", post(callback::callback))
-        .with_state(env)
+        .with_state(config)
 }
 
-pub fn protected_auth_router() -> Router<Env> {
+pub fn protected_auth_router() -> Router<Config> {
     let r = Router::new().route("/me", get(me));
 
     #[cfg(feature = "test-api")]

@@ -1,11 +1,13 @@
 use ldap3::{LdapConnAsync, Scope, SearchEntry};
+use portail_core::config::Config;
 
-use super::redirect_env::redirect_ldap_env_to_test;
+use crate::common::config::set_test_config::set_test_config;
 
 async fn purge_ou(ou: &str) {
-    let url = std::env::var("LDAP_TEST_URL").unwrap_or_else(|_| "ldap://127.0.0.1:3891".into());
-    let base =
-        std::env::var("LDAP_TEST_BASE_DN").unwrap_or_else(|_| "dc=test,dc=example,dc=com".into());
+    let config = Config::global();
+    let url = config.ldap_url.clone();
+    let base = config.ldap_base_dn.clone();
+    let admin_pw = config.ldap_admin_pw.clone();
     let search_base = format!("ou={ou},{base}");
 
     let Ok((conn, mut ldap)) = LdapConnAsync::new(&url).await else {
@@ -14,7 +16,7 @@ async fn purge_ou(ou: &str) {
     ldap3::drive!(conn);
 
     let bind_dn = format!("cn=admin,{base}");
-    if ldap.simple_bind(&bind_dn, "admin").await.is_err() {
+    if ldap.simple_bind(&bind_dn, &admin_pw).await.is_err() {
         return;
     }
 
@@ -56,7 +58,7 @@ fn purge_test_ldap() {
 
 #[ctor::ctor(unsafe)]
 fn purge_test_ldap_at_start() {
-    redirect_ldap_env_to_test();
+    set_test_config();
     purge_test_ldap();
 }
 

@@ -4,8 +4,15 @@ use portail_oidc::auth::{Claims, middleware::AuthUser};
 pub async fn inject_admin(mut req: Request, next: Next) -> Result<Response, StatusCode> {
     let claims = Claims {
         sub: "admin".into(),
-        aud: serde_json::json!(env!("OIDC_CLIENT_ID")),
-        iss: env!("OIDC_ISSUER_URL").to_string(),
+        aud: serde_json::json!(
+            portail_core::config::Config::global()
+                .oidc_client_id
+                .as_str()
+        ),
+        iss: portail_core::config::Config::global()
+            .oidc_issuer_url
+            .as_str()
+            .to_string(),
         exp: 9999999999,
         groups: vec!["admin".into()],
         email: Some("admin@example.com".into()),

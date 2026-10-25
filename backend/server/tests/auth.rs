@@ -81,7 +81,7 @@ async fn public_endpoints_not_401_without_token() {
         "/api/auth/callback",
         Some(json!({
             "code": "fake",
-            "redirect_uri": env!("OIDC_REDIRECT_URI")
+            "redirect_uri": portail_core::config::Config::global().oidc_redirect_uri.as_str()
         })),
     )
     .await;

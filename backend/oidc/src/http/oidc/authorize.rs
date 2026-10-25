@@ -10,7 +10,7 @@ use crate::{
     domain::oidc::Client,
     http::oidc,
 };
-use portail_core::env::Env;
+use portail_core::config::Config;
 use portail_core::error::AppError;
 
 #[derive(Deserialize)]
@@ -34,13 +34,13 @@ pub struct AuthorizeParams {
 }
 
 pub async fn authorize(
-    State(env): State<Env>,
+    State(config): State<Config>,
     headers: HeaderMap,
     Query(q): Query<AuthorizeParams>,
 ) -> Result<Response, AppError> {
     let client_id = q.client_id.clone().unwrap_or_default();
     let redirect_uri = q.redirect_uri.clone().unwrap_or_default();
-    let clients = tokens::clients(&env)?;
+    let clients = tokens::clients(&config)?;
     let client = Client::find_in(&clients, &client_id)
         .ok_or_else(|| AppError::BadRequest("unknown client_id".into()))?;
     if !client.enabled {
@@ -92,7 +92,7 @@ pub async fn authorize(
     }
 
     let req_id = store::save_pending(flow).map_err(AppError::Internal)?;
-    let app_url = env.app_url.trim_end_matches('/');
+    let app_url = config.app_url.trim_end_matches('/');
     Ok(oidc::redirect_to(
         &format!("{app_url}/login?req={req_id}"),
         None,
@@ -107,16 +107,15 @@ mod tests {
     use tower::ServiceExt;
 
     fn app() -> axum::Router {
-        portail_core::env::Env::ensure_init();
-        crate::test_helpers::app::bootstrap_clients_file(portail_core::env::Env::global());
-        crate::auth::secrets::ensure(portail_core::env::Env::global()).unwrap();
-        let env = portail_core::env::Env::global().clone();
-        oidc::oidc_router(env.clone()).with_state(env)
+        crate::auth::secrets::ensure(portail_core::config::Config::global()).unwrap();
+        let config = portail_core::config::Config::global().clone();
+        oidc::oidc_router(config.clone()).with_state(config)
     }
 
     fn env_redirect() -> String {
-        std::env::var("OIDC_REDIRECT_URI")
-            .unwrap_or_else(|_| "http://localhost:5173/callback".into())
+        portail_core::config::Config::global()
+            .oidc_redirect_uri
+            .clone()
     }
 
     #[tokio::test]
@@ -139,7 +138,9 @@ mod tests {
     #[tokio::test]
     async fn authorize_rejects_unregistered_redirect_uri() {
         let app = app();
-        let client_id = portail_core::env::Env::global().oidc_client_id.clone();
+        let client_id = portail_core::config::Config::global()
+            .oidc_client_id
+            .as_str();
         let req = Request::builder()
             .uri(format!("/api/oidc/authorization?client_id={client_id}&redirect_uri=https%3A%2F%2Fevil.example&response_type=code"))
             .body(Body::empty())
@@ -157,11 +158,11 @@ mod tests {
     #[tokio::test]
     async fn authorize_redirects_to_login_when_anonymous() {
         let app = app();
-        let env = portail_core::env::Env::global().clone();
+        let config = portail_core::config::Config::global().clone();
         let req = Request::builder()
             .uri(format!(
                 "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=code&state=state123456&code_challenge=chal&code_challenge_method=S256",
-                env.oidc_client_id,
+                config.oidc_client_id,
                 urlencoding(&env_redirect()),
             ))
             .body(Body::empty())
@@ -185,7 +186,10 @@ mod tests {
             .unwrap_or("")
             .to_string();
         assert!(
-            location.starts_with(&format!("{}/login?req=", env.app_url.trim_end_matches('/'))),
+            location.starts_with(&format!(
+                "{}/login?req=",
+                config.app_url.trim_end_matches('/')
+            )),
             "anonymous authorize must send the SPA to /login?req=..., got {location}"
         );
     }

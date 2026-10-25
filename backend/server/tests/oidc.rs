@@ -59,9 +59,13 @@ async fn discovery_advertises_endpoints() {
         send_raw(Method::GET, "/.well-known/openid-configuration", &[], None).await;
 
     assert_eq!(status, StatusCode::OK, "discovery must be 200");
-    let iss = env!("OIDC_ISSUER_URL").trim_end_matches('/').to_string();
+    let iss = portail_core::config::Config::global()
+        .oidc_issuer_url
+        .as_str()
+        .trim_end_matches('/')
+        .to_string();
 
-    assert_eq!(body["issuer"], iss, "issuer should match env");
+    assert_eq!(body["issuer"], iss, "issuer should match config");
     assert_eq!(
         body["authorization_endpoint"],
         format!("{iss}/api/oidc/authorization"),
@@ -80,10 +84,18 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
     if !provider_available().await {
         return;
     }
-    let redirect_uri = env!("OIDC_REDIRECT_URI");
+    let redirect_uri = portail_core::config::Config::global()
+        .oidc_redirect_uri
+        .as_str();
     let state = "state1234567890";
 
-    let url = auth_url(env!("OIDC_CLIENT_ID"), redirect_uri, state);
+    let url = auth_url(
+        portail_core::config::Config::global()
+            .oidc_client_id
+            .as_str(),
+        redirect_uri,
+        state,
+    );
     let (status, headers, _, _) = send_raw(Method::GET, &url, &[], None).await;
     assert_eq!(
         status,
@@ -98,7 +110,10 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
     assert!(
         location.starts_with(&format!(
             "{}/login?req=",
-            env!("APP_URL").trim_end_matches('/')
+            portail_core::config::Config::global()
+                .app_url
+                .as_str()
+                .trim_end_matches('/')
         )),
         "should redirect to the SPA login route: {location}"
     );
@@ -180,7 +195,13 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
 
     let (status, headers, _, _) = send_raw(
         Method::GET,
-        &auth_url(env!("OIDC_CLIENT_ID"), redirect_uri, "state2"),
+        &auth_url(
+            portail_core::config::Config::global()
+                .oidc_client_id
+                .as_str(),
+            redirect_uri,
+            "state2",
+        ),
         &header_pairs(&[("cookie", cookie.clone())]),
         None,
     )
@@ -267,9 +288,17 @@ async fn token_rejects_wrong_pkce_verifier() {
     if status == StatusCode::INTERNAL_SERVER_ERROR {
         return;
     }
-    let redirect_uri = env!("OIDC_REDIRECT_URI");
+    let redirect_uri = portail_core::config::Config::global()
+        .oidc_redirect_uri
+        .as_str();
 
-    let url = auth_url(env!("OIDC_CLIENT_ID"), redirect_uri, "stpkce");
+    let url = auth_url(
+        portail_core::config::Config::global()
+            .oidc_client_id
+            .as_str(),
+        redirect_uri,
+        "stpkce",
+    );
     let (_, headers, _, _) = send_raw(Method::GET, &url, &[], None).await;
     let location = headers
         .get("location")
@@ -350,9 +379,17 @@ async fn login_rejects_wrong_password() {
     if status == StatusCode::INTERNAL_SERVER_ERROR {
         return;
     }
-    let redirect_uri = env!("OIDC_REDIRECT_URI");
+    let redirect_uri = portail_core::config::Config::global()
+        .oidc_redirect_uri
+        .as_str();
 
-    let url = auth_url(env!("OIDC_CLIENT_ID"), redirect_uri, "stwrp");
+    let url = auth_url(
+        portail_core::config::Config::global()
+            .oidc_client_id
+            .as_str(),
+        redirect_uri,
+        "stwrp",
+    );
     let (_, headers, _, _) = send_raw(Method::GET, &url, &[], None).await;
     let location = headers
         .get("location")
@@ -421,7 +458,13 @@ async fn login_rejects_unknown_req() {
 
 #[tokio::test]
 async fn authorize_requires_registered_redirect_uri() {
-    let url = auth_url(env!("OIDC_CLIENT_ID"), "https://evil.example/cb", "stevil");
+    let url = auth_url(
+        portail_core::config::Config::global()
+            .oidc_client_id
+            .as_str(),
+        "https://evil.example/cb",
+        "stevil",
+    );
     let (status, _, _, _) = send_raw(Method::GET, &url, &[], None).await;
 
     assert_eq!(

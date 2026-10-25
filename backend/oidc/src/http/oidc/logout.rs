@@ -6,7 +6,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::{auth::store, http::oidc};
-use portail_core::env::Env;
+use portail_core::config::Config;
 
 #[derive(Deserialize)]
 pub struct LogoutQuery {
@@ -15,16 +15,16 @@ pub struct LogoutQuery {
 }
 
 pub async fn logout(
-    State(env): State<Env>,
+    State(config): State<Config>,
     headers: HeaderMap,
     Query(q): Query<LogoutQuery>,
 ) -> Response {
     if let Some(sid) = oidc::session_id(&headers) {
         store::destroy_session(&sid);
     }
-    let fallback = format!("{}/", env.app_url.trim_end_matches('/'));
+    let fallback = format!("{}/", config.app_url.trim_end_matches('/'));
     let target =
-        q.rd.filter(|rd| rd.starts_with(&env.app_url))
+        q.rd.filter(|rd| rd.starts_with(&config.app_url))
             .unwrap_or(fallback);
     oidc::redirect_to(&target, Some(oidc::expired_cookie()))
 }
@@ -39,9 +39,8 @@ mod tests {
     use tower::ServiceExt;
 
     fn app() -> axum::Router {
-        portail_core::env::Env::ensure_init();
-        let env = portail_core::env::Env::global().clone();
-        oidc::oidc_router(env.clone()).with_state(env)
+        let config = portail_core::config::Config::global().clone();
+        oidc::oidc_router(config.clone()).with_state(config)
     }
 
     #[tokio::test]
@@ -61,9 +60,9 @@ mod tests {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_string();
-        let app_url = portail_core::env::Env::global().app_url.clone();
+        let app_url = portail_core::config::Config::global().app_url.as_str();
         assert!(
-            location.starts_with(&app_url),
+            location.starts_with(app_url),
             "default redirect should be the portal: {location}"
         );
     }

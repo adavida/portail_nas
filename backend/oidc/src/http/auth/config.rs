@@ -1,7 +1,7 @@
 use axum::{Json, extract::State};
 use serde::Serialize;
 
-use portail_core::env::Env;
+use portail_core::config::Config;
 
 #[derive(Serialize)]
 pub struct AuthConfig {
@@ -10,10 +10,10 @@ pub struct AuthConfig {
     redirect_uri: String,
 }
 
-pub async fn config(State(env): State<Env>) -> Json<AuthConfig> {
+pub async fn config(State(config): State<Config>) -> Json<AuthConfig> {
     Json(AuthConfig {
-        issuer: env.oidc_issuer_url.clone(),
-        client_id: env.oidc_client_id.clone(),
-        redirect_uri: env.oidc_redirect_uri.clone(),
+        issuer: config.oidc_issuer_url.clone(),
+        client_id: config.oidc_client_id.clone(),
+        redirect_uri: config.oidc_redirect_uri.clone(),
     })
 }

@@ -1,32 +1,41 @@
-# 06 — Environment Helpers
+# 06 — Config — Fichier TOML, zéro variable d'env backend
 
-> Skills: backend `backend/core/src/env/` — frontend `frontend/src/env.ts`
+> Backend: `backend/core/src/config/` + `config.toml` / `config.test.toml` racine — Frontend: `frontend/src/env.ts` (Vite, build-time — hors périmètre env runtime).
 
 ## Objectif
 
-Toutes les variables d'environnement via des helpers centralisés — un seul endroit définit les noms. Deux catégories :
+Aucune variable d'env de configuration pour le backend. Le binaire se lance avec `portail-backend --config <chemin>` ; `Config::load(path)` (dans `backend/core/src/config/`) parse le TOML et construit le struct `Config`. Clap interdit — parsing argv à la main dans `main.rs` (5 lignes), `panic!` avec message `usage: ...` si `--config` absent.
 
-- **Obligatoires** (défaut interdit): manquant/vide = erreur agrégée anglais.
-- **Optionnables** (défaut autorisé): valeur personnalizable via env, défaut hard-codé visible dans l'appel `take_opt(name, default)` / `take_secret_opt(name, default, ...)` dans `env/mod.rs` — utilisé quand var absente ou vide.
+## Structure
 
-## Backend `backend/core/src/env/` (seul avec `std::env::var`)
+- `config/mod.rs`: `struct Config` (champs plats, mêmes noms que les anciennes vars: `ldap_url`, `oidc_issuer_url`…) + `RawConfig` serde (`deny_unknown_fields`) + `load(path)` + `log_summary()` + défauts `DEFAULT_*` (`DEFAULT_KEY_BITS`, `DEFAULT_PENDING_TTL_SECS`, `DEFAULT_CODE_TTL_SECS`, `DEFAULT_SESSION_TTL_SECS`).
+- `config/global.rs`: `static CONFIG: OnceLock<Config>` + `set()` (2e appel ignoré) + `global()` + `ensure_init(path)` (idempotent).
+- `config/errors.rs`: `ConfigError`.
+- Clés requises (absentes = erreur serde, fail-fast): `app_url`, `bind_addr`, `ldap_url`, `ldap_base_dn`, `oidc_issuer_url`, `oidc_client_id`, `oidc_redirect_uri`, `oidc_secrets_dir`.
+- Clés optionnelles avec défaut: `ldap_people_ou`→people, `ldap_groups_ou`→groups, `ldap_tls_ca`→vide, `ldap_admin_pw_file`→absent = `admin` (valeur lue depuis le fichier, trim), `oidc_key_bits`→2048, `oidc_secret_logs`→true, `oidc_client_owners`→vide, `oidc_clients`→[], `oidc_*_ttl_secs`→300/60/43200.
+- chemins relatifs dans le TOML (`oidc_secrets_dir`, `ldap_tls_ca`, `ldap_admin_pw_file`) résolus contre le répertoire du fichier de config (jamais le cwd).
+- Fichier illisible / TOML invalide / champ manquant ou inconnu / secret file vide = `ConfigError` → `main` panique avec le message complet.
 
-- `env/mod.rs`: struct `Env` + `static ENV: OnceLock<Env>` + `create()` (collecte toutes les vars manquantes/vides → `EnvError` agrégé anglais) + `set()` (2e appel ignoré) / `global()` / `ensure_init()` (panique avec l'`EnvError` complet si env manquant — devenv doit fournir les vars).
-- Vars obligatoires via `take(name, ...)` → manquant = `EnvError`. Vars optionnables via `take_opt(name, default)` (`var().ok().trim().filter(!empty).unwrap_or(default)`), jamais incluses dans l'erreur.
-- `env/errors.rs`: `EnvError`.
-- Message type: `missing or empty env vars: A, B.` — pas de seuil `first-error`, pas de hint devenv (le code tourne aussi sous systemd/NixOS).
-- Autres fichiers: `Env::global()` (ou `ensure_init()`) — jamais `std::env::var` direct. Pas de fallback hard-codé (hors défauts optionnables infra LDAP) — l'erreur remonte à `EnvError`/panic.
-- Défauts optionnables seulement pour l'infra LDAP standard (ex: `LDAP_PEOPLE_OU`→`people`, `LDAP_GROUPS_OU`→`groups`); secrets/URLs restent obligatoires.
-- Vérif: `rg -n "std::env::var|option_env!|env!" backend/*/src --glob '!env/**'` vide hors `#[cfg(test)]`.
+## Fichiers
 
-## Frontend `frontend/src/env.ts` (seul avec `import.meta.env`)
+- `config.toml` (racine, commité): valeurs dev (LDAP 3890 `dc=dev`, chemins `.devenv/state/...` relatifs). Lancé par `devenv up` via `--config config.toml`.
+- `config.test.toml` (racine, commité): LDAP 3891 `dc=test`, secrets `.devenv/state/secrets-test`. Chargé par les helpers de test via `env!("CARGO_MANIFEST_DIR")/../../config.test.toml` (constante de build, pas d'env runtime).
 
-- `createEnv(get?)` collecte les noms manquants → `throw` une seule `Error` (liste + hint `set ${name} in devenv.nix env (VITE_${name})`).
-- `export const env`; le reste importe `env` — jamais `import.meta.env`; `vite.config.ts` valide au build.
-- Vérif: `rg -n "import\.meta\.env|process\.env" frontend/src --glob '!env.ts' --glob '!vite.config.ts'` vide.
+## Tests
+
+- Aucun `std::env::var` dans les tests : `set_test_config()` (1 helper = 1 fichier, `src/test_helpers/config/` et `tests/common/config/`) charge `config.test.toml` via `Config::ensure_init` — `#[ctor]` dans les crates src, appel explicite dans `tests/`.
+- LDAP test uniquement (3891, `dc=test`) — jamais `dev` (règle 02).
 
 ## Interdits
 
-- `std::env::var` / `option_env!` / `env!` hors `backend/core/src/env/**`
-- `import.meta.env` / `process.env` hors `frontend/src/env.ts` (et `vite.config.ts` build)
-- Fallback hard-codé `unwrap_or("http://localhost...")` — utiliser `EnvError`/`throw` anglais (seule exception: défauts optionnables infra LDAP, cf. ci-dessus).
+- `std::env::var` / `option_env!` / `env!` hors `backend/core/src/config/**` et hors `#[cfg(test)]` (seule exception: `env!("CARGO_MANIFEST_DIR")` dans les helpers de test, `std::env::args` dans `main.rs`).
+- Toute nouvelle clé de config passe par `RawConfig` — jamais de lecture directe ailleurs.
+- Frontend: `import.meta.env` reste cantonné à `frontend/src/env.ts` (inchangé).
+
+## Vérification
+
+```bash
+rg -n "std::env::var|option_env!" backend/*/src backend/server/tests --glob '*.rs' # vide hors config/** et cfg(test)
+rg -n 'env!\("' backend --glob '*.rs' -g '!target' # uniquement CARGO_MANIFEST_DIR
+devenv shell -- cargo test --features test-api
+```

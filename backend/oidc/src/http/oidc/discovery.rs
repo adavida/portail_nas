@@ -1,10 +1,10 @@
 use axum::{Json, extract::State};
 use serde_json::json;
 
-use portail_core::env::Env;
+use portail_core::config::Config;
 
-pub async fn discovery(State(env): State<Env>) -> Json<serde_json::Value> {
-    let iss = env.oidc_issuer_url.trim_end_matches('/').to_string();
+pub async fn discovery(State(config): State<Config>) -> Json<serde_json::Value> {
+    let iss = config.oidc_issuer_url.trim_end_matches('/').to_string();
     Json(json!({
         "issuer": iss,
         "authorization_endpoint": format!("{iss}/api/oidc/authorization"),
@@ -43,11 +43,11 @@ mod tests {
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-        let iss = portail_core::env::Env::global()
+        let iss = portail_core::config::Config::global()
             .oidc_issuer_url
             .trim_end_matches('/')
             .to_string();
-        assert_eq!(v["issuer"], iss, "issuer must match env");
+        assert_eq!(v["issuer"], iss, "issuer must match config");
         assert_eq!(
             v["token_endpoint"],
             format!("{iss}/api/oidc/token"),
@@ -60,8 +60,7 @@ mod tests {
     }
 
     fn oidc_app() -> axum::Router {
-        portail_core::env::Env::ensure_init();
-        let env = portail_core::env::Env::global().clone();
-        crate::http::oidc::oidc_router(env.clone()).with_state(env)
+        let config = portail_core::config::Config::global().clone();
+        crate::http::oidc::oidc_router(config.clone()).with_state(config)
     }
 }

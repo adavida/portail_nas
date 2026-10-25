@@ -14,8 +14,8 @@ struct MemberPayload {
     uid: Uid,
 }
 
-pub fn groups_router() -> Router<portail_core::env::Env> {
-    Router::<portail_core::env::Env>::new()
+pub fn groups_router() -> Router<portail_core::config::Config> {
+    Router::<portail_core::config::Config>::new()
         .route("/", get(list_groups).post(create_group))
         .route("/{gid}", put(update_group).delete(delete_group))
         .route("/{gid}/members", axum::routing::post(post_member))

@@ -93,10 +93,10 @@ mod tests {
 
     #[tokio::test]
     async fn users_lists_seeded_user() {
-        let url = portail_core::env::ldap_test_url();
-        let base = portail_core::env::ldap_test_base_dn();
+        let url = portail_core::config::Config::global().ldap_url.as_str();
+        let base = portail_core::config::Config::global().ldap_base_dn.as_str();
 
-        if let Ok((conn, mut ldap)) = ldap3::LdapConnAsync::new(&url).await {
+        if let Ok((conn, mut ldap)) = ldap3::LdapConnAsync::new(url).await {
             ldap3::drive!(conn);
             let bind_dn = format!("cn=admin,{base}");
             let _ = ldap.simple_bind(&bind_dn, "admin").await;
@@ -157,7 +157,7 @@ mod tests {
             assert_eq!(apitest1["name"], "Api Test1");
             assert_eq!(apitest1["email"], "apitest1@example.com");
 
-            if let Ok((conn, mut l2)) = ldap3::LdapConnAsync::new(&url).await {
+            if let Ok((conn, mut l2)) = ldap3::LdapConnAsync::new(url).await {
                 ldap3::drive!(conn);
                 let _ = l2.simple_bind(&format!("cn=admin,{base}"), "admin").await;
                 for uid in ["apitest1", "apitest2"] {

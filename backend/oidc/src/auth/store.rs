@@ -1,3 +1,4 @@
+use portail_core::config::Config;
 use std::collections::HashMap;
 use std::io::Read;
 use std::sync::{Mutex, OnceLock};
@@ -15,10 +16,6 @@ pub struct AuthFlow {
     pub groups: Vec<String>,
     pub email: Option<String>,
 }
-
-const PENDING_TTL: Duration = Duration::from_secs(300);
-const CODE_TTL: Duration = Duration::from_secs(60);
-const SESSION_TTL: Duration = Duration::from_secs(12 * 3600);
 
 #[derive(Default)]
 struct Store {
@@ -51,35 +48,35 @@ fn prune<T>(map: &mut HashMap<String, (T, Instant)>, ttl: Duration) {
 pub fn save_pending(flow: AuthFlow) -> Result<String, String> {
     let id = random_id()?;
     let mut guard = store().lock().map_err(|e| e.to_string())?;
-    prune(&mut guard.pending, PENDING_TTL);
+    prune(&mut guard.pending, Config::global().oidc_pending_ttl);
     guard.pending.insert(id.clone(), (flow, Instant::now()));
     Ok(id)
 }
 
 pub fn take_pending(id: &str) -> Option<AuthFlow> {
     let mut guard = store().lock().ok()?;
-    prune(&mut guard.pending, PENDING_TTL);
+    prune(&mut guard.pending, Config::global().oidc_pending_ttl);
     guard.pending.remove(id).map(|(f, _)| f)
 }
 
 pub fn save_code(flow: AuthFlow) -> Result<String, String> {
     let id = random_id()?;
     let mut guard = store().lock().map_err(|e| e.to_string())?;
-    prune(&mut guard.codes, CODE_TTL);
+    prune(&mut guard.codes, Config::global().oidc_code_ttl);
     guard.codes.insert(id.clone(), (flow, Instant::now()));
     Ok(id)
 }
 
 pub fn take_code(code: &str) -> Option<AuthFlow> {
     let mut guard = store().lock().ok()?;
-    prune(&mut guard.codes, CODE_TTL);
+    prune(&mut guard.codes, Config::global().oidc_code_ttl);
     guard.codes.remove(code).map(|(f, _)| f)
 }
 
 pub fn create_session(sub: &str) -> Result<String, String> {
     let id = random_id()?;
     let mut guard = store().lock().map_err(|e| e.to_string())?;
-    prune(&mut guard.sessions, SESSION_TTL);
+    prune(&mut guard.sessions, Config::global().oidc_session_ttl);
     guard
         .sessions
         .insert(id.clone(), (sub.to_string(), Instant::now()));
@@ -88,7 +85,7 @@ pub fn create_session(sub: &str) -> Result<String, String> {
 
 pub fn session_sub(sid: &str) -> Option<String> {
     let mut guard = store().lock().ok()?;
-    prune(&mut guard.sessions, SESSION_TTL);
+    prune(&mut guard.sessions, Config::global().oidc_session_ttl);
     guard.sessions.get(sid).map(|(sub, _)| sub.clone())
 }
 

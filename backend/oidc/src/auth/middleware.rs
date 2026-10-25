@@ -6,17 +6,17 @@ use axum::{
 };
 
 use crate::auth::{Claims, tokens};
-use portail_core::env::Env;
+use portail_core::config::Config;
 
-pub fn verify_token(env: &Env, token: &str) -> Result<Claims, String> {
-    tokens::verify(env, token).map_err(|e| e.to_string())
+pub fn verify_token(config: &Config, token: &str) -> Result<Claims, String> {
+    tokens::verify(config, token).map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Clone)]
 pub struct AuthUser(pub Claims);
 
 pub async fn require_auth(
-    State(env): State<Env>,
+    State(config): State<Config>,
     mut req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
@@ -34,7 +34,7 @@ pub async fn require_auth(
         tracing::warn!("401 missing Bearer for {} {}", req.method(), req.uri());
         return Err(StatusCode::UNAUTHORIZED);
     }
-    match verify_token(&env, token) {
+    match verify_token(&config, token) {
         Ok(claims) => {
             tracing::info!(
                 "auth ok sub={} groups={:?} for {}",
@@ -81,9 +81,9 @@ mod tests {
 
     #[test]
     fn verify_rejects_garbage_token() {
-        let env = portail_core::env::Env::global();
+        let config = portail_core::config::Config::global();
 
-        let err = verify_token(env, "not.a.jwt").unwrap_err();
+        let err = verify_token(config, "not.a.jwt").unwrap_err();
 
         assert!(
             err.contains("token invalid") || err.contains("signing key"),

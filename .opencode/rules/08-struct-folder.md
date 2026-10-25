@@ -21,7 +21,7 @@ backend/*/src/<module>/<object>/mod.rs     # pub mod errors; pub use errors::<St
 backend/*/src/<module>/mod.rs?:            # pub mod <object>; pub use <object>::{<Struct>, <Struct>Error}; — plat
 ```
 
-- Racine type `env.rs` ⇒ `env/mod.rs` (struct) + `env/errors.rs`.
+- Racine type `env.rs` ⇒ `config/mod.rs` (struct) + `config/errors.rs`.
 - Frontend identique: `frontend/src/<module>/<object>/errors.ts`.
 
 ### Fonctions publiques libres (ex: `repository/ldap/users/`)
@@ -35,7 +35,7 @@ Exemple standard: `repository/ldap/users/` (`list_users.rs`, `create_user.rs`, `
 
 Helper de test → `src/test_helpers/` (1 helper = 1 fichier, règle `10-test-helpers.md`), jamais de `test_utils` inline dans le `mod.rs`.
 
-Exemples standards: `env/` (`Env`/`EnvError`), `domain/groups/group/` (`Group`/`GroupError`), `domain/groups/members/` (`Members`/`MembersError`), VOs `users/uid/` (`Uid`/`UidError`).
+Exemples standards: `config/` (`Config`/`ConfigError`), `domain/groups/group/` (`Group`/`GroupError`), `domain/groups/members/` (`Members`/`MembersError`), VOs `users/uid/` (`Uid`/`UidError`).
 
 ### Frontend — 1 composant = 1 fichier
 
@@ -60,7 +60,7 @@ frontend/src/components/<Name>.test.ts  # test vitest collocalisé
 
 ```bash
 # snake_case + errors séparés + struct sans error
-test -f backend/core/src/env/mod.rs && test ! -f backend/core/src/env/Env.rs && echo "OK env"
+test -f backend/core/src/config/mod.rs && test ! -f backend/core/src/config/Config.rs && echo "OK config"
 rg -n "pub enum.*Error" backend/*/src --glob '*/mod.rs' # doit être vide (hors sub-modules)
 rg -n "allow\(clippy::module_inception\)" backend/*/src # doit être vide
 

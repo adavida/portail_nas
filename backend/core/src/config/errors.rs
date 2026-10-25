@@ -1,10 +1,10 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EnvError(pub String);
+pub struct ConfigError(pub String);
 
-impl std::fmt::Display for EnvError {
+impl std::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl std::error::Error for EnvError {}
+impl std::error::Error for ConfigError {}

@@ -6,7 +6,7 @@ use axum::{
     routing::{get, post},
 };
 
-use portail_core::env::Env;
+use portail_core::config::Config;
 use portail_core::error::AppError;
 
 pub mod authorize;
@@ -17,7 +17,7 @@ pub mod logout;
 pub mod token;
 pub mod userinfo;
 
-pub fn oidc_router(env: Env) -> Router<Env> {
+pub fn oidc_router(config: Config) -> Router<Config> {
     Router::new()
         .route(
             "/.well-known/openid-configuration",
@@ -29,7 +29,7 @@ pub fn oidc_router(env: Env) -> Router<Env> {
         .route("/api/oidc/login", post(login::login))
         .route("/api/oidc/token", post(token::token))
         .route("/api/oidc/userinfo", get(userinfo::userinfo))
-        .with_state(env)
+        .with_state(config)
 }
 
 pub(crate) const SESSION_COOKIE: &str = "portail_session";
@@ -42,8 +42,8 @@ pub(crate) fn session_id(headers: &HeaderMap) -> Option<String> {
         .map(|sid| sid.trim().to_string())
 }
 
-pub(crate) fn session_cookie(env: &Env, sid: &str) -> String {
-    let secure = if env.oidc_issuer_url.starts_with("https://") {
+pub(crate) fn session_cookie(config: &Config, sid: &str) -> String {
+    let secure = if config.oidc_issuer_url.starts_with("https://") {
         "; Secure"
     } else {
         ""
@@ -124,12 +124,12 @@ mod tests {
 
     #[test]
     fn session_cookie_secure_only_on_https_issuer() {
-        let mut env = portail_core::env::Env::global().clone();
-        env.oidc_issuer_url = "https://portail.example.com".into();
+        let mut config = portail_core::config::Config::global().clone();
+        config.oidc_issuer_url = "https://portail.example.com".into();
 
-        let secure = session_cookie(&env, "sid");
-        env.oidc_issuer_url = "http://127.0.0.1:3000".into();
-        let plain = session_cookie(&env, "sid");
+        let secure = session_cookie(&config, "sid");
+        config.oidc_issuer_url = "http://127.0.0.1:3000".into();
+        let plain = session_cookie(&config, "sid");
 
         assert!(
             secure.contains("Secure"),

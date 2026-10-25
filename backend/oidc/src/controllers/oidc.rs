@@ -18,9 +18,9 @@ pub struct OidcTestReport {
 }
 
 pub fn test_client(client_id: ClientId) -> Result<OidcTestReport, AppError> {
-    let env = portail_core::env::Env::global();
+    let config = portail_core::config::Config::global();
     let signing_key_ok = key::global().is_some();
-    let clients = tokens::clients(env)?;
+    let clients = tokens::clients(config)?;
     let Some(client) = Client::find_in(&clients, client_id.as_str()) else {
         return Ok(OidcTestReport {
             client_id,
@@ -53,12 +53,12 @@ pub fn test_client(client_id: ClientId) -> Result<OidcTestReport, AppError> {
         userinfo_ok: false,
         error: None,
     };
-    let secret = crate::auth::secrets::stored_secret(env, client)
+    let secret = crate::auth::secrets::stored_secret(config, client)
         .map_err(AppError::Internal)?
         .map(|s| s.as_str().to_string())
         .unwrap_or_default();
     let report = match tokens::exchange(
-        env,
+        config,
         base.client_id.as_str(),
         &secret,
         &code,
@@ -67,7 +67,7 @@ pub fn test_client(client_id: ClientId) -> Result<OidcTestReport, AppError> {
     ) {
         Ok(tokens) => OidcTestReport {
             userinfo_ok: tokens::verify_with_aud(
-                env,
+                config,
                 &tokens.access_token,
                 base.client_id.as_str(),
             )
@@ -90,8 +90,6 @@ mod tests {
 
     #[test]
     fn test_unknown_client_reports_not_found() {
-        portail_core::env::Env::ensure_init();
-        crate::test_helpers::app::bootstrap_clients_file(portail_core::env::Env::global());
         let Ok(client_id) = ClientId::try_new("no-such-client".into()) else {
             return;
         };

@@ -5,7 +5,7 @@
 ## Backend workspace — 4 crates (Axum 0.8, Tokio full)
 
 - Workspace `Cargo.toml` `members = ["backend/core", "backend/directory", "backend/oidc", "backend/server"]`.
-- `portail-core` (`backend/core`): `env/` + `error` (AppError + `IntoResponse`) — dépendance de tous.
+- `portail-core` (`backend/core`): `config/` (TOML, `Config`/`ConfigError`) + `error` (AppError + `IntoResponse`) — dépendance de tous.
 - `portail-directory` (`backend/directory`): `domain/{users,groups}`, `repository/ldap`, `controllers/{users,groups}`, `http/{users,groups}` — routers **sans middleware**, `ldap3`/`native-tls` isolés ici.
 - `portail-oidc` (`backend/oidc`): `auth/` (dont middleware `require_auth`/`require_admin`), `domain/oidc`, `controllers/oidc`, `http/{oidc,auth}` — dépend directory (login authentifie via LDAP).
 - `portail-server` (`backend/server`): assemblage `router()` (`lib.rs` `pub use http::router as app`), health, `main.rs` (bin `portail-backend` via `[[bin]]`), `tests/` intégration — dépend les trois autres.
@@ -16,7 +16,7 @@
 - **1 endpoint = au moins 1 test d'intégration** — nouvelle route sans test = pas finie.
 - 1 fichier = 1 ressource (`health.rs`, `users.rs`); nouvelle ressource ⇒ nouveau fichier `tests/<ressource>.rs`.
 - Router via `portail_server::app()` + `tower::ServiceExt::oneshot` (pas de vrai serveur); helper partagé `send(method, uri, Option<json>) -> (StatusCode, Value)` dans `tests/common/send.rs` (règle `10-test-helpers.md`).
-- LDAP test uniquement (`LDAP_TEST_*`, 3891) — jamais `dev` (3890).
+- LDAP test uniquement (`config.test.toml`, 3891) — jamais `dev` (3890).
 - Auto-clean: `mod common;` + `tests/common/purge.rs` (`#[ctor] fn purge_test_ldap`, dev-dep `ctor`) purge `ou=people` de la base test au démarrage; LDAP down ⇒ no-op silencieux.
 - Données uniques: uid timestamp (`TestUser::new`) — prefix `^[a-z0-9._-]+$` (pénètre dans l'URL). Pas de cleanup par test — la purge `ctor` suffit (sauf tests dont le DELETE est le sujet).
 - Corps 204 vide ⇒ parse JSON avec fallback `unwrap_or(json!({}))`. LDAP inatteignable ⇒ skip via guard (`500`/`Err(AppError::Ldap)`), CI sans LDAP reste verte.

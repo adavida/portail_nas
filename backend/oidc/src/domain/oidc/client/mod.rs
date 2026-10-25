@@ -1,7 +1,7 @@
 pub mod errors;
 pub use errors::ClientError;
 
-use serde::Deserialize;
+use portail_core::config::ClientEntry;
 
 use crate::domain::oidc::{ClientId, RedirectUri};
 
@@ -12,18 +12,6 @@ pub struct Client {
     pub enabled: bool,
     pub redirect_uris: Vec<RedirectUri>,
     pub scopes: Vec<String>,
-}
-
-#[derive(Deserialize)]
-struct RawClient {
-    id: String,
-    #[serde(default)]
-    secret_file: Option<String>,
-    #[serde(default)]
-    enabled: bool,
-    redirect_uris: Vec<String>,
-    #[serde(default)]
-    scopes: Vec<String>,
 }
 
 impl Client {
@@ -54,12 +42,18 @@ impl Client {
         })
     }
 
-    pub fn parse_all(raw: &str) -> Result<Vec<Self>, ClientError> {
-        let parsed: Vec<RawClient> =
-            serde_json::from_str(raw).map_err(|e| ClientError::Json(e.to_string()))?;
-        parsed
-            .into_iter()
-            .map(|c| Self::try_new(c.id, c.secret_file, c.enabled, c.redirect_uris, c.scopes))
+    pub fn from_entries(entries: &[ClientEntry]) -> Result<Vec<Self>, ClientError> {
+        entries
+            .iter()
+            .map(|entry| {
+                Self::try_new(
+                    entry.id.clone(),
+                    entry.secret_file.clone(),
+                    entry.enabled,
+                    entry.redirect_uris.clone(),
+                    entry.scopes.clone(),
+                )
+            })
             .collect()
     }
 
@@ -84,13 +78,23 @@ impl Client {
 mod tests {
     use super::*;
 
-    fn raw() -> String {
-        r#"[{"id":"portail-dev","secret_file":"portail-dev_secret","enabled":true,"redirect_uris":["http://localhost:5173/callback"],"scopes":["openid","groups","email","profile"]}]"#.to_string()
+    fn entry(id: &str, secret_file: Option<&str>, enabled: bool) -> ClientEntry {
+        ClientEntry {
+            id: id.into(),
+            secret_file: secret_file.map(Into::into),
+            enabled,
+            redirect_uris: vec!["http://localhost:5173/callback".into()],
+            scopes: vec!["openid".into(), "groups".into()],
+        }
+    }
+
+    fn entries() -> Vec<ClientEntry> {
+        vec![entry("portail-dev", Some("portail-dev_secret"), true)]
     }
 
     #[test]
-    fn parses_valid_file() {
-        let clients = Client::parse_all(&raw()).unwrap();
+    fn from_entries_parses_all_fields() {
+        let clients = Client::from_entries(&entries()).unwrap();
 
         assert_eq!(clients.len(), 1, "one client expected");
         assert_eq!(clients[0].id.as_str(), "portail-dev");
@@ -120,10 +124,9 @@ mod tests {
 
     #[test]
     fn missing_or_blank_secret_file_marks_public_client() {
-        let public =
-            Client::parse_all(r#"[{"id":"app1","redirect_uris":["https://app/cb"],"scopes":[]}]"#)
-                .unwrap()
-                .remove(0);
+        let public = Client::from_entries(&[entry("app1", None, true)])
+            .unwrap()
+            .remove(0);
         let blank = Client::try_new(
             "app2".into(),
             Some("   ".into()),
@@ -141,31 +144,35 @@ mod tests {
     }
 
     #[test]
-    fn enabled_defaults_to_false() {
-        let clients = Client::parse_all(
-            r#"[{"id":"app1","secret_file":"a","redirect_uris":["https://app/cb"]}]"#,
-        )
-        .unwrap();
+    fn disabled_entry_stays_disabled() {
+        let clients = Client::from_entries(&[entry("app1", Some("a"), false)]).unwrap();
 
         assert!(
             !clients[0].enabled,
-            "client without explicit enabled must be disabled"
+            "entry with enabled=false must stay disabled"
         );
     }
 
     #[test]
-    fn parse_all_rejects_bad_json() {
-        let err = Client::parse_all("not json").unwrap_err();
+    fn from_entries_propagates_invalid_client() {
+        let err = Client::from_entries(&[ClientEntry {
+            id: "app1".into(),
+            secret_file: None,
+            enabled: true,
+            redirect_uris: vec![],
+            scopes: vec![],
+        }])
+        .unwrap_err();
 
         assert!(
-            matches!(err, ClientError::Json(_)),
-            "bad json should map to Json error, got {err}"
+            matches!(err, ClientError::NoRedirects),
+            "invalid entry should surface its error, got {err}"
         );
     }
 
     #[test]
     fn find_in_returns_matching_client() {
-        let clients = Client::parse_all(&raw()).unwrap();
+        let clients = Client::from_entries(&entries()).unwrap();
 
         let found = Client::find_in(&clients, "portail-dev");
         let missing = Client::find_in(&clients, "nope");
@@ -176,7 +183,7 @@ mod tests {
 
     #[test]
     fn allows_redirect_exact_match() {
-        let clients = Client::parse_all(&raw()).unwrap();
+        let clients = Client::from_entries(&entries()).unwrap();
         let client = &clients[0];
 
         assert!(

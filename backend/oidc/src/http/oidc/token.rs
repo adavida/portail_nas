@@ -6,7 +6,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::auth::tokens::{self, TokenResponse, basic_credentials};
-use portail_core::env::Env;
+use portail_core::config::Config;
 use portail_core::error::AppError;
 
 #[derive(Deserialize)]
@@ -26,7 +26,7 @@ pub struct TokenForm {
 }
 
 pub async fn token(
-    State(env): State<Env>,
+    State(config): State<Config>,
     headers: HeaderMap,
     Form(f): Form<TokenForm>,
 ) -> Result<Json<TokenResponse>, AppError> {
@@ -45,7 +45,7 @@ pub async fn token(
         },
     };
     let tokens = tokens::exchange(
-        &env,
+        &config,
         &client_id,
         &client_secret,
         &f.code.unwrap_or_default(),
@@ -66,11 +66,9 @@ mod tests {
     use tower::ServiceExt;
 
     fn app() -> axum::Router {
-        portail_core::env::Env::ensure_init();
-        crate::test_helpers::app::bootstrap_clients_file(portail_core::env::Env::global());
-        crate::auth::secrets::ensure(portail_core::env::Env::global()).unwrap();
-        let env = portail_core::env::Env::global().clone();
-        super::super::oidc_router(env.clone()).with_state(env)
+        crate::auth::secrets::ensure(portail_core::config::Config::global()).unwrap();
+        let config = portail_core::config::Config::global().clone();
+        super::super::oidc_router(config.clone()).with_state(config)
     }
 
     fn basic(client_id: &str, secret: &str) -> String {

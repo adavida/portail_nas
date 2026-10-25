@@ -14,11 +14,11 @@ use crate::domain::{groups::Gid, users::Uid};
 use portail_core::error::AppError;
 
 pub(crate) fn ldap_url() -> &'static String {
-    &portail_core::env::Env::global().ldap_url
+    &portail_core::config::Config::global().ldap_url
 }
 
 pub(crate) fn ldap_base() -> &'static String {
-    &portail_core::env::Env::global().ldap_base_dn
+    &portail_core::config::Config::global().ldap_base_dn
 }
 
 pub(crate) fn with_tls_ca(
@@ -42,8 +42,8 @@ pub(crate) fn with_tls_ca(
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) async fn connect() -> Result<ldap3::Ldap, AppError> {
-    let env = portail_core::env::Env::global();
-    let settings = with_tls_ca(ldap3::LdapConnSettings::new(), &env.ldap_tls_ca)?;
+    let config = portail_core::config::Config::global();
+    let settings = with_tls_ca(ldap3::LdapConnSettings::new(), &config.ldap_tls_ca)?;
     let (conn, mut ldap) = ldap3::LdapConnAsync::with_settings(settings, ldap_url())
         .await
         .map_ldap()?;
@@ -56,9 +56,11 @@ pub(crate) async fn connect() -> Result<ldap3::Ldap, AppError> {
 pub(crate) async fn bind_admin(ldap: &mut ldap3::Ldap) -> Result<(), AppError> {
     let bind_dn = format!("cn=admin,{}", ldap_base());
     tracing::info!(bind_dn = %bind_dn, url = %ldap_url(), "ldap admin bind");
-    let pw = portail_core::env::Env::global().ldap_admin_pw.clone();
+    let pw = portail_core::config::Config::global()
+        .ldap_admin_pw
+        .as_str();
 
-    ldap.simple_bind(&bind_dn, &pw)
+    ldap.simple_bind(&bind_dn, pw)
         .await
         .map_ldap()?
         .success()
@@ -70,7 +72,7 @@ pub(crate) fn user_dn(uid: &Uid) -> String {
     format!(
         "uid={},ou={},{}",
         uid.as_str(),
-        portail_core::env::Env::global().ldap_people_ou,
+        portail_core::config::Config::global().ldap_people_ou,
         ldap_base()
     )
 }
@@ -79,7 +81,7 @@ pub(crate) fn group_dn_from(gid: &Gid) -> String {
     format!(
         "cn={},ou={},{}",
         gid.as_str(),
-        portail_core::env::Env::global().ldap_groups_ou,
+        portail_core::config::Config::global().ldap_groups_ou,
         ldap_base()
     )
 }
@@ -87,7 +89,7 @@ pub(crate) fn group_dn_from(gid: &Gid) -> String {
 pub(crate) fn people_search_base() -> String {
     format!(
         "ou={},{}",
-        portail_core::env::Env::global().ldap_people_ou,
+        portail_core::config::Config::global().ldap_people_ou,
         ldap_base()
     )
 }
@@ -95,7 +97,7 @@ pub(crate) fn people_search_base() -> String {
 pub(crate) fn groups_search_base() -> String {
     format!(
         "ou={},{}",
-        portail_core::env::Env::global().ldap_groups_ou,
+        portail_core::config::Config::global().ldap_groups_ou,
         ldap_base()
     )
 }

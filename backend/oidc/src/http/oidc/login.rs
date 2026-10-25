@@ -7,7 +7,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{auth::store, http::oidc};
-use portail_core::env::Env;
+use portail_core::config::Config;
 use portail_core::error::AppError;
 use portail_directory::domain::users::{Password, Uid};
 
@@ -22,7 +22,7 @@ pub struct LoginCredentials {
 }
 
 pub async fn login(
-    State(env): State<Env>,
+    State(config): State<Config>,
     Json(f): Json<LoginCredentials>,
 ) -> Result<Response, AppError> {
     if f.req.is_empty() {
@@ -53,7 +53,7 @@ pub async fn login(
 
     Ok((
         StatusCode::OK,
-        [(header::SET_COOKIE, oidc::session_cookie(&env, &sid))],
+        [(header::SET_COOKIE, oidc::session_cookie(&config, &sid))],
         Json(json!({ "redirect": redirect })),
     )
         .into_response())

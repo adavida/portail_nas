@@ -1,4 +1,3 @@
-mod bootstrap_clients;
 mod inject_admin;
 pub(crate) mod test_app;
 

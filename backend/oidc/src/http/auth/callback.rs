@@ -5,7 +5,7 @@ use crate::{
     auth::tokens::{self, TokenResponse, exchange},
     domain::oidc::Client,
 };
-use portail_core::env::Env;
+use portail_core::config::Config;
 use portail_core::error::AppError;
 
 #[derive(Deserialize)]
@@ -16,7 +16,7 @@ pub struct CallbackRequest {
 }
 
 pub async fn callback(
-    State(env): State<Env>,
+    State(config): State<Config>,
     Json(payload): Json<CallbackRequest>,
 ) -> Result<Json<TokenResponse>, AppError> {
     tracing::info!(
@@ -26,20 +26,20 @@ pub async fn callback(
     );
     let redirect_uri = payload
         .redirect_uri
-        .unwrap_or_else(|| env.oidc_redirect_uri.clone());
-    let clients = tokens::clients(&env)?;
-    let client = Client::find_in(&clients, &env.oidc_client_id).ok_or_else(|| {
+        .unwrap_or_else(|| config.oidc_redirect_uri.clone());
+    let clients = tokens::clients(&config)?;
+    let client = Client::find_in(&clients, &config.oidc_client_id).ok_or_else(|| {
         AppError::Internal(format!(
             "portal client '{}' not found in clients file",
-            env.oidc_client_id
+            config.oidc_client_id
         ))
     })?;
-    let secret = crate::auth::secrets::stored_secret(&env, client)
+    let secret = crate::auth::secrets::stored_secret(&config, client)
         .map_err(AppError::Internal)?
         .map(|s| s.as_str().to_string())
         .unwrap_or_default();
     let tokens = exchange(
-        &env,
+        &config,
         client.id.as_str(),
         &secret,
         &payload.code,

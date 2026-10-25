@@ -1,0 +1,22 @@
+app_url = "http://localhost:5173"
+bind_addr = "0.0.0.0:3000"
+ldap_url = "ldap://127.0.0.1:3891"
+ldap_base_dn = "dc=test,dc=example,dc=com"
+ldap_people_ou = "people"
+ldap_groups_ou = "groups"
+oidc_issuer_url = "http://127.0.0.1:3000"
+oidc_client_id = "portail-dev"
+oidc_redirect_uri = "http://localhost:5173/callback"
+oidc_secrets_dir = ".devenv/state/secrets-test"
+oidc_key_bits = 2048
+oidc_secret_logs = false
+oidc_clients = [
+    { id = "portail-dev", secret_file = "portail-dev_secret", enabled = true, redirect_uris = [
+        "http://localhost:5173/callback",
+    ], scopes = [
+        "openid",
+        "profile",
+        "email",
+        "groups",
+    ] },
+]

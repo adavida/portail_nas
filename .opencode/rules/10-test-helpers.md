@@ -6,7 +6,7 @@
 
 Tout helper de test (unit ou intégration) vit dans un répertoire dédié, **1 helper = 1 fichier**. Les `mod.rs` de ces répertoires ne contiennent que `mod <helper>;` + re-exports — aucun corps de fonction.
 
-## Chemins — sous-dossiers par type (assert, seed, app/http, env/ldap)
+## Chemins — sous-dossiers par type (assert, seed, app/http, config, env/ldap)
 
 ```text
 backend/*/src/test_helpers/mod.rs      # #[cfg(test)] pub(crate) mod test_helpers; dans lib.rs; pub(crate) mod <type>;
@@ -17,8 +17,8 @@ backend/server/tests/common/<type>/mod.rs   # pub(crate) mod <helper>; — pas d
 backend/server/tests/common/<type>/<helper>.rs # 1 helper
 ```
 
-- Types unit: `seed/` (gen_uid, gen_gid, new_user, ensure_clean, seed_and_create_user, seed_user, seed_group, cleanup), `assert/` (assert_auth_ok/fail/err), `app/` (test_app, inject_admin), `env/` (redirect_ldap_env). Un helper `#[cfg(test)]` n'est pas exportable entre crates ⇒ duplication assumée par crate d'appartenance (bootstrap_clients: oidc+server, redirect_ldap_env: directory+oidc+server, test_helpers/seed+assert: directory).
-- Types intégration: `seed/` (test_user, test_group, fixture, seed_user, new_group_with_member, nanos), `assert/` (uid_exists, user_groups), `http/` (send, oneshot, req, req_with_app, test_app, test_app_as_user, inject_admin, inject_user), `ldap/` (purge, redirect_env, ensure_clean).
+- Types unit: `seed/` (gen_uid, gen_gid, new_user, ensure_clean, seed_and_create_user, seed_user, seed_group, cleanup), `assert/` (assert_auth_ok/fail/err), `app/` (test_app, inject_admin), `config/` (set_test_config). Un helper `#[cfg(test)]` n'est pas exportable entre crates ⇒ duplication assumée par crate d'appartenance (set_test_config: directory+oidc+server, test_helpers/seed+assert: directory).
+- Types intégration: `seed/` (test_user, test_group, fixture, seed_user, new_group_with_member, nanos), `assert/` (uid_exists, user_groups), `http/` (send, oneshot, req, req_with_app, test_app, test_app_as_user, inject_admin, inject_user), `config/` (set_test_config), `ldap/` (purge, ensure_clean).
 - Frontend: `frontend/src/test/<helper>.ts`, 1 helper par fichier (`setup.ts` reste l'entrée setupFiles).
 
 ## Interdits

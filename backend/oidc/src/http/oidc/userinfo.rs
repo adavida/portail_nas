@@ -2,11 +2,11 @@ use axum::{Json, extract::State, http::HeaderMap};
 use serde_json::json;
 
 use crate::auth::tokens;
-use portail_core::env::Env;
+use portail_core::config::Config;
 use portail_core::error::AppError;
 
 pub async fn userinfo(
-    State(env): State<Env>,
+    State(config): State<Config>,
     headers: HeaderMap,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let auth = headers
@@ -17,7 +17,7 @@ pub async fn userinfo(
     if token.is_empty() {
         return Err(AppError::Unauthorized("missing Bearer token".into()));
     }
-    let claims = tokens::verify_any_aud(&env, token)?;
+    let claims = tokens::verify_any_aud(&config, token)?;
     Ok(Json(json!({
         "sub": claims.sub,
         "preferred_username": claims.preferred_username,
@@ -37,9 +37,8 @@ mod tests {
 
     #[tokio::test]
     async fn userinfo_without_token_is_401() {
-        portail_core::env::Env::ensure_init();
-        let env = portail_core::env::Env::global().clone();
-        let app = super::super::oidc_router(env.clone()).with_state(env);
+        let config = portail_core::config::Config::global().clone();
+        let app = super::super::oidc_router(config.clone()).with_state(config);
         let req = Request::builder()
             .uri("/api/oidc/userinfo")
             .body(Body::empty())

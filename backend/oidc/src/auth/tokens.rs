@@ -11,7 +11,7 @@ use crate::{
     auth::{Claims, key, store},
     domain::oidc::Client,
 };
-use portail_core::env::Env;
+use portail_core::config::Config;
 use portail_core::error::AppError;
 
 pub const ACCESS_TOKEN_TTL: i64 = 3600;
@@ -32,27 +32,26 @@ pub fn check_pkce(verifier: Option<&str>, challenge: Option<&str>) -> bool {
     }
 }
 
-pub fn clients(env: &Env) -> Result<Vec<Client>, AppError> {
-    let raw = crate::auth::secrets::read_clients(env).map_err(AppError::Internal)?;
-    Client::parse_all(&raw).map_err(|e| AppError::Internal(e.to_string()))
+pub fn clients(config: &Config) -> Result<Vec<Client>, AppError> {
+    crate::auth::secrets::clients(config).map_err(AppError::Internal)
 }
 
 pub fn exchange(
-    env: &Env,
+    config: &Config,
     client_id: &str,
     client_secret: &str,
     code: &str,
     redirect_uri: &str,
     verifier: Option<&str>,
 ) -> Result<TokenResponse, AppError> {
-    let clients = clients(env)?;
+    let clients = clients(config)?;
     let Some(client) = Client::find_in(&clients, client_id) else {
         return Err(AppError::BadRequest("invalid_client".into()));
     };
     if !client.enabled {
         return Err(AppError::BadRequest("invalid_client".into()));
     }
-    let stored = crate::auth::secrets::stored_secret(env, client)
+    let stored = crate::auth::secrets::stored_secret(config, client)
         .map_err(AppError::Internal)?
         .map(|s| s.as_str().to_string())
         .unwrap_or_default();
@@ -73,7 +72,7 @@ pub fn exchange(
     if !check_pkce(verifier, flow.challenge.as_deref()) {
         return Err(AppError::BadRequest("invalid_grant".into()));
     }
-    tokens_for(env, &flow)
+    tokens_for(config, &flow)
 }
 
 fn now() -> usize {
@@ -83,11 +82,11 @@ fn now() -> usize {
         .unwrap_or(0)
 }
 
-fn claims(env: &Env, flow: &store::AuthFlow) -> Claims {
+fn claims(config: &Config, flow: &store::AuthFlow) -> Claims {
     Claims {
         sub: flow.sub.clone(),
         aud: serde_json::json!(flow.client_id),
-        iss: env.oidc_issuer_url.clone(),
+        iss: config.oidc_issuer_url.clone(),
         exp: now() + ACCESS_TOKEN_TTL as usize,
         groups: flow.groups.clone(),
         email: flow
@@ -111,8 +110,8 @@ fn sign(claims: &Claims) -> Result<String, AppError> {
         .map_err(|e| AppError::Internal(format!("token signing failed: {e}")))
 }
 
-pub fn tokens_for(env: &Env, flow: &store::AuthFlow) -> Result<TokenResponse, AppError> {
-    let access_token = sign(&claims(env, flow))?;
+pub fn tokens_for(config: &Config, flow: &store::AuthFlow) -> Result<TokenResponse, AppError> {
+    let access_token = sign(&claims(config, flow))?;
     let id_token = access_token.clone();
     Ok(TokenResponse {
         access_token,
@@ -122,19 +121,19 @@ pub fn tokens_for(env: &Env, flow: &store::AuthFlow) -> Result<TokenResponse, Ap
     })
 }
 
-pub fn verify(env: &Env, token: &str) -> Result<Claims, AppError> {
-    decode_token(env, token, Some(&env.oidc_client_id))
+pub fn verify(config: &Config, token: &str) -> Result<Claims, AppError> {
+    decode_token(config, token, Some(&config.oidc_client_id))
 }
 
-pub fn verify_with_aud(env: &Env, token: &str, aud: &str) -> Result<Claims, AppError> {
-    decode_token(env, token, Some(aud))
+pub fn verify_with_aud(config: &Config, token: &str, aud: &str) -> Result<Claims, AppError> {
+    decode_token(config, token, Some(aud))
 }
 
-pub fn verify_any_aud(env: &Env, token: &str) -> Result<Claims, AppError> {
-    decode_token(env, token, None)
+pub fn verify_any_aud(config: &Config, token: &str) -> Result<Claims, AppError> {
+    decode_token(config, token, None)
 }
 
-fn decode_token(env: &Env, token: &str, aud: Option<&str>) -> Result<Claims, AppError> {
+fn decode_token(config: &Config, token: &str, aud: Option<&str>) -> Result<Claims, AppError> {
     let key = key::global().ok_or_else(|| {
         AppError::Internal("signing key not available: generate it in the OIDC secrets dir".into())
     })?;
@@ -143,7 +142,7 @@ fn decode_token(env: &Env, token: &str, aud: Option<&str>) -> Result<Claims, App
         Some(aud) => validation.set_audience(&[aud]),
         None => validation.validate_aud = false,
     }
-    validation.set_issuer(&[&env.oidc_issuer_url]);
+    validation.set_issuer(&[&config.oidc_issuer_url]);
     decode::<Claims>(token, key.decoding(), &validation)
         .map(|data| data.claims)
         .map_err(|e| AppError::Unauthorized(format!("token invalid: {e}")))
@@ -163,23 +162,26 @@ mod tests {
     const PUBLIC_ID: &str = "oauth-debugger";
     const PUBLIC_REDIRECT: &str = "http://127.0.0.1:3030/callback";
 
-    fn env_with_public_client(tag: &str) -> Env {
-        let mut env = portail_core::env::Env::global().clone();
-        env.oidc_secrets_dir = format!(
+    fn env_with_public_client(tag: &str) -> Config {
+        let mut config = portail_core::config::Config::global().clone();
+        config.oidc_secrets_dir = format!(
             "{}/portail-public-test-{tag}-{}",
             std::env::temp_dir().display(),
             std::process::id()
         );
-        env.oidc_clients_file = format!("{}/clients.json", env.oidc_secrets_dir);
-        std::fs::create_dir_all(&env.oidc_secrets_dir).unwrap();
-        std::fs::write(
-            crate::auth::secrets::clients_path(&env),
-            format!(
-                r#"[{{"id":"{PUBLIC_ID}","enabled":true,"redirect_uris":["{PUBLIC_REDIRECT}"],"scopes":["openid","profile","email","groups"]}}]"#
-            ),
-        )
-        .unwrap();
-        env
+        config.oidc_clients = vec![portail_core::config::ClientEntry {
+            id: PUBLIC_ID.into(),
+            secret_file: None,
+            enabled: true,
+            redirect_uris: vec![PUBLIC_REDIRECT.into()],
+            scopes: vec![
+                "openid".into(),
+                "profile".into(),
+                "email".into(),
+                "groups".into(),
+            ],
+        }];
+        config
     }
 
     fn public_flow(challenge: Option<&str>) -> store::AuthFlow {
@@ -245,18 +247,18 @@ mod tests {
 
     #[test]
     fn exchange_unknown_code_is_invalid_grant() {
-        let env = portail_core::env::Env::global();
-        let Ok(clients) = clients(env) else { return };
+        let config = portail_core::config::Config::global();
+        let Ok(clients) = clients(config) else { return };
         let Some(client) = clients.iter().find(|c| c.enabled) else {
             return;
         };
-        let Ok(stored) = crate::auth::secrets::stored_secret(env, client) else {
+        let Ok(stored) = crate::auth::secrets::stored_secret(config, client) else {
             return;
         };
         let presented = stored.map(|s| s.as_str().to_string()).unwrap_or_default();
 
         let err = exchange(
-            env,
+            config,
             client.id.as_str(),
             &presented,
             "no-such-code",
@@ -273,14 +275,14 @@ mod tests {
 
     #[test]
     fn exchange_public_client_exchanges_form_credentials_with_pkce() {
-        let env = env_with_public_client("ok");
+        let config = env_with_public_client("ok");
         let code = store::save_code(public_flow(Some(
             "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
         )))
         .unwrap();
 
         let tokens = exchange(
-            &env,
+            &config,
             PUBLIC_ID,
             "",
             &code,
@@ -293,17 +295,17 @@ mod tests {
             !tokens.access_token.is_empty(),
             "access_token must be issued to a public client"
         );
-        let claims = verify_any_aud(&env, &tokens.access_token)
+        let claims = verify_any_aud(&config, &tokens.access_token)
             .expect("token for another audience must verify for userinfo");
         assert_eq!(claims.sub, "tester", "userinfo verification keeps sub");
     }
 
     #[test]
     fn exchange_public_client_without_pkce_is_rejected() {
-        let env = env_with_public_client("nopkce");
+        let config = env_with_public_client("nopkce");
         let code = store::save_code(public_flow(None)).unwrap();
 
-        let err = exchange(&env, PUBLIC_ID, "", &code, PUBLIC_REDIRECT, None).unwrap_err();
+        let err = exchange(&config, PUBLIC_ID, "", &code, PUBLIC_REDIRECT, None).unwrap_err();
 
         assert!(
             matches!(&err, AppError::BadRequest(m) if m.contains("PKCE")),
@@ -313,10 +315,18 @@ mod tests {
 
     #[test]
     fn exchange_public_client_rejects_presented_secret() {
-        let env = env_with_public_client("secret");
+        let config = env_with_public_client("secret");
         let code = store::save_code(public_flow(Some("chal"))).unwrap();
 
-        let err = exchange(&env, PUBLIC_ID, "not-empty", &code, PUBLIC_REDIRECT, None).unwrap_err();
+        let err = exchange(
+            &config,
+            PUBLIC_ID,
+            "not-empty",
+            &code,
+            PUBLIC_REDIRECT,
+            None,
+        )
+        .unwrap_err();
 
         assert!(
             matches!(&err, AppError::BadRequest(m) if m == "invalid_client"),
@@ -324,33 +334,32 @@ mod tests {
         );
     }
 
-    fn env_with_secret_client(tag: &str, enabled: bool) -> Env {
-        let mut env = portail_core::env::Env::global().clone();
-        env.oidc_secrets_dir = format!(
+    fn env_with_secret_client(tag: &str, enabled: bool) -> Config {
+        let mut config = portail_core::config::Config::global().clone();
+        config.oidc_secrets_dir = format!(
             "{}/portail-confid-test-{tag}-{}",
             std::env::temp_dir().display(),
             std::process::id()
         );
-        env.oidc_clients_file = format!("{}/clients.json", env.oidc_secrets_dir);
-        std::fs::create_dir_all(&env.oidc_secrets_dir).unwrap();
+        config.oidc_clients = vec![portail_core::config::ClientEntry {
+            id: "confid".into(),
+            secret_file: Some("confid_secret".into()),
+            enabled,
+            redirect_uris: vec![PUBLIC_REDIRECT.into()],
+            scopes: vec!["openid".into()],
+        }];
+        std::fs::create_dir_all(&config.oidc_secrets_dir).unwrap();
         std::fs::write(
-            crate::auth::secrets::clients_path(&env),
-            format!(
-                r#"[{{"id":"confid","secret_file":"confid_secret","enabled":{enabled},"redirect_uris":["{PUBLIC_REDIRECT}"],"scopes":["openid"]}}]"#
-            ),
-        )
-        .unwrap();
-        std::fs::write(
-            crate::auth::secrets::secret_path(&env, "confid_secret"),
+            crate::auth::secrets::secret_path(&config, "confid_secret"),
             "s3cr3t\n",
         )
         .unwrap();
-        env
+        config
     }
 
     #[test]
     fn exchange_confidential_client_reads_secret_from_file() {
-        let env = env_with_secret_client("ok", true);
+        let config = env_with_secret_client("ok", true);
         let flow = store::AuthFlow {
             client_id: "confid".into(),
             redirect_uri: PUBLIC_REDIRECT.into(),
@@ -364,30 +373,37 @@ mod tests {
         };
         let code = store::save_code(flow).unwrap();
 
-        let err =
-            exchange(&env, "confid", "wrong-secret", &code, PUBLIC_REDIRECT, None).unwrap_err();
+        let err = exchange(
+            &config,
+            "confid",
+            "wrong-secret",
+            &code,
+            PUBLIC_REDIRECT,
+            None,
+        )
+        .unwrap_err();
 
         assert!(
             matches!(&err, AppError::BadRequest(m) if m == "invalid_client"),
             "wrong secret must be invalid_client, got {err}"
         );
-        let tokens = exchange(&env, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None)
+        let tokens = exchange(&config, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None)
             .expect("secret from the file must authenticate the client");
         assert!(!tokens.access_token.is_empty(), "tokens expected");
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }
 
     #[test]
     fn exchange_disabled_client_is_invalid_client() {
-        let env = env_with_secret_client("disabled", false);
+        let config = env_with_secret_client("disabled", false);
         let code = store::save_code(public_flow(Some("chal"))).unwrap();
 
-        let err = exchange(&env, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None).unwrap_err();
+        let err = exchange(&config, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None).unwrap_err();
 
         assert!(
             matches!(&err, AppError::BadRequest(m) if m == "invalid_client"),
             "disabled client must be invalid_client, got {err}"
         );
-        let _ = std::fs::remove_dir_all(&env.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }
 }
