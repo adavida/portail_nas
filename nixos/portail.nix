@@ -317,7 +317,7 @@ in
                 };
               };
               default = { };
-              description = "Optional `oidc` sub-object (disabled by default): `oidc.enable = true` registers the app as an enabled OIDC client of the portal in the generated `config.toml` (`oidc_clients`). Entries removed from `apps` disappear at the next rebuild; generated `<clientId>_secret` files remain in `oidc.secretsDir`.";
+              description = "Optional `oidc` sub-object (disabled by default): registers the app as an OIDC client of the portal in the generated `config.toml` (`oidc_clients`) with `enabled: false` unless `oidc.enabled = true`. Entries removed from `apps` disappear at the next rebuild; generated `<clientId>_secret` files remain in `oidc.secretsDir`.";
             };
           };
         });
