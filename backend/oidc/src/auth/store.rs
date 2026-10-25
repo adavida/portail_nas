@@ -59,6 +59,16 @@ pub fn take_pending(id: &str) -> Option<AuthFlow> {
     guard.pending.remove(id).map(|(f, _)| f)
 }
 
+pub fn has_pending(id: &str) -> bool {
+    let Ok(guard) = store().lock() else {
+        return false;
+    };
+    guard
+        .pending
+        .get(id)
+        .is_some_and(|(_, born)| born.elapsed() < Config::global().oidc_pending_ttl)
+}
+
 pub fn save_code(flow: AuthFlow) -> Result<String, String> {
     let id = random_id()?;
     let mut guard = store().lock().map_err(|e| e.to_string())?;
@@ -145,5 +155,19 @@ mod tests {
 
         assert!(first.is_some(), "pending request should be retrievable");
         assert!(second.is_none(), "pending request must be consumed once");
+    }
+
+    #[test]
+    fn has_pending_checks_without_consuming() {
+        let id = save_pending(flow("dave")).unwrap();
+
+        let before = has_pending(&id);
+        let taken = take_pending(&id);
+        let after = has_pending(&id);
+
+        assert!(before, "stored pending id should be visible");
+        assert!(taken.is_some(), "take after has_pending must still succeed");
+        assert!(!after, "consumed pending id must be gone");
+        assert!(!has_pending("unknown-id"), "unknown id must be false");
     }
 }

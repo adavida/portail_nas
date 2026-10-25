@@ -48,6 +48,17 @@ fn session_cookie(set_cookie: Option<&axum::http::HeaderValue>) -> String {
         .to_string()
 }
 
+fn req_id_from(location: &str) -> String {
+    location
+        .split("req=")
+        .nth(1)
+        .unwrap_or_default()
+        .split('&')
+        .next()
+        .unwrap_or_default()
+        .to_string()
+}
+
 async fn provider_available() -> bool {
     let (status, _, _, _) = send_raw(Method::GET, "/jwks.json", &[], None).await;
     status == StatusCode::OK
@@ -117,14 +128,7 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         )),
         "should redirect to the SPA login route: {location}"
     );
-    let req_id = location
-        .split("req=")
-        .nth(1)
-        .unwrap_or_default()
-        .split('&')
-        .next()
-        .unwrap_or_default()
-        .to_string();
+    let req_id = req_id_from(&location);
 
     let (status, headers, body, _) = send_raw(
         Method::POST,
@@ -396,14 +400,7 @@ async fn login_rejects_wrong_password() {
         .and_then(|v| v.to_str().ok())
         .unwrap_or_default()
         .to_string();
-    let req_id = location
-        .split("req=")
-        .nth(1)
-        .unwrap_or_default()
-        .split('&')
-        .next()
-        .unwrap_or_default()
-        .to_string();
+    let req_id = req_id_from(&location);
 
     let (status, _, body, _) = send_raw(
         Method::POST,
@@ -424,6 +421,81 @@ async fn login_rejects_wrong_password() {
     assert_eq!(
         body["error"], "invalid username or password",
         "JSON error contract expected: {body}"
+    );
+
+    let _ = user.delete().await;
+}
+
+#[tokio::test]
+async fn login_same_req_still_works_after_wrong_password() {
+    if !provider_available().await {
+        return;
+    }
+    let user = TestUser::new("apiolsw");
+    let (status, _) = user.create().await;
+    if status == StatusCode::INTERNAL_SERVER_ERROR {
+        return;
+    }
+    assert_eq!(status, StatusCode::CREATED);
+    let redirect_uri = portail_core::config::Config::global()
+        .oidc_redirect_uri
+        .as_str();
+    let url = auth_url(
+        portail_core::config::Config::global()
+            .oidc_client_id
+            .as_str(),
+        redirect_uri,
+        "stlsw",
+    );
+    let (_, headers, _, _) = send_raw(Method::GET, &url, &[], None).await;
+    let location = headers
+        .get("location")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
+    let req_id = req_id_from(&location);
+
+    let (status, _, _, _) = send_raw(
+        Method::POST,
+        "/api/oidc/login",
+        &header_pairs(&[("content-type", "application/json".to_string())]),
+        Some(
+            json!({
+                "req": req_id,
+                "username": user.uid,
+                "password": "wrong-password",
+            })
+            .to_string(),
+        ),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "bad password must be 401");
+
+    let (status, _, body, _) = send_raw(
+        Method::POST,
+        "/api/oidc/login",
+        &header_pairs(&[("content-type", "application/json".to_string())]),
+        Some(
+            json!({
+                "req": req_id,
+                "username": user.uid,
+                "password": user.password,
+            })
+            .to_string(),
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "retry with correct password on same req must succeed: {body}"
+    );
+    let redirect = body["redirect"].as_str().unwrap_or_default().to_string();
+    assert!(
+        redirect.starts_with(redirect_uri),
+        "redirect must target the registered redirect_uri: {redirect}"
     );
 
     let _ = user.delete().await;

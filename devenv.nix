@@ -189,6 +189,7 @@ in
       bind_addr = "$BIND_ADDR"
       ldap_url = "$LDAP_URL"
       ldap_base_dn = "$LDAP_BASE_DN"
+      ldap_tls_ca = "$LDAP_TLS_CA"
       oidc_issuer_url = "$OIDC_ISSUER_URL"
       oidc_client_id = "$OIDC_CLIENT_ID"
       oidc_redirect_uri = "$OIDC_REDIRECT_URI"

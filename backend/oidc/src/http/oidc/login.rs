@@ -32,11 +32,9 @@ pub async fn login(
     if f.req.is_empty() {
         return Err(AppError::BadRequest("missing req parameter".into()));
     }
-    let Some(mut flow) = store::take_pending(&f.req) else {
-        return Err(AppError::BadRequest(
-            "unknown or expired login request".into(),
-        ));
-    };
+    if !store::has_pending(&f.req) {
+        return Err(unknown_login_request());
+    }
     let Ok(uid) = Uid::try_new(f.username) else {
         return Err(invalid_credentials());
     };
@@ -46,6 +44,9 @@ pub async fn login(
     if !portail_directory::controllers::users::authenticate(uid.clone(), password).await? {
         return Err(invalid_credentials());
     }
+    let Some(mut flow) = store::take_pending(&f.req) else {
+        return Err(unknown_login_request());
+    };
 
     flow.sub = uid.as_str().to_string();
     oidc::enrich_flow(&mut flow).await?;
@@ -65,4 +66,8 @@ pub async fn login(
 
 fn invalid_credentials() -> AppError {
     AppError::Unauthorized("invalid username or password".into())
+}
+
+fn unknown_login_request() -> AppError {
+    AppError::BadRequest("unknown or expired login request".into())
 }
