@@ -68,16 +68,16 @@ Le flake expose `packages.portail-backend` (= `packages.default`), `packages.por
 
 ### Les clients OIDC
 
-Les clients OIDC vivent inline dans le fichier de config généré (`oidc_clients` dans `config.toml`). **Seul Nix/devenv l'écrit** (depuis les options `apps` du module, ou le heredoc `backend.exec` en dev) ; le backend le **lit au démarrage** — ajouter un client ou l'activer = `nixos-rebuild switch` (ou relancer `devenv up`), puis redémarrage du service. Les secrets ne sont **jamais dans le TOML** : un client confidentiel référence dans `secret_file` le fichier qui contient son secret — nom relatif dans `oidc.secretsDir`, ou chemin absolu (`secretFile` agenix/sops) ; le backend génère les fichiers manquants au premier démarrage (0600, jamais écrasés). Une app déclarée est `enabled = false` par défaut : **l'activer est manuel** (`oidc.enabled = true` dans le module, valeur réécrite à chaque rebuild).
+Les clients OIDC vivent inline dans le fichier de config généré (`oidc_clients` dans `config.toml`). **Seul Nix/devenv l'écrit** (depuis les options `apps` du module, ou le heredoc `backend.exec` en dev) ; le backend le **lit au démarrage** — ajouter un client ou l'activer = `nixos-rebuild switch` (ou relancer `devenv up`), puis redémarrage du service. Les secrets ne sont **jamais dans le TOML** : un client confidentiel référence dans `secret_file` le fichier qui contient son secret — nom relatif dans `oidc.secretsDir`, ou chemin absolu (`secretFile` agenix/sops) ; le backend génère les fichiers manquants au premier démarrage (0600, jamais écrasés). `oidc.enable = true` enregistre l'app comme client OIDC **et l'active** (`enabled` réécrit à `true` à chaque rebuild).
 
-| Champ           | Rôle                                                            |
-| --------------- | --------------------------------------------------------------- |
-| `id`            | client_id                                                       |
-| `secret_file`   | fichier du secret ; `null` = client public (PKCE obligatoire)   |
-| `enabled`       | défaut `false` ; passer à `true` = activation manuelle          |
-| `redirect_uris` | URLs exactes autorisées au authorize                            |
-| `scopes`        | scopes accordables par ce client                                |
-| `managed`       | interne Nix : géré par le module (purgé si l'app quitte `apps`) |
+| Champ           | Rôle                                                             |
+| --------------- | ---------------------------------------------------------------- |
+| `id`            | client_id                                                        |
+| `secret_file`   | fichier du secret ; `null` = client public (PKCE obligatoire)    |
+| `enabled`       | activation ; écrit `true` par le module, `false` possible en dev |
+| `redirect_uris` | URLs exactes autorisées au authorize                             |
+| `scopes`        | scopes accordables par ce client                                 |
+| `managed`       | interne Nix : géré par le module (purgé si l'app quitte `apps`)  |
 
 ```json
 [
@@ -91,7 +91,7 @@ Les clients OIDC vivent inline dans le fichier de config généré (`oidc_client
   {
     "id": "nextcloud",
     "secret_file": "nextcloud_secret",
-    "enabled": false,
+    "enabled": true,
     "redirect_uris": [
       "https://cloud.portail.example.com/apps/oauth2/redirect_ui"
     ],
@@ -103,7 +103,7 @@ Les clients OIDC vivent inline dans le fichier de config généré (`oidc_client
 
 ### Applications affichées
 
-`services.portail.apps` alimente la page d'accueil : chaque entrée = un lien (nom + URL, description et icône optionnelles), trié par nom. Le module le rend dans un `/apps.json` statique servi par le vhost nginx — le backend n'intervient pas. En dev, la liste vient de `frontend/public/apps.json` (servie par vite, modifiable à chaud). Chaque entrée accepte un sous-objet `oidc` désactivé par défaut : `oidc.enable = true` enregistre l'application comme client OIDC du portail dans le `config.toml` généré (`oidc_clients`), avec `clientId` (défaut : nom en minuscules), `redirectUris`, `scopes`, un `secret_file` (`null` si `public = true` ; sinon `oidc.secretsDir/<clientId>_secret`, généré par le backend au premier démarrage — 0600, jamais écrasé — ou chemin absolu surchargeable par `secretFile` agenix/sops) et `enabled: false` — **l'activer est manuel**, dans le JSON. `oidc.user`/`oidc.group` (défaut : vides) déclarent le user/groupe linux dotés d'un **ACL de lecture** sur le secret généré (ré-appliqué par le backend à chaque démarrage, `ensure()` — aucune capacité requise). Une app retirée de `apps` disparaît du config généré au rebuild suivant (son secret généré reste sur disque).
+`services.portail.apps` alimente la page d'accueil : chaque entrée = un lien (nom + URL, description et icône optionnelles), trié par nom. Le module le rend dans un `/apps.json` statique servi par le vhost nginx — le backend n'intervient pas. En dev, la liste vient de `frontend/public/apps.json` (servie par vite, modifiable à chaud). Chaque entrée accepte un sous-objet `oidc` désactivé par défaut : `oidc.enable = true` enregistre l'application comme client OIDC **activé** du portail dans le `config.toml` généré (`oidc_clients`), avec `clientId` (défaut : nom en minuscules), `redirectUris`, `scopes`, un `secret_file` (`null` si `public = true` ; sinon `oidc.secretsDir/<clientId>_secret`, généré par le backend au premier démarrage — 0600, jamais écrasé — ou chemin absolu surchargeable par `secretFile` agenix/sops). `oidc.user`/`oidc.group` (défaut : vides) déclarent le user/groupe linux dotés d'un **ACL de lecture** sur le secret généré (ré-appliqué par le backend à chaque démarrage, `ensure()` — aucune capacité requise). Une app retirée de `apps` disparaît du config généré au rebuild suivant (son secret généré reste sur disque).
 
 ```nix
 services.portail.apps = [
@@ -222,16 +222,16 @@ The flake exposes `packages.portail-backend` (= `packages.default`), `packages.p
 
 #### The OIDC clients
 
-OIDC clients live inline in the generated config file (`oidc_clients` in `config.toml`). **Only Nix/devenv writes it** (from the module `apps` options, or the `backend.exec` heredoc in dev); the backend **reads it at startup** — adding or activating a client = `nixos-rebuild switch` (or re-run `devenv up`), then service restart. Secrets are **never in the TOML**: a confidential client references through `secret_file` the file holding its secret — a name relative to `oidc.secretsDir`, or an absolute path (`secretFile` agenix/sops); the backend generates missing files on first start (0600, never overwritten). A declared app is `enabled = false` by default: **activating it is manual** (`oidc.enabled = true` in the module, the value is rewritten at every rebuild).
+OIDC clients live inline in the generated config file (`oidc_clients` in `config.toml`). **Only Nix/devenv writes it** (from the module `apps` options, or the `backend.exec` heredoc in dev); the backend **reads it at startup** — adding or activating a client = `nixos-rebuild switch` (or re-run `devenv up`), then service restart. Secrets are **never in the TOML**: a confidential client references through `secret_file` the file holding its secret — a name relative to `oidc.secretsDir`, or an absolute path (`secretFile` agenix/sops); the backend generates missing files on first start (0600, never overwritten). `oidc.enable = true` registers the app as an OIDC client **and enables it** (`enabled` rewritten to `true` at every rebuild).
 
-| Field           | Purpose                                                          |
-| --------------- | ---------------------------------------------------------------- |
-| `id`            | client_id                                                        |
-| `secret_file`   | secret file; `null` = public client (PKCE mandatory)             |
-| `enabled`       | defaults to `false`; set `true` = manual activation              |
-| `redirect_uris` | exact URLs allowed at authorize                                  |
-| `scopes`        | scopes this client may request                                   |
-| `managed`       | Nix internal: module-managed (pruned when the app leaves `apps`) |
+| Field           | Purpose                                                           |
+| --------------- | ----------------------------------------------------------------- |
+| `id`            | client_id                                                         |
+| `secret_file`   | secret file; `null` = public client (PKCE mandatory)              |
+| `enabled`       | activation; written `true` by the module, `false` possible in dev |
+| `redirect_uris` | exact URLs allowed at authorize                                   |
+| `scopes`        | scopes this client may request                                    |
+| `managed`       | Nix internal: module-managed (pruned when the app leaves `apps`)  |
 
 ```json
 [
@@ -245,7 +245,7 @@ OIDC clients live inline in the generated config file (`oidc_clients` in `config
   {
     "id": "nextcloud",
     "secret_file": "nextcloud_secret",
-    "enabled": false,
+    "enabled": true,
     "redirect_uris": [
       "https://cloud.portail.example.com/apps/oauth2/redirect_ui"
     ],
@@ -257,7 +257,7 @@ OIDC clients live inline in the generated config file (`oidc_clients` in `config
 
 #### Listed applications
 
-`services.portail.apps` feeds the home page: each entry = a link (name + URL, optional description and icon), sorted by name. The module renders it into a static `/apps.json` served by the nginx vhost — the backend is not involved. In dev, the list comes from `frontend/public/apps.json` (served by vite, hot-editable). Each entry accepts an `oidc` sub-object, disabled by default: `oidc.enable = true` registers the app as an OIDC client of the portal in the generated `config.toml` (`oidc_clients`), with `clientId` (default: lowercased name), `redirectUris`, `scopes`, a `secret_file` (`null` when `public = true`; otherwise `oidc.secretsDir/<clientId>_secret`, generated by the backend on first start — 0600, never overwritten — or an absolute path overridable with `secretFile` agenix/sops) and `enabled: false` — **activating it is manual**, in the JSON. `oidc.user`/`oidc.group` (default: empty) declare the Linux user/group granted **read ACL** on the generated secret (re-applied by the backend at every startup, `ensure()` — no capabilities needed). An app removed from `apps` disappears from the generated config at the next rebuild (its generated secret file remains on disk).
+`services.portail.apps` feeds the home page: each entry = a link (name + URL, optional description and icon), sorted by name. The module renders it into a static `/apps.json` served by the nginx vhost — the backend is not involved. In dev, the list comes from `frontend/public/apps.json` (served by vite, hot-editable). Each entry accepts an `oidc` sub-object, disabled by default: `oidc.enable = true` registers the app as an **enabled** OIDC client of the portal in the generated `config.toml` (`oidc_clients`), with `clientId` (default: lowercased name), `redirectUris`, `scopes`, a `secret_file` (`null` when `public = true`; otherwise `oidc.secretsDir/<clientId>_secret`, generated by the backend on first start — 0600, never overwritten — or an absolute path overridable with `secretFile` agenix/sops). `oidc.user`/`oidc.group` (default: empty) declare the Linux user/group granted **read ACL** on the generated secret (re-applied by the backend at every startup, `ensure()` — no capabilities needed). An app removed from `apps` disappears from the generated config at the next rebuild (its generated secret file remains on disk).
 
 ```nix
 services.portail.apps = [
