@@ -9,13 +9,13 @@ Toutes les variables d'environnement via des helpers centralisés — un seul en
 - **Obligatoires** (défaut interdit): manquant/vide = erreur agrégée anglais.
 - **Optionnables** (défaut autorisé): valeur personnalizable via env, défaut hard-codé documenté dans `env/mod.rs` — utilisé quand var absente ou vide.
 
-## Backend `backend/core/src/env/` (seul avec `option_env!`/`env!`/`std::env::var`)
+## Backend `backend/core/src/env/` (seul avec `std::env::var`)
 
-- `env/mod.rs`: struct `Env` + `static ENV: OnceLock<Env>` + `create()` (collecte toutes les vars manquantes/vides → `EnvError` agrégé anglais) + `set()` (2e appel ignoré) / `global()` / `ensure_init()` / fallback `from_compile_fallback()` (tests).
+- `env/mod.rs`: struct `Env` + `static ENV: OnceLock<Env>` + `create()` (collecte toutes les vars manquantes/vides → `EnvError` agrégé anglais) + `set()` (2e appel ignoré) / `global()` / `ensure_init()` (panique avec l'`EnvError` complet si env manquant — devenv doit fournir les vars).
 - Vars obligatoires via `take(name, ...)` → manquant = `EnvError`. Vars optionnables via `take_opt(name, default)` (`var().ok().trim().filter(!empty).unwrap_or(default)`), jamais incluses dans l'erreur.
 - `env/errors.rs`: `EnvError`.
-- Message type: `missing or empty env vars: A, B. set them in devenv.nix env` — pas de seuil `first-error`.
-- Autres fichiers: `Env::global()` (ou `ensure_init()`) — jamais `std::env::var` direct. Pas de fallback hard-codé hors `from_compile_fallback`.
+- Message type: `missing or empty env vars: A, B.` — pas de seuil `first-error`, pas de hint devenv (le code tourne aussi sous systemd/NixOS).
+- Autres fichiers: `Env::global()` (ou `ensure_init()`) — jamais `std::env::var` direct. Pas de fallback hard-codé (hors défauts optionnables infra LDAP) — l'erreur remonte à `EnvError`/panic.
 - Défauts optionnables seulement pour l'infra LDAP standard (ex: `LDAP_PEOPLE_OU`→`people`, `LDAP_GROUPS_OU`→`groups`); secrets/URLs restent obligatoires.
 - Vérif: `rg -n "std::env::var|option_env!|env!" backend/*/src --glob '!env/**'` vide hors `#[cfg(test)]`.
 

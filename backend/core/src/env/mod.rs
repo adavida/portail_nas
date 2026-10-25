@@ -1,7 +1,6 @@
 pub mod errors;
+mod global;
 pub use errors::EnvError;
-
-use std::sync::OnceLock;
 
 #[derive(Debug, Clone)]
 pub struct Env {
@@ -32,8 +31,6 @@ pub struct Env {
     /// files stay owned by the service user.
     pub oidc_client_owners: String,
 }
-
-static ENV: OnceLock<Env> = OnceLock::new();
 
 pub const DEFAULT_KEY_BITS: usize = 2048;
 
@@ -125,7 +122,7 @@ impl Env {
 
         if !missing.is_empty() {
             return Err(EnvError(format!(
-                "missing or empty env vars: {}. set them in devenv.nix env",
+                "missing or empty env vars: {}.",
                 missing.join(", ")
             )));
         }
@@ -137,7 +134,7 @@ impl Env {
         }
         if !invalid.is_empty() {
             return Err(EnvError(format!(
-                "invalid env values: {}. set them in devenv.nix env",
+                "invalid env values: {}.",
                 invalid.join("; ")
             )));
         }
@@ -183,90 +180,6 @@ impl Env {
             ldap_tls_ca = %self.ldap_tls_ca,
             "backend env loaded"
         );
-    }
-
-    /// Stores the Env created once in `main`; second call is ignored.
-    pub fn set(env: Env) -> &'static Env {
-        let _ = ENV.set(env);
-        ENV.get().unwrap()
-    }
-
-    /// Returns the Env stored via `set`; panics if not yet initialized.
-    pub fn global() -> &'static Env {
-        ENV.get()
-            .expect("env not initialized: call Env::set in main")
-    }
-
-    /// For tests / fallback: ensure global is initialized (from env or compile-time fallback).
-    pub fn ensure_init() {
-        if ENV.get().is_none() {
-            if let Ok(env) = Self::create() {
-                let _ = ENV.set(env);
-            } else {
-                let env = Self::from_compile_fallback();
-                let _ = ENV.set(env);
-            }
-        }
-    }
-
-    fn from_compile_fallback() -> Self {
-        // ponytail: test fallback outside devenv — the secrets dir points to a
-        // temp path where the test helpers write the clients file and
-        // `secrets::ensure` creates the signing key + secret files.
-        let oidc_secrets_dir = option_env!("OIDC_SECRETS_DIR")
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| {
-                format!(
-                    "{}/portail-oidc-secrets-{}",
-                    std::env::temp_dir().display(),
-                    std::process::id()
-                )
-            });
-        let oidc_clients_file = option_env!("OIDC_CLIENTS_FILE")
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| format!("{oidc_secrets_dir}/clients.json"));
-        Self {
-            oidc_issuer_url: option_env!("OIDC_ISSUER_URL")
-                .unwrap_or("http://127.0.0.1:3000")
-                .to_string(),
-            oidc_client_id: option_env!("OIDC_CLIENT_ID")
-                .unwrap_or("portail-dev")
-                .to_string(),
-            oidc_redirect_uri: option_env!("OIDC_REDIRECT_URI")
-                .unwrap_or("http://localhost:5173/callback")
-                .to_string(),
-            oidc_secrets_dir,
-            oidc_clients_file,
-            oidc_key_bits: option_env!("OIDC_KEY_BITS")
-                .and_then(|s| s.trim().parse::<usize>().ok())
-                .unwrap_or(DEFAULT_KEY_BITS),
-            oidc_secret_logs: option_env!("OIDC_SECRET_LOGS")
-                .map(|s| !s.trim().eq_ignore_ascii_case("false"))
-                .unwrap_or(true),
-            app_url: option_env!("APP_URL")
-                .unwrap_or("http://localhost:5173")
-                .to_string(),
-            bind_addr: option_env!("BIND_ADDR")
-                .unwrap_or("0.0.0.0:3000")
-                .to_string(),
-            ldap_url: option_env!("LDAP_URL")
-                .unwrap_or("ldap://127.0.0.1:3890")
-                .to_string(),
-            ldap_base_dn: option_env!("LDAP_BASE_DN")
-                .unwrap_or("dc=dev,dc=example,dc=com")
-                .to_string(),
-            ldap_people_ou: option_env!("LDAP_PEOPLE_OU")
-                .unwrap_or("people")
-                .to_string(),
-            ldap_groups_ou: option_env!("LDAP_GROUPS_OU")
-                .unwrap_or("groups")
-                .to_string(),
-            ldap_admin_pw: option_env!("LDAP_ADMIN_PW").unwrap_or("admin").to_string(),
-            ldap_tls_ca: option_env!("LDAP_TLS_CA").unwrap_or("").to_string(),
-            oidc_client_owners: option_env!("OIDC_CLIENT_OWNERS").unwrap_or("").to_string(),
-        }
     }
 }
 
@@ -364,7 +277,10 @@ mod tests {
         for k in vars {
             assert!(err.0.contains(k), "error missing {k}: {err}");
         }
-        assert!(err.0.contains("devenv.nix env"), "hint missing: {err}");
+        assert!(
+            err.0.starts_with("missing or empty env vars:"),
+            "message prefix missing: {err}"
+        );
 
         for (k, v) in saved {
             if let Some(val) = v {
