@@ -12,7 +12,7 @@ Aucune variable d'env de configuration pour le backend. Le binaire se lance avec
 - `config/global.rs`: `static CONFIG: OnceLock<Config>` + `set()` (2e appel ignoré) + `global()` + `ensure_init(path)` (idempotent).
 - `config/errors.rs`: `ConfigError`.
 - Clés requises (absentes = erreur serde, fail-fast): `app_url`, `bind_addr`, `ldap_url`, `ldap_base_dn`, `oidc_issuer_url`, `oidc_client_id`, `oidc_redirect_uri`, `oidc_secrets_dir`.
-- Clés optionnelles avec défaut: `ldap_people_ou`→people, `ldap_groups_ou`→groups, `ldap_tls_ca`→vide, `ldap_admin_pw_file`→absent = `admin` (valeur lue depuis le fichier, trim), `oidc_key_bits`→2048, `oidc_secret_logs`→true, `oidc_client_owners`→vide, `oidc_clients`→[], `oidc_*_ttl_secs`→300/60/43200.
+- Clés optionnelles avec défaut: `ldap_people_ou`→people, `ldap_groups_ou`→groups, `ldap_tls_ca`→vide, `ldap_admin_pw_file`→absent = `admin` (valeur lue depuis le fichier, trim), `oidc_key_bits`→2048, `oidc_secret_logs`→true, `oidc_client_owners`→vide, `oidc_clients`→[], `oidc_*_ttl_secs`→300/60/43200/3600, `password_min_length`→8, `login_max_attempts`→10, `oidc_id_bytes`→16 (plancher validé au load, jamais sous 16).
 - chemins relatifs dans le TOML (`oidc_secrets_dir`, `ldap_tls_ca`, `ldap_admin_pw_file`) résolus contre le répertoire du fichier de config (jamais le cwd).
 - Fichier illisible / TOML invalide / champ manquant ou inconnu / secret file vide = `ConfigError` → `main` panique avec le message complet.
 

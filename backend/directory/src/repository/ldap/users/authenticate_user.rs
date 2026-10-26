@@ -4,6 +4,9 @@ use crate::{
 };
 use portail_core::error::AppError;
 
+const LDAP_RESULT_SUCCESS: u32 = 0;
+const LDAP_RESULT_INVALID_CREDENTIALS: u32 = 49;
+
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn authenticate_user(uid: &Uid, password: Password) -> Result<bool, AppError> {
     let mut ldap = connect().await?;
@@ -20,8 +23,8 @@ pub async fn authenticate_user(uid: &Uid, password: Password) -> Result<bool, Ap
     let rc = bind_result.rc;
     let _ = ldap.unbind().await;
     match rc {
-        0 => Ok(true),
-        49 => Ok(false),
+        LDAP_RESULT_SUCCESS => Ok(true),
+        LDAP_RESULT_INVALID_CREDENTIALS => Ok(false),
         _ => Err(AppError::Ldap(format!(
             "bind rc {rc}: {}",
             bind_result.text

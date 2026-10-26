@@ -22,10 +22,10 @@ pub async fn logout(
     if let Some(sid) = oidc::session_id(&headers) {
         store::destroy_session(&sid);
     }
-    let fallback = format!("{}/", config.app_url.trim_end_matches('/'));
+    let root = config.app_url.trim_end_matches('/');
     let target =
-        q.rd.filter(|rd| rd.starts_with(&config.app_url))
-            .unwrap_or(fallback);
+        q.rd.filter(|rd| *rd == root || rd.starts_with(&format!("{root}/")))
+            .unwrap_or_else(|| format!("{root}/"));
     oidc::redirect_to(&target, Some(oidc::expired_cookie()))
 }
 
@@ -86,6 +86,33 @@ mod tests {
         assert!(
             !location.contains("evil"),
             "foreign rd must be ignored, got {location}"
+        );
+    }
+
+    #[tokio::test]
+    async fn logout_rejects_lookalike_host_rd() {
+        let app = app();
+        let app_url = portail_core::config::Config::global()
+            .app_url
+            .trim_end_matches('/')
+            .to_string();
+        let req = Request::builder()
+            .uri(format!("/logout?rd={app_url}.evil.example"))
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+
+        let location = resp
+            .headers()
+            .get("location")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        assert_eq!(
+            location,
+            format!("{app_url}/"),
+            "lookalike host rd must fall back to the portal root"
         );
     }
 

@@ -1,68 +1,18 @@
 use axum::http::{Method, StatusCode};
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::Engine as _;
 use serde_json::json;
-use sha2::{Digest, Sha256};
 
 #[allow(dead_code)]
 mod common;
 use common::{
     http::send_raw::send_raw,
+    oidc::{
+        auth_url::auth_url, challenge::VERIFIER, header_pairs::header_pairs,
+        provider_available::provider_available, req_id_from::req_id_from,
+        session_cookie::session_cookie, urlencoding::urlencoding,
+    },
     seed::{oidc_client_secret::oidc_client_secret, test_user::TestUser},
 };
-
-const VERIFIER: &str = "portail-test-pkce-verifier-0123456789-abcdefghij";
-
-fn challenge() -> String {
-    URL_SAFE_NO_PAD.encode(Sha256::digest(VERIFIER.as_bytes()))
-}
-
-fn auth_url(client_id: &str, redirect_uri: &str, state: &str) -> String {
-    format!(
-        "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=code&state={state}&scope=openid%20groups%20email%20profile&code_challenge={}&code_challenge_method=S256",
-        client_id,
-        urlencoding(redirect_uri),
-        urlencoding(&challenge()),
-    )
-}
-
-fn urlencoding(s: &str) -> String {
-    s.replace('%', "%25")
-        .replace(':', "%3A")
-        .replace('/', "%2F")
-        .replace('?', "%3F")
-        .replace('&', "%26")
-        .replace('=', "%3D")
-}
-
-fn header_pairs(pairs: &[(&'static str, String)]) -> Vec<(&'static str, String)> {
-    pairs.to_vec()
-}
-
-fn session_cookie(set_cookie: Option<&axum::http::HeaderValue>) -> String {
-    set_cookie
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default()
-        .split(';')
-        .next()
-        .unwrap_or_default()
-        .to_string()
-}
-
-fn req_id_from(location: &str) -> String {
-    location
-        .split("req=")
-        .nth(1)
-        .unwrap_or_default()
-        .split('&')
-        .next()
-        .unwrap_or_default()
-        .to_string()
-}
-
-async fn provider_available() -> bool {
-    let (status, _, _, _) = send_raw(Method::GET, "/jwks.json", &[], None).await;
-    status == StatusCode::OK
-}
 
 #[tokio::test]
 async fn discovery_advertises_endpoints() {
@@ -525,6 +475,59 @@ async fn login_rejects_unknown_req() {
             .unwrap_or_default()
             .contains("expired"),
         "english JSON error expected: {body}"
+    );
+}
+
+#[tokio::test]
+async fn login_caps_attempts_per_req() {
+    let url = auth_url(
+        portail_core::config::Config::global()
+            .oidc_client_id
+            .as_str(),
+        portail_core::config::Config::global()
+            .oidc_redirect_uri
+            .as_str(),
+        "stcaps",
+    );
+    let (_, headers, _, _) = send_raw(Method::GET, &url, &[], None).await;
+    let location = headers
+        .get("location")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
+    let req_id = req_id_from(&location);
+    assert!(!req_id.is_empty(), "authorize must hand out a login req");
+
+    for _ in 0..portail_core::config::Config::global().login_max_attempts {
+        portail_oidc::auth::store::record_login_failure(&req_id);
+    }
+
+    let (status, _, body, _) = send_raw(
+        Method::POST,
+        "/api/oidc/login",
+        &header_pairs(&[("content-type", "application/json".to_string())]),
+        Some(
+            json!({
+                "req": req_id,
+                "username": "ghostuser-notcreated",
+                "password": "pw",
+            })
+            .to_string(),
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "req exhausted of attempts must be refused: {body}"
+    );
+    assert!(
+        body["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("expired"),
+        "exhausted req reports the same expired error as unknown req: {body}"
     );
 }
 

@@ -14,14 +14,12 @@ use crate::{
 use portail_core::config::Config;
 use portail_core::error::AppError;
 
-pub const ACCESS_TOKEN_TTL: i64 = 3600;
-
 #[derive(Debug, Clone, Serialize)]
 pub struct TokenResponse {
     pub access_token: String,
     pub id_token: String,
     pub token_type: &'static str,
-    pub expires_in: i64,
+    pub expires_in: u64,
 }
 
 pub fn check_pkce(verifier: Option<&str>, challenge: Option<&str>) -> bool {
@@ -87,7 +85,7 @@ fn claims(config: &Config, flow: &store::AuthFlow) -> Claims {
         sub: flow.sub.clone(),
         aud: flow.client_id.clone(),
         iss: config.oidc_issuer_url.clone(),
-        exp: now() + ACCESS_TOKEN_TTL as usize,
+        exp: now() + config.oidc_access_ttl.as_secs() as usize,
         groups: flow.groups.clone(),
         email: flow
             .email
@@ -117,7 +115,7 @@ pub fn tokens_for(config: &Config, flow: &store::AuthFlow) -> Result<TokenRespon
         access_token,
         id_token,
         token_type: "bearer",
-        expires_in: ACCESS_TOKEN_TTL,
+        expires_in: config.oidc_access_ttl.as_secs(),
     })
 }
 

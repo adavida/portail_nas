@@ -3,13 +3,19 @@ pub use errors::PasswordError;
 
 use serde::Deserialize;
 
+use portail_core::config::Config;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Password(String);
 
 impl Password {
     pub fn try_new(raw: String) -> Result<Self, PasswordError> {
+        let min_length = Config::global().password_min_length;
         if raw.is_empty() {
             return Err(PasswordError::Empty);
+        }
+        if raw.chars().count() < min_length {
+            return Err(PasswordError::TooShort(min_length));
         }
         Ok(Self(raw))
     }
@@ -40,6 +46,17 @@ mod tests {
         let pw = Password::try_new("secret".into()).unwrap();
 
         assert_eq!(pw.as_str(), "secret");
+    }
+
+    #[test]
+    fn rejects_short() {
+        let err = Password::try_new("x".into()).unwrap_err();
+
+        assert_eq!(
+            err,
+            PasswordError::TooShort(2),
+            "len < configured minimum should be TooShort: {err}"
+        );
     }
 
     #[test]

@@ -57,9 +57,26 @@ pub(crate) fn expired_cookie() -> String {
 
 pub(crate) fn callback_location(redirect_uri: &str, code: &str, state: Option<&str>) -> String {
     match state {
-        Some(state) => format!("{redirect_uri}?code={code}&state={state}"),
-        None => format!("{redirect_uri}?code={code}"),
+        Some(state) => format!(
+            "{redirect_uri}?code={}&state={}",
+            encode_query_value(code),
+            encode_query_value(state)
+        ),
+        None => format!("{redirect_uri}?code={}", encode_query_value(code)),
     }
+}
+
+pub(crate) fn encode_query_value(raw: &str) -> String {
+    let mut encoded = String::with_capacity(raw.len());
+    for byte in raw.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char)
+            }
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
 }
 
 pub(crate) fn redirect_to(location: &str, cookie: Option<String>) -> Response {
@@ -95,6 +112,17 @@ pub(crate) async fn enrich_flow(flow: &mut crate::auth::store::AuthFlow) -> Resu
 mod tests {
     use super::*;
     use axum::http::HeaderValue;
+
+    #[test]
+    fn callback_location_encodes_state() {
+        let location =
+            callback_location("http://localhost:5173/callback", "abc123", Some("a&b=#c"));
+
+        assert_eq!(
+            location, "http://localhost:5173/callback?code=abc123&state=a%26b%3D%23c",
+            "state metacharacters must be percent-encoded"
+        );
+    }
 
     #[test]
     fn session_id_extracts_cookie() {

@@ -10,7 +10,11 @@ pub use errors::ConfigError;
 pub const DEFAULT_KEY_BITS: usize = 2048;
 pub const DEFAULT_PENDING_TTL_SECS: u64 = 300;
 pub const DEFAULT_CODE_TTL_SECS: u64 = 60;
+pub const DEFAULT_ACCESS_TTL_SECS: u64 = 3600;
 pub const DEFAULT_SESSION_TTL_SECS: u64 = 12 * 3600;
+pub const DEFAULT_PASSWORD_MIN_LENGTH: usize = 8;
+pub const DEFAULT_LOGIN_MAX_ATTEMPTS: u32 = 10;
+pub const DEFAULT_OIDC_ID_BYTES: usize = 16;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -33,6 +37,10 @@ pub struct Config {
     pub oidc_pending_ttl: Duration,
     pub oidc_code_ttl: Duration,
     pub oidc_session_ttl: Duration,
+    pub oidc_access_ttl: Duration,
+    pub password_min_length: usize,
+    pub login_max_attempts: u32,
+    pub oidc_id_bytes: usize,
 }
 
 #[derive(Deserialize)]
@@ -68,6 +76,14 @@ struct RawConfig {
     oidc_code_ttl_secs: Option<u64>,
     #[serde(default)]
     oidc_session_ttl_secs: Option<u64>,
+    #[serde(default)]
+    oidc_access_ttl_secs: Option<u64>,
+    #[serde(default)]
+    password_min_length: Option<usize>,
+    #[serde(default)]
+    login_max_attempts: Option<u32>,
+    #[serde(default)]
+    oidc_id_bytes: Option<usize>,
 }
 
 fn default_people_ou() -> String {
@@ -118,6 +134,12 @@ impl Config {
                 .map_err(|e| ConfigError(format!("ldap_admin_pw_file: {e}")))?,
             None => "admin".to_string(),
         };
+        let oidc_id_bytes = parsed.oidc_id_bytes.unwrap_or(DEFAULT_OIDC_ID_BYTES);
+        if oidc_id_bytes < DEFAULT_OIDC_ID_BYTES {
+            return Err(ConfigError(format!(
+                "oidc_id_bytes must stay at least {DEFAULT_OIDC_ID_BYTES} (got {oidc_id_bytes})"
+            )));
+        }
         Ok(Self {
             app_url: parsed.app_url,
             bind_addr: parsed.bind_addr,
@@ -148,6 +170,18 @@ impl Config {
                     .oidc_session_ttl_secs
                     .unwrap_or(DEFAULT_SESSION_TTL_SECS),
             ),
+            oidc_access_ttl: Duration::from_secs(
+                parsed
+                    .oidc_access_ttl_secs
+                    .unwrap_or(DEFAULT_ACCESS_TTL_SECS),
+            ),
+            password_min_length: parsed
+                .password_min_length
+                .unwrap_or(DEFAULT_PASSWORD_MIN_LENGTH),
+            login_max_attempts: parsed
+                .login_max_attempts
+                .unwrap_or(DEFAULT_LOGIN_MAX_ATTEMPTS),
+            oidc_id_bytes,
         })
     }
 
@@ -171,6 +205,10 @@ impl Config {
             oidc_pending_ttl_secs = %self.oidc_pending_ttl.as_secs(),
             oidc_code_ttl_secs = %self.oidc_code_ttl.as_secs(),
             oidc_session_ttl_secs = %self.oidc_session_ttl.as_secs(),
+            oidc_access_ttl_secs = %self.oidc_access_ttl.as_secs(),
+            password_min_length = %self.password_min_length,
+            login_max_attempts = %self.login_max_attempts,
+            oidc_id_bytes = %self.oidc_id_bytes,
             "backend config loaded"
         );
     }
@@ -235,6 +273,36 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
             Duration::from_secs(DEFAULT_SESSION_TTL_SECS),
             "default session ttl expected"
         );
+        assert_eq!(
+            config.oidc_access_ttl,
+            Duration::from_secs(DEFAULT_ACCESS_TTL_SECS),
+            "default access token ttl expected"
+        );
+        assert_eq!(
+            config.password_min_length, DEFAULT_PASSWORD_MIN_LENGTH,
+            "default password min length expected"
+        );
+        assert_eq!(
+            config.login_max_attempts, DEFAULT_LOGIN_MAX_ATTEMPTS,
+            "default login attempt cap expected"
+        );
+        assert_eq!(
+            config.oidc_id_bytes, DEFAULT_OIDC_ID_BYTES,
+            "default id entropy expected"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_id_bytes_below_floor() {
+        let path = write_temp_config("weakid", &format!("{}oidc_id_bytes = 4\n", minimal_toml()));
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("oidc_id_bytes") && err.0.contains("at least"),
+            "id entropy below the floor should be rejected: {err}"
+        );
         let _ = std::fs::remove_file(&path);
     }
 
@@ -246,7 +314,7 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
         let path = write_temp_config(
             "custom",
             &format!(
-                "{}ldap_admin_pw_file = \"{}\"\nldap_people_ou = \"humains\"\noidc_code_ttl_secs = 90\noidc_key_bits = 4096\n",
+                "{}ldap_admin_pw_file = \"{}\"\nldap_people_ou = \"humains\"\noidc_code_ttl_secs = 90\noidc_key_bits = 4096\npassword_min_length = 12\nlogin_max_attempts = 5\noidc_access_ttl_secs = 120\noidc_id_bytes = 32\n",
                 minimal_toml(),
                 pw_file.to_str().unwrap()
             ),
@@ -265,6 +333,23 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
             "custom code ttl expected"
         );
         assert_eq!(config.oidc_key_bits, 4096, "custom key size expected");
+        assert_eq!(
+            config.password_min_length, 12,
+            "custom password min length expected"
+        );
+        assert_eq!(
+            config.login_max_attempts, 5,
+            "custom login attempt cap expected"
+        );
+        assert_eq!(
+            config.oidc_access_ttl,
+            Duration::from_secs(120),
+            "custom access token ttl expected"
+        );
+        assert_eq!(
+            config.oidc_id_bytes, 32,
+            "custom id entropy should be allowed upward"
+        );
         assert_eq!(config.oidc_clients.len(), 1, "one inline client expected");
         assert_eq!(
             config.oidc_clients[0].id, "portail-dev",

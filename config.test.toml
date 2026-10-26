@@ -10,6 +10,8 @@ oidc_redirect_uri = "http://localhost:5173/callback"
 oidc_secrets_dir = ".devenv/state/secrets-test"
 oidc_key_bits = 2048
 oidc_secret_logs = false
+password_min_length = 2
+login_max_attempts = 3
 oidc_clients = [
     { id = "portail-dev", secret_file = "portail-dev_secret", enabled = true, redirect_uris = [
         "http://localhost:5173/callback",

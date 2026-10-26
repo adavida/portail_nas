@@ -22,6 +22,7 @@ struct Store {
     pending: HashMap<String, (AuthFlow, Instant)>,
     codes: HashMap<String, (AuthFlow, Instant)>,
     sessions: HashMap<String, (String, Instant)>,
+    login_failures: HashMap<String, (u32, Instant)>,
 }
 
 // shortcut: sessions in memory, single-process — restart = re-login, upgrade when multi-process
@@ -32,7 +33,7 @@ fn store() -> &'static Mutex<Store> {
 }
 
 pub(crate) fn random_id() -> Result<String, String> {
-    let mut buf = [0u8; 16];
+    let mut buf = vec![0u8; Config::global().oidc_id_bytes];
     let mut file = std::fs::File::open("/dev/urandom")
         .map_err(|e| format!("cannot read /dev/urandom: {e}"))?;
     file.read_exact(&mut buf)
@@ -56,7 +57,36 @@ pub fn save_pending(flow: AuthFlow) -> Result<String, String> {
 pub fn take_pending(id: &str) -> Option<AuthFlow> {
     let mut guard = store().lock().ok()?;
     prune(&mut guard.pending, Config::global().oidc_pending_ttl);
-    guard.pending.remove(id).map(|(f, _)| f)
+    let flow = guard.pending.remove(id).map(|(f, _)| f);
+    if flow.is_some() {
+        guard.login_failures.remove(id);
+    }
+    flow
+}
+
+pub fn record_login_failure(req_id: &str) {
+    let Ok(mut guard) = store().lock() else {
+        return;
+    };
+    prune(&mut guard.login_failures, Config::global().oidc_pending_ttl);
+    guard
+        .login_failures
+        .entry(req_id.to_string())
+        .and_modify(|(count, _)| *count += 1)
+        .or_insert((1, Instant::now()));
+}
+
+pub fn login_attempts_exceeded(req_id: &str) -> bool {
+    let Ok(guard) = store().lock() else {
+        return false;
+    };
+    let max_attempts = Config::global().login_max_attempts;
+    guard
+        .login_failures
+        .get(req_id)
+        .is_some_and(|(count, born)| {
+            *count >= max_attempts && born.elapsed() < Config::global().oidc_pending_ttl
+        })
 }
 
 pub fn has_pending(id: &str) -> bool {
@@ -121,6 +151,37 @@ mod tests {
             groups: vec!["user".into()],
             email: Some(format!("{sub}@example.com")),
         }
+    }
+
+    #[test]
+    fn login_failures_block_after_max_attempts() {
+        let req = "fail-counter-req";
+        let exceeded_before = login_attempts_exceeded(req);
+
+        for _ in 0..Config::global().login_max_attempts {
+            record_login_failure(req);
+        }
+        let exceeded_after = login_attempts_exceeded(req);
+
+        assert!(!exceeded_before, "unknown req must not be blocked");
+        assert!(exceeded_after, "req at the configured cap must be blocked");
+    }
+
+    #[test]
+    fn take_pending_clears_login_failures() {
+        let req = save_pending(flow("erin")).unwrap();
+        for _ in 0..Config::global().login_max_attempts {
+            record_login_failure(&req);
+        }
+
+        let taken = take_pending(&req);
+        let blocked = login_attempts_exceeded(&req);
+
+        assert!(taken.is_some(), "pending should be retrievable");
+        assert!(
+            !blocked,
+            "consumed pending must also clear its failure counter"
+        );
     }
 
     #[test]

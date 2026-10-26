@@ -32,7 +32,7 @@ pub async fn login(
     if f.req.is_empty() {
         return Err(AppError::BadRequest("missing req parameter".into()));
     }
-    if !store::has_pending(&f.req) {
+    if !store::has_pending(&f.req) || store::login_attempts_exceeded(&f.req) {
         return Err(unknown_login_request());
     }
     let Ok(uid) = Uid::try_new(f.username) else {
@@ -41,7 +41,15 @@ pub async fn login(
     let Ok(password) = Password::try_new(f.password) else {
         return Err(invalid_credentials());
     };
-    if !portail_directory::controllers::users::authenticate(uid.clone(), password).await? {
+    let Ok(authenticated) =
+        portail_directory::controllers::users::authenticate(uid.clone(), password).await
+    else {
+        return Err(AppError::Internal(
+            "authentication backend unavailable".into(),
+        ));
+    };
+    if !authenticated {
+        store::record_login_failure(&f.req);
         return Err(invalid_credentials());
     }
     let Some(mut flow) = store::take_pending(&f.req) else {
