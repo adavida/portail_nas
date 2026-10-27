@@ -185,7 +185,8 @@ in
         type = lib.types.str;
         default = "/var/lib/portail/oidc";
         description = ''
-          Directory holding the OIDC secrets (mode 0700, owned by `portail`).
+          Directory holding the OIDC secrets (mode 0700, owned by `portail`,
+          plus per-client owner traverse ACLs).
           Clients are declared in the generated `config.toml` (`oidc_clients`),
           never in this directory: it only holds secret files. The backend
           generates the RSA signing key and every missing `secret_file`
@@ -304,7 +305,7 @@ in
                     default = "";
                     description = ''
                       Linux user given read access (POSIX ACL) to the generated `<client_id>_secret`
-                      file. Empty (default) = nobody but `portail` can read it. The backend
+                      file and traverse access on `oidc.secretsDir`. Empty (default) = nobody but `portail` can read it. The backend
                       re-applies the ACL at every startup — no capabilities needed since it owns
                       the generated files. Requires `group`, `public = false` and no `secretFile`.
                     '';

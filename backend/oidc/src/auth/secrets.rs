@@ -44,6 +44,8 @@ pub fn ensure(config: &Config) -> Result<(), String> {
     write_new(config, &key_path(config), || generate_signing_key(config))?;
 
     let owners = parse_owners(config)?;
+    let mut traverse: std::collections::BTreeSet<(String, String)> =
+        std::collections::BTreeSet::new();
     for client in clients(config)? {
         let Some(name) = &client.secret_file else {
             continue;
@@ -52,7 +54,32 @@ pub fn ensure(config: &Config) -> Result<(), String> {
         write_new(config, &path, store::random_id)?;
         if let Some(owner) = owners.get(client.id.as_str()) {
             grant_owner_read(config, &path, owner)?;
+            traverse.insert((owner.user.clone(), owner.group.clone()));
         }
+    }
+    if !traverse.is_empty() {
+        grant_dir_traverse(config, dir, &traverse)?;
+    }
+    Ok(())
+}
+
+fn grant_dir_traverse(
+    config: &Config,
+    dir: &str,
+    owners: &std::collections::BTreeSet<(String, String)>,
+) -> Result<(), String> {
+    let mut entries = from_mode(0o700);
+    for (user, group) in owners {
+        entries.push(AclEntry::allow_user(user, Perm::EXECUTE, None));
+        entries.push(AclEntry::allow_group(group, Perm::EXECUTE, None));
+    }
+    setfacl(&[Path::new(dir)], &entries, None)
+        .map_err(|e| format!("cannot set traverse ACL on {dir}: {e}"))?;
+    if config.oidc_secret_logs {
+        tracing::info!(
+            "OIDC secrets dir traversal ACL granted for {} owner(s)",
+            owners.len()
+        );
     }
     Ok(())
 }
@@ -361,6 +388,30 @@ mod tests {
             .any(|e| e.name == group && e.perms.contains(Perm::READ));
         assert!(has_user, "declared user must have ACL read: {entries:?}");
         assert!(has_group, "declared group must have ACL read: {entries:?}");
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+    }
+
+    #[test]
+    fn ensure_grants_owner_execute_acl_on_secrets_dir() {
+        let (user, group) = current_owner();
+        let mut config = confidential_clients(&test_env("dir-acl"), &["app1"]);
+        config.oidc_client_owners =
+            format!(r#"{{"app1": {{"user": "{user}", "group": "{group}"}}}}"#);
+
+        ensure(&config).unwrap();
+
+        let entries = getfacl(Path::new(&config.oidc_secrets_dir), None).unwrap();
+        let has_user = entries
+            .iter()
+            .any(|e| e.name == user && e.perms.contains(Perm::EXECUTE));
+        let has_group = entries
+            .iter()
+            .any(|e| e.name == group && e.perms.contains(Perm::EXECUTE));
+        assert!(
+            has_user,
+            "owner needs dir traverse to reach its secret: {entries:?}"
+        );
+        assert!(has_group, "owner group needs dir traverse: {entries:?}");
         let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }
 
