@@ -20,6 +20,13 @@ impl Password {
         Ok(Self(raw))
     }
 
+    pub fn for_authentication(raw: String) -> Result<Self, PasswordError> {
+        if raw.is_empty() {
+            return Err(PasswordError::Empty);
+        }
+        Ok(Self(raw))
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -62,6 +69,24 @@ mod tests {
     #[test]
     fn rejects_empty() {
         let err = Password::try_new("".into()).unwrap_err();
+
+        assert_eq!(err, PasswordError::Empty);
+    }
+
+    #[test]
+    fn for_authentication_accepts_short_password() {
+        let pw = Password::for_authentication("user".into()).unwrap();
+
+        assert_eq!(
+            pw.as_str(),
+            "user",
+            "login must not enforce creation min length"
+        );
+    }
+
+    #[test]
+    fn for_authentication_rejects_empty() {
+        let err = Password::for_authentication("".into()).unwrap_err();
 
         assert_eq!(err, PasswordError::Empty);
     }

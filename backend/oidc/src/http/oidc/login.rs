@@ -38,7 +38,7 @@ pub async fn login(
     let Ok(uid) = Uid::try_new(f.username) else {
         return Err(invalid_credentials());
     };
-    let Ok(password) = Password::try_new(f.password) else {
+    let Ok(password) = Password::for_authentication(f.password) else {
         return Err(invalid_credentials());
     };
     let Ok(authenticated) =
