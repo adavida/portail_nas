@@ -41,7 +41,9 @@ pub fn ensure(config: &Config) -> Result<(), String> {
         .map_err(|e| format!("cannot create OIDC secrets dir {dir}: {e}"))?;
     std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
         .map_err(|e| format!("cannot set mode on OIDC secrets dir {dir}: {e}"))?;
-    write_new(config, &key_path(config), || generate_signing_key(config))?;
+    write_new(config, &key_path(config), None, || {
+        generate_signing_key(config)
+    })?;
 
     let owners = parse_owners(config)?;
     let mut traverse: std::collections::BTreeSet<(String, String)> =
@@ -51,9 +53,9 @@ pub fn ensure(config: &Config) -> Result<(), String> {
             continue;
         };
         let path = secret_path(config, name);
-        write_new(config, &path, store::random_id)?;
-        if let Some(owner) = owners.get(client.id.as_str()) {
-            grant_owner_read(config, &path, owner)?;
+        let owner = owners.get(client.id.as_str());
+        write_new(config, &path, owner, store::random_id)?;
+        if let Some(owner) = owner {
             traverse.insert((owner.user.clone(), owner.group.clone()));
         }
     }
@@ -167,6 +169,7 @@ fn generate_signing_key(config: &Config) -> Result<String, String> {
 fn write_new(
     config: &Config,
     path: &Path,
+    owner: Option<&ClientOwner>,
     content: impl FnOnce() -> Result<String, String>,
 ) -> Result<(), String> {
     let mut file = match std::fs::OpenOptions::new()
@@ -177,13 +180,29 @@ fn write_new(
     {
         Ok(f) => f,
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            if config.oidc_secret_logs {
-                tracing::info!(
-                    "OIDC secret file already exists, kept as-is: {}",
-                    path.display()
-                );
+            if std::fs::metadata(path)
+                .map(|m| m.len() > 0)
+                .unwrap_or(false)
+            {
+                if config.oidc_secret_logs {
+                    tracing::info!(
+                        "OIDC secret file already exists, kept as-is: {}",
+                        path.display()
+                    );
+                }
+                if let Some(owner) = owner {
+                    grant_owner_read(config, path, owner)?;
+                }
+                return Ok(());
             }
-            return Ok(());
+            std::fs::remove_file(path)
+                .map_err(|e| format!("cannot remove empty secret {}: {e}", path.display()))?;
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(path)
+                .map_err(|e| format!("cannot recreate {}: {e}", path.display()))?
         }
         Err(e) => return Err(format!("cannot create {}: {e}", path.display())),
     };
@@ -197,6 +216,10 @@ fn write_new(
     };
     file.write_all(content.as_bytes())
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
+    drop(file);
+    if let Some(owner) = owner {
+        grant_owner_read(config, path, owner)?;
+    }
     if config.oidc_secret_logs {
         tracing::info!("generated OIDC secret file: {}", path.display());
     }
@@ -291,6 +314,22 @@ mod tests {
         assert_eq!(
             content, "admin-placed\n",
             "existing secret must be kept as-is"
+        );
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+    }
+
+    #[test]
+    fn ensure_regenerates_empty_secret_file() {
+        let config = confidential_clients(&test_env("empty-secret"), &["app1"]);
+        std::fs::create_dir_all(secret_file(&config, "app1").parent().unwrap()).unwrap();
+        std::fs::write(secret_file(&config, "app1"), "").unwrap();
+
+        ensure(&config).unwrap();
+
+        let generated = std::fs::read_to_string(secret_file(&config, "app1")).unwrap();
+        assert!(
+            !generated.trim().is_empty(),
+            "an empty secret file must be regenerated, not kept as-is"
         );
         let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }

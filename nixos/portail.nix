@@ -190,7 +190,8 @@ in
           Clients are declared in the generated `config.toml` (`oidc_clients`),
           never in this directory: it only holds secret files. The backend
           generates the RSA signing key and every missing `secret_file`
-          (0600, never overwritten) on first start. A client exists and is
+          (0600, never overwritten once non-empty — an empty file is
+          regenerated) on first start. A client exists and is
           activated by `oidc.enable = true` on the app (rewritten at every
           `nixos-rebuild` + service restart).
         '';
@@ -296,7 +297,8 @@ in
                       File holding the client secret (agenix/sops) — recorded as an absolute
                       `secret_file` in `oidc_clients`; the secret file is read by the backend on every token request.
                       When null and `public = false`, the backend generates the secret on first
-                      start in `oidc.secretsDir/<client_id>_secret` (0600, never overwritten).
+                      start in `oidc.secretsDir/<client_id>_secret` (0600, never overwritten once
+                      non-empty; an empty file is regenerated).
                       A provided file must be readable by the `portail` user.
                     '';
                   };
