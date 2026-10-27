@@ -8,6 +8,20 @@ Portail perso pour gérer les utilisateurs de mon NAS NixOS et afficher une page
 
 Le flake expose `packages.portail-backend` (= `packages.default`), `packages.portail-frontend` et `nixosModules.default` (module `services.portail` : service systemd du backend + vhost nginx du frontend, proxy `/api`, `forceSSL` par défaut). OpenLDAP est provisionné par la config hôte. Le backend est **son propre fournisseur OIDC** (`/.well-known/openid-configuration`, `/jwks.json`, `/api/oidc/*`, `/logout` servis sur `appUrl`) : il génère sa clé de signature au premier démarrage dans `oidc.secretsDir` et déclare ses clients OIDC inline dans son `config.toml` généré (`oidc_clients`) — ajouter ou activer un client = rebuild + restart.
 
+### API OIDC
+
+| Méthode | Endpoint                            | Rôle                                                                                                  |
+| ------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| GET     | `/.well-known/openid-configuration` | Discovery : endpoints, scopes, algorithmes supportés                                                  |
+| GET     | `/jwks.json`                        | Clés publiques RS256 de vérification des JWT                                                          |
+| GET     | `/api/oidc/authorization`           | Authorize : valide client/redirect_uri/PKCE, renvoie vers le login ou émet un `code` si déjà connecté |
+| POST    | `/api/oidc/login`                   | Login (hors spec) : `{req, username, password}` → bind LDAP → session + `code`                        |
+| POST    | `/api/oidc/token`                   | Échange du `code` (+ `code_verifier` PKCE) contre `access_token`/`id_token`                           |
+| GET     | `/api/oidc/userinfo`                | Identité (`sub`, `preferred_username`, `email`, `groups`) via `Bearer`                                |
+| GET     | `/logout`                           | Fin de session : détruit la session, purge le cookie                                                  |
+
+Le frontend du portail utilise les mêmes endpoints (c'est un client OIDC de lui-même) plus `GET /api/auth/config` (amorcer le flux) et `POST /api/auth/callback` (échange du code côté serveur). Contrat détaillé : `.opencode/rules/15-oidc-api.md`.
+
 ```nix
 { inputs, ... }:
 {
@@ -161,6 +175,20 @@ Personal portal to manage the users of my NixOS NAS and show a page gathering it
 ### NixOS deployment (flake)
 
 The flake exposes `packages.portail-backend` (= `packages.default`), `packages.portail-frontend` and `nixosModules.default` (the `services.portail` module: backend systemd service + frontend nginx vhost, `/api` proxy, `forceSSL` by default). OpenLDAP is provisioned by the host config. The backend is **its own OIDC provider** (`/.well-known/openid-configuration`, `/jwks.json`, `/api/oidc/*`, `/logout` served on `appUrl`): it generates its signing key on first start in `oidc.secretsDir` and declares its OIDC clients inline in its generated `config.toml` (`oidc_clients`) — adding or activating a client = rebuild + restart.
+
+### OIDC API
+
+| Method | Endpoint                            | Role                                                                                                   |
+| ------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| GET    | `/.well-known/openid-configuration` | Discovery: endpoints, scopes, supported algorithms                                                     |
+| GET    | `/jwks.json`                        | RS256 public keys for JWT verification                                                                 |
+| GET    | `/api/oidc/authorization`           | Authorize: validates client/redirect_uri/PKCE, goes to login or issues a `code` when already signed in |
+| POST   | `/api/oidc/login`                   | Login (off-spec): `{req, username, password}` → LDAP bind → session + `code`                           |
+| POST   | `/api/oidc/token`                   | Exchanges the `code` (+ PKCE `code_verifier`) for `access_token`/`id_token`                            |
+| GET    | `/api/oidc/userinfo`                | Identity (`sub`, `preferred_username`, `email`, `groups`) via `Bearer`                                 |
+| GET    | `/logout`                           | End session: destroys the session, purges the cookie                                                   |
+
+The portal frontend uses the same endpoints (it is a client of itself) plus `GET /api/auth/config` (to start the flow) and `POST /api/auth/callback` (server-side code exchange). Detailed contract: `.opencode/rules/15-oidc-api.md`.
 
 ```nix
 { inputs, ... }:
