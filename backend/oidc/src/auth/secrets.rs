@@ -48,7 +48,6 @@ pub fn ensure(config: &Config) -> Result<(), String> {
     let owners = parse_owners(config)?;
 
     for client in clients(config)? {
-        tracing::info!("client {}", client.id.as_str());
         let Some(name) = &client.secret_file else {
             continue;
         };
@@ -207,7 +206,6 @@ fn write_new(
         }
         Err(e) => return Err(format!("cannot create {}: {e}", path.display())),
     };
-                         tracing::info!("ici: 1");
 
     let content = match content() {
         Ok(c) => c,
@@ -217,10 +215,8 @@ fn write_new(
             return Err(e);
         }
     };
-                             tracing::info!("ici: 2");
     file.write_all(content.as_bytes())
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
-                             tracing::info!("ici: 3");
 
     drop(file);
     if let Some(owner) = owner {
