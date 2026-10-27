@@ -41,7 +41,6 @@ pub fn ensure(config: &Config) -> Result<(), String> {
         .map_err(|e| format!("cannot create OIDC secrets dir {dir}: {e}"))?;
     std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
         .map_err(|e| format!("cannot set mode on OIDC secrets dir {dir}: {e}"))?;
-    tracing::info!("ici: ");
     write_new(config, &key_path(config), None, || {
         generate_signing_key(config)
     })?;
@@ -208,6 +207,8 @@ fn write_new(
         }
         Err(e) => return Err(format!("cannot create {}: {e}", path.display())),
     };
+                         tracing::info!("ici: 1");
+
     let content = match content() {
         Ok(c) => c,
         Err(e) => {
@@ -216,8 +217,11 @@ fn write_new(
             return Err(e);
         }
     };
+                             tracing::info!("ici: 2");
     file.write_all(content.as_bytes())
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
+                             tracing::info!("ici: 3");
+
     drop(file);
     if let Some(owner) = owner {
         grant_owner_read(config, path, owner)?;
