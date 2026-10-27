@@ -41,14 +41,15 @@ pub fn ensure(config: &Config) -> Result<(), String> {
         .map_err(|e| format!("cannot create OIDC secrets dir {dir}: {e}"))?;
     std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
         .map_err(|e| format!("cannot set mode on OIDC secrets dir {dir}: {e}"))?;
+    tracing::info!("ici: ");
     write_new(config, &key_path(config), None, || {
         generate_signing_key(config)
     })?;
 
     let owners = parse_owners(config)?;
-    let mut traverse: std::collections::BTreeSet<(String, String)> =
-        std::collections::BTreeSet::new();
+
     for client in clients(config)? {
+        tracing::info!("client {}", client.id.as_str());
         let Some(name) = &client.secret_file else {
             continue;
         };
@@ -56,31 +57,32 @@ pub fn ensure(config: &Config) -> Result<(), String> {
         let owner = owners.get(client.id.as_str());
         write_new(config, &path, owner, store::random_id)?;
         if let Some(owner) = owner {
-            traverse.insert((owner.user.clone(), owner.group.clone()));
+            grant_dir_traverse(config, dir, owner)?;
         }
-    }
-    if !traverse.is_empty() {
-        grant_dir_traverse(config, dir, &traverse)?;
     }
     Ok(())
 }
 
-fn grant_dir_traverse(
-    config: &Config,
-    dir: &str,
-    owners: &std::collections::BTreeSet<(String, String)>,
-) -> Result<(), String> {
+fn grant_dir_traverse(config: &Config, dir: &str, owner: &ClientOwner) -> Result<(), String> {
     let mut entries = from_mode(0o700);
-    for (user, group) in owners {
-        entries.push(AclEntry::allow_user(user, Perm::EXECUTE, None));
-        entries.push(AclEntry::allow_group(group, Perm::EXECUTE, None));
-    }
+    entries.push(AclEntry::allow_user(
+        owner.user.as_str(),
+        Perm::EXECUTE,
+        None,
+    ));
+    entries.push(AclEntry::allow_group(
+        owner.group.as_str(),
+        Perm::EXECUTE,
+        None,
+    ));
+
     setfacl(&[Path::new(dir)], &entries, None)
         .map_err(|e| format!("cannot set traverse ACL on {dir}: {e}"))?;
     if config.oidc_secret_logs {
         tracing::info!(
-            "OIDC secrets dir traversal ACL granted for {} owner(s)",
-            owners.len()
+            "OIDC secrets dir traversal ACL granted for {} {}",
+            owner.user,
+            owner.group
         );
     }
     Ok(())

@@ -21,10 +21,15 @@ async fn main() {
     tracing::info!("start ... ... portail");
     let config = Config::load(&config_path_from_args()).unwrap_or_else(|e| panic!("{e}"));
     config.log_summary();
-    portail_oidc::auth::secrets::ensure(&config).unwrap_or_else(|e| panic!("{e}"));
+    tracing::info!("ensure start");
+    portail_oidc::auth::secrets::ensure(&config).unwrap_or_else(|e| panic!("ensure panic : {e}"));
+    tracing::info!("ensure end");
     let bind = config.bind_addr.clone();
     Config::set(config);
-    let app = app();
+    tracing::info!("Config::set");
+    let app: axum::Router = app();
+    tracing::info!("app ...");
+      
     let listener = tokio::net::TcpListener::bind(bind).await.unwrap();
     tracing::info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
