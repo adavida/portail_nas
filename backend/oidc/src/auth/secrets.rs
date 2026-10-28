@@ -47,7 +47,9 @@ pub fn ensure(config: &Config) -> Result<(), String> {
 
     let owners = parse_owners(config)?;
 
-    for client in clients(config)? {
+    let mut o = Vec::new();
+    let all_clients = clients(config)?;
+    for client in all_clients {
         let Some(name) = &client.secret_file else {
             continue;
         };
@@ -55,33 +57,38 @@ pub fn ensure(config: &Config) -> Result<(), String> {
         let owner = owners.get(client.id.as_str());
         write_new(config, &path, owner, store::random_id)?;
         if let Some(owner) = owner {
-            grant_dir_traverse(config, dir, owner)?;
+            o.push(owner);
         }
-    }
+    }       
+     grant_dir_traverse(config, o, dir)?;
+
     Ok(())
 }
 
-fn grant_dir_traverse(config: &Config, dir: &str, owner: &ClientOwner) -> Result<(), String> {
-    let mut entries = from_mode(0o700);
-    entries.push(AclEntry::allow_user(
-        owner.user.as_str(),
-        Perm::EXECUTE,
-        None,
-    ));
-    entries.push(AclEntry::allow_group(
-        owner.group.as_str(),
-        Perm::EXECUTE,
-        None,
-    ));
+fn grant_dir_traverse(config: &Config, owners: Vec<&ClientOwner>, dir: &str) -> Result<(), String> {
+    let entries = [
+        from_mode(0o700),
+        owners
+            .iter()
+            .flat_map(|o| {
+                vec![
+                    AclEntry::allow_user(o.user.as_str(), Perm::EXECUTE, None),
+                    AclEntry::allow_group(o.group.as_str(), Perm::EXECUTE, None),
+                ]
+            })
+            .collect::<Vec<_>>(),
+    ]
+    .concat();
 
     setfacl(&[Path::new(dir)], &entries, None)
         .map_err(|e| format!("cannot set traverse ACL on {dir}: {e}"))?;
     if config.oidc_secret_logs {
-        tracing::info!(
-            "OIDC secrets dir traversal ACL granted for {} {}",
-            owner.user,
-            owner.group
-        );
+        let r = owners
+            .iter()
+            .map(|o| format!("u: {} g: {}", o.user, o.group))
+            .collect::<Vec<_>>()
+            .join(", ");
+        tracing::info!("OIDC secrets dir traversal ACL granted for {} ", r);
     }
     Ok(())
 }
