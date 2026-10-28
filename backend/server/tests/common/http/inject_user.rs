@@ -11,6 +11,7 @@ pub async fn inject_user(mut req: Request, next: Next) -> Result<Response, Statu
             .oidc_issuer_url
             .as_str()
             .to_string(),
+        iat: 0,
         exp: 9999999999,
         groups: vec![],
         email: Some("user@example.com".into()),

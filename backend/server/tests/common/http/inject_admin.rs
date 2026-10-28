@@ -11,6 +11,7 @@ pub async fn inject_admin(mut req: Request, next: Next) -> Result<Response, Stat
             .oidc_issuer_url
             .as_str()
             .to_string(),
+        iat: 0,
         exp: 9999999999,
         groups: vec!["admin".into()],
         email: Some("admin@example.com".into()),

@@ -85,6 +85,7 @@ fn claims(config: &Config, flow: &store::AuthFlow) -> Claims {
         sub: flow.sub.clone(),
         aud: flow.client_id.clone(),
         iss: config.oidc_issuer_url.clone(),
+        iat: now(),
         exp: now() + config.oidc_access_ttl.as_secs() as usize,
         groups: flow.groups.clone(),
         email: flow
@@ -296,6 +297,36 @@ mod tests {
         let claims = verify_any_aud(&config, &tokens.access_token)
             .expect("token for another audience must verify for userinfo");
         assert_eq!(claims.sub, "tester", "userinfo verification keeps sub");
+    }
+
+    #[test]
+    fn issued_tokens_carry_iat_claim() {
+        let config = env_with_public_client("iat");
+        let code = store::save_code(public_flow(Some(
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+        )))
+        .unwrap();
+
+        let tokens = exchange(
+            &config,
+            PUBLIC_ID,
+            "",
+            &code,
+            PUBLIC_REDIRECT,
+            Some("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+        )
+        .expect("public client with PKCE should get tokens");
+        let claims = verify_any_aud(&config, &tokens.id_token).expect("id_token must verify");
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as usize;
+        assert!(
+            claims.iat > 0 && claims.iat <= now,
+            "id_token iat must be present and not in the future, got {}",
+            claims.iat
+        );
     }
 
     #[test]

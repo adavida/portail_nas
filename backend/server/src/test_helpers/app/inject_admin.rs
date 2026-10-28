@@ -8,6 +8,7 @@ pub(crate) async fn inject_admin(mut req: Request, next: Next) -> Result<Respons
         sub: "admin".into(),
         aud: Config::global().oidc_client_id.clone(),
         iss: Config::global().oidc_issuer_url.clone(),
+        iat: 0,
         exp: 9999999999,
         groups: vec!["admin".into()],
         email: Some("admin@example.com".into()),

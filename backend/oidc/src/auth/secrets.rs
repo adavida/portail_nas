@@ -47,7 +47,7 @@ pub fn ensure(config: &Config) -> Result<(), String> {
 
     let owners = parse_owners(config)?;
 
-    let mut o = Vec::new();
+    let mut owners_for_dir = Vec::new();
     let all_clients = clients(config)?;
     for client in all_clients {
         let Some(name) = &client.secret_file else {
@@ -57,10 +57,10 @@ pub fn ensure(config: &Config) -> Result<(), String> {
         let owner = owners.get(client.id.as_str());
         write_new(config, &path, owner, store::random_id)?;
         if let Some(owner) = owner {
-            o.push(owner);
+            owners_for_dir.push(owner);
         }
-    }       
-     grant_dir_traverse(config, o, dir)?;
+    }
+    grant_dir_traverse(config, owners_for_dir, dir)?;
 
     Ok(())
 }
