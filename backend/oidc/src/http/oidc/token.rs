@@ -1,11 +1,11 @@
 use axum::{
-    Json,
     extract::{Form, State},
     http::HeaderMap,
+    response::Response,
 };
 use serde::Deserialize;
 
-use crate::auth::tokens::{self, TokenResponse, basic_credentials};
+use crate::auth::tokens::{self, basic_credentials};
 use portail_core::config::Config;
 use portail_core::error::AppError;
 
@@ -29,7 +29,7 @@ pub async fn token(
     State(config): State<Config>,
     headers: HeaderMap,
     Form(f): Form<TokenForm>,
-) -> Result<Json<TokenResponse>, AppError> {
+) -> Result<Response, AppError> {
     if f.grant_type.as_deref() != Some("authorization_code") {
         return Err(AppError::BadRequest("unsupported_grant_type".into()));
     }
@@ -41,7 +41,7 @@ pub async fn token(
         Some(credentials) => credentials,
         None => match f.client_id {
             Some(id) => (id, f.client_secret.unwrap_or_default()),
-            None => return Err(AppError::BadRequest("invalid_client".into())),
+            None => return Err(AppError::InvalidClient("invalid_client".into())),
         },
     };
     let tokens = tokens::exchange(
@@ -52,7 +52,7 @@ pub async fn token(
         &f.redirect_uri.unwrap_or_default(),
         f.code_verifier.as_deref(),
     )?;
-    Ok(Json(tokens))
+    Ok(super::no_store_json(tokens))
 }
 
 #[cfg(test)]
@@ -113,9 +113,22 @@ mod tests {
 
         let resp = app.oneshot(req).await.unwrap();
 
+        let status = resp.status();
+        let www = resp
+            .headers()
+            .get("www-authenticate")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap_or(serde_json::json!({}));
 
+        assert_eq!(
+            status,
+            StatusCode::UNAUTHORIZED,
+            "invalid_client must be 401"
+        );
+        assert_eq!(www, "Basic", "401 must advertise Basic auth");
         assert_eq!(
             v["error"], "invalid_client",
             "unknown client must return invalid_client"

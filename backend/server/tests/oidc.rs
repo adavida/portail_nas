@@ -122,7 +122,7 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         return;
     };
     let basic = base64::engine::general_purpose::STANDARD.encode(format!("{client_id}:{secret}"));
-    let (status, _, body, _) = send_raw(
+    let (status, token_headers, body, _) = send_raw(
         Method::POST,
         "/api/oidc/token",
         &header_pairs(&[
@@ -141,6 +141,22 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "token exchange should be 200");
+    assert_eq!(
+        body["token_type"], "Bearer",
+        "RFC 6749 7.1 token_type is case-sensitive: {body}"
+    );
+    assert_eq!(
+        token_headers
+            .get("cache-control")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default(),
+        "no-store",
+        "RFC 6749 5.1 token responses must be no-store"
+    );
+    assert_ne!(
+        body["access_token"], body["id_token"],
+        "id_token and access_token must be distinct"
+    );
     let access = body["access_token"]
         .as_str()
         .unwrap_or_default()

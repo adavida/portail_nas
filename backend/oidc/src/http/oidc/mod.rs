@@ -2,7 +2,7 @@ use axum::{
     Router,
     body::Body,
     http::{HeaderMap, StatusCode, header},
-    response::Response,
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
 
@@ -91,6 +91,28 @@ pub(crate) fn redirect_to(location: &str, cookie: Option<String>) -> Response {
         .unwrap_or_else(|_| Response::new(Body::empty()))
 }
 
+pub(crate) fn no_store_json<T: serde::Serialize>(value: T) -> axum::response::Response {
+    (
+        [
+            (header::CACHE_CONTROL, "no-store"),
+            (header::PRAGMA, "no-cache"),
+        ],
+        axum::Json(value),
+    )
+        .into_response()
+}
+
+pub(crate) fn error_location(redirect_uri: &str, error: &str, state: Option<&str>) -> String {
+    match state {
+        Some(state) => format!(
+            "{redirect_uri}?error={}&state={}",
+            encode_query_value(error),
+            encode_query_value(state)
+        ),
+        None => format!("{redirect_uri}?error={}", encode_query_value(error)),
+    }
+}
+
 pub(crate) async fn enrich_flow(flow: &mut crate::auth::store::AuthFlow) -> Result<(), AppError> {
     let user = portail_directory::controllers::users::list()
         .await?
@@ -121,6 +143,21 @@ mod tests {
         assert_eq!(
             location, "http://localhost:5173/callback?code=abc123&state=a%26b%3D%23c",
             "state metacharacters must be percent-encoded"
+        );
+    }
+
+    #[test]
+    fn error_location_encodes_error_and_state() {
+        let with_state = error_location("http://app/cb", "invalid_request", Some("s&1"));
+        let without_state = error_location("http://app/cb", "unsupported_response_type", None);
+
+        assert_eq!(
+            with_state, "http://app/cb?error=invalid_request&state=s%261",
+            "error redirects must keep error then state"
+        );
+        assert_eq!(
+            without_state, "http://app/cb?error=unsupported_response_type",
+            "state is omitted when absent"
         );
     }
 

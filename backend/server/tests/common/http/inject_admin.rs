@@ -17,6 +17,7 @@ pub async fn inject_admin(mut req: Request, next: Next) -> Result<Response, Stat
         email: Some("admin@example.com".into()),
         preferred_username: Some("admin".into()),
         nonce: None,
+        azp: None,
     };
     req.extensions_mut().insert(AuthUser(claims));
     Ok(next.run(req).await)

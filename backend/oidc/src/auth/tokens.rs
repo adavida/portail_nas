@@ -34,6 +34,14 @@ pub fn clients(config: &Config) -> Result<Vec<Client>, AppError> {
     crate::auth::secrets::clients(config).map_err(AppError::Internal)
 }
 
+pub fn issuer(config: &Config) -> String {
+    config.oidc_issuer_url.trim_end_matches('/').to_string()
+}
+
+fn secrets_match(presented: &str, stored: &str) -> bool {
+    Sha256::digest(presented) == Sha256::digest(stored)
+}
+
 pub fn exchange(
     config: &Config,
     client_id: &str,
@@ -44,17 +52,17 @@ pub fn exchange(
 ) -> Result<TokenResponse, AppError> {
     let clients = clients(config)?;
     let Some(client) = Client::find_in(&clients, client_id) else {
-        return Err(AppError::BadRequest("invalid_client".into()));
+        return Err(AppError::InvalidClient("invalid_client".into()));
     };
     if !client.enabled {
-        return Err(AppError::BadRequest("invalid_client".into()));
+        return Err(AppError::InvalidClient("invalid_client".into()));
     }
     let stored = crate::auth::secrets::stored_secret(config, client)
         .map_err(AppError::Internal)?
         .map(|s| s.as_str().to_string())
         .unwrap_or_default();
-    if stored != client_secret {
-        return Err(AppError::BadRequest("invalid_client".into()));
+    if !secrets_match(client_secret, &stored) {
+        return Err(AppError::InvalidClient("invalid_client".into()));
     }
     let Some(flow) = store::take_code(code) else {
         return Err(AppError::BadRequest("invalid_grant".into()));
@@ -84,7 +92,7 @@ fn claims(config: &Config, flow: &store::AuthFlow) -> Claims {
     Claims {
         sub: flow.sub.clone(),
         aud: flow.client_id.clone(),
-        iss: config.oidc_issuer_url.clone(),
+        iss: issuer(config),
         iat: now(),
         exp: now() + config.oidc_access_ttl.as_secs() as usize,
         groups: flow.groups.clone(),
@@ -94,6 +102,7 @@ fn claims(config: &Config, flow: &store::AuthFlow) -> Claims {
             .filter(|e| !e.is_empty() && flow.scopes.iter().any(|s| s == "email")),
         preferred_username: Some(flow.sub.clone()),
         nonce: flow.nonce.clone(),
+        azp: None,
     }
 }
 
@@ -110,12 +119,14 @@ fn sign(claims: &Claims) -> Result<String, AppError> {
 }
 
 pub fn tokens_for(config: &Config, flow: &store::AuthFlow) -> Result<TokenResponse, AppError> {
-    let access_token = sign(&claims(config, flow))?;
-    let id_token = access_token.clone();
+    let mut id_claims = claims(config, flow);
+    id_claims.azp = Some(flow.client_id.clone());
+    let mut access_claims = claims(config, flow);
+    access_claims.nonce = None;
     Ok(TokenResponse {
-        access_token,
-        id_token,
-        token_type: "bearer",
+        access_token: sign(&access_claims)?,
+        id_token: sign(&id_claims)?,
+        token_type: "Bearer",
         expires_in: config.oidc_access_ttl.as_secs(),
     })
 }
@@ -141,7 +152,7 @@ fn decode_token(config: &Config, token: &str, aud: Option<&str>) -> Result<Claim
         Some(aud) => validation.set_audience(&[aud]),
         None => validation.validate_aud = false,
     }
-    validation.set_issuer(&[&config.oidc_issuer_url]);
+    validation.set_issuer(&[&issuer(config)]);
     decode::<Claims>(token, key.decoding(), &validation)
         .map(|data| data.claims)
         .map_err(|e| AppError::Unauthorized(format!("token invalid: {e}")))
@@ -358,8 +369,57 @@ mod tests {
         .unwrap_err();
 
         assert!(
-            matches!(&err, AppError::BadRequest(m) if m == "invalid_client"),
+            matches!(&err, AppError::InvalidClient(m) if m == "invalid_client"),
             "public client must refuse a presented secret, got {err}"
+        );
+    }
+
+    #[test]
+    fn id_token_and_access_token_are_distinct_jwt() {
+        let config = env_with_public_client("split");
+        let mut flow = public_flow(Some("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"));
+        flow.nonce = Some("n-123".into());
+        let code = store::save_code(flow).unwrap();
+
+        let tokens = exchange(
+            &config,
+            PUBLIC_ID,
+            "",
+            &code,
+            PUBLIC_REDIRECT,
+            Some("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+        )
+        .expect("public client with PKCE should get tokens");
+
+        assert_eq!(
+            tokens.token_type, "Bearer",
+            "token_type must be the case-sensitive RFC 6749 value"
+        );
+        assert_ne!(
+            tokens.id_token, tokens.access_token,
+            "id_token and access_token must be distinct"
+        );
+        let id_claims = verify_any_aud(&config, &tokens.id_token).expect("id_token must verify");
+        let access_claims =
+            verify_any_aud(&config, &tokens.access_token).expect("access_token must verify");
+        assert_eq!(
+            id_claims.nonce.as_deref(),
+            Some("n-123"),
+            "nonce belongs to the id_token only"
+        );
+        assert_eq!(
+            id_claims.azp.as_deref(),
+            Some(PUBLIC_ID),
+            "id_token must carry azp"
+        );
+        assert_eq!(
+            access_claims.nonce, None,
+            "access_token must not carry the nonce"
+        );
+        assert_eq!(
+            id_claims.iss,
+            issuer(&config),
+            "iss must be the normalized issuer"
         );
     }
 
@@ -413,7 +473,7 @@ mod tests {
         .unwrap_err();
 
         assert!(
-            matches!(&err, AppError::BadRequest(m) if m == "invalid_client"),
+            matches!(&err, AppError::InvalidClient(m) if m == "invalid_client"),
             "wrong secret must be invalid_client, got {err}"
         );
         let tokens = exchange(&config, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None)
@@ -430,7 +490,7 @@ mod tests {
         let err = exchange(&config, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None).unwrap_err();
 
         assert!(
-            matches!(&err, AppError::BadRequest(m) if m == "invalid_client"),
+            matches!(&err, AppError::InvalidClient(m) if m == "invalid_client"),
             "disabled client must be invalid_client, got {err}"
         );
         let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);

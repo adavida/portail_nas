@@ -51,17 +51,28 @@ pub async fn authorize(
     if !client.allows_redirect(&redirect_uri) {
         return Err(AppError::BadRequest("redirect_uri not registered".into()));
     }
+    let failure = |error: &'static str| {
+        oidc::redirect_to(
+            &oidc::error_location(&redirect_uri, error, q.state.as_deref()),
+            None,
+        )
+    };
     if q.response_type.as_deref() != Some("code") {
-        return Err(AppError::BadRequest("unsupported response_type".into()));
+        return Ok(failure("unsupported_response_type"));
     }
-    let scopes: Vec<String> = q
-        .scope
-        .clone()
-        .unwrap_or_else(|| "openid".into())
-        .split_whitespace()
+    let scope_raw = q.scope.clone().unwrap_or_default();
+    let requested: Vec<&str> = scope_raw.split_whitespace().collect();
+    if !requested.contains(&"openid") {
+        return Ok(failure("invalid_request"));
+    }
+    let scopes: Vec<String> = requested
+        .into_iter()
         .filter(|s| *s == "openid" || client.grants(s))
         .map(String::from)
         .collect();
+    if q.code_challenge.is_some() && q.code_challenge_method.as_deref() != Some("S256") {
+        return Ok(failure("invalid_request"));
+    }
     let mut flow = store::AuthFlow {
         client_id,
         redirect_uri: redirect_uri.clone(),
@@ -161,7 +172,7 @@ mod tests {
         let config = portail_core::config::Config::global().clone();
         let req = Request::builder()
             .uri(format!(
-                "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=code&state=state123456&code_challenge=chal&code_challenge_method=S256",
+                "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=code&scope=openid&state=state123456&code_challenge=chal&code_challenge_method=S256",
                 config.oidc_client_id,
                 urlencoding(&env_redirect()),
             ))
@@ -191,6 +202,93 @@ mod tests {
                 config.app_url.trim_end_matches('/')
             )),
             "anonymous authorize must send the SPA to /login?req=..., got {location}"
+        );
+    }
+
+    #[tokio::test]
+    async fn authorize_redirects_back_with_unsupported_response_type() {
+        let app = app();
+        let config = portail_core::config::Config::global().clone();
+        let req = Request::builder()
+            .uri(format!(
+                "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=token&scope=openid&state=stabc",
+                config.oidc_client_id,
+                urlencoding(&env_redirect()),
+            ))
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+
+        let location = resp
+            .headers()
+            .get("location")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        assert_eq!(
+            resp.status(),
+            StatusCode::FOUND,
+            "validated client errors must redirect per RFC 6749 4.1.2.1"
+        );
+        assert!(
+            location.contains("error=unsupported_response_type")
+                && location.contains("state=stabc"),
+            "authorize must redirect error+state to the registered uri, got {location}"
+        );
+    }
+
+    #[tokio::test]
+    async fn authorize_rejects_scope_without_openid() {
+        let app = app();
+        let config = portail_core::config::Config::global().clone();
+        let req = Request::builder()
+            .uri(format!(
+                "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=code&scope=groups%20email",
+                config.oidc_client_id,
+                urlencoding(&env_redirect()),
+            ))
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+
+        let location = resp
+            .headers()
+            .get("location")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        assert!(
+            location.contains("error=invalid_request"),
+            "scope without openid must be invalid_request, got {location}"
+        );
+    }
+
+    #[tokio::test]
+    async fn authorize_rejects_unsupported_code_challenge_method() {
+        let app = app();
+        let config = portail_core::config::Config::global().clone();
+        let req = Request::builder()
+            .uri(format!(
+                "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=code&scope=openid&code_challenge=chal&code_challenge_method=plain",
+                config.oidc_client_id,
+                urlencoding(&env_redirect()),
+            ))
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.oneshot(req).await.unwrap();
+
+        let location = resp
+            .headers()
+            .get("location")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        assert!(
+            location.contains("error=invalid_request"),
+            "plain challenge must be refused since only S256 is supported, got {location}"
         );
     }
 

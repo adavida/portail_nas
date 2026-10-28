@@ -1,9 +1,10 @@
-use axum::{Json, extract::State};
+use axum::{Json, extract::State, response::Response};
 use serde::Deserialize;
 
 use crate::{
-    auth::tokens::{self, TokenResponse, exchange},
+    auth::tokens::{self, exchange},
     domain::oidc::Client,
+    http::oidc,
 };
 use portail_core::config::Config;
 use portail_core::error::AppError;
@@ -18,7 +19,7 @@ pub struct CallbackRequest {
 pub async fn callback(
     State(config): State<Config>,
     Json(payload): Json<CallbackRequest>,
-) -> Result<Json<TokenResponse>, AppError> {
+) -> Result<Response, AppError> {
     tracing::info!(
         "callback code len={} redirect_uri={:?}",
         payload.code.len(),
@@ -47,5 +48,5 @@ pub async fn callback(
         payload.code_verifier.as_deref(),
     )?;
     tracing::info!("token exchange ok for code len={}", payload.code.len());
-    Ok(Json(tokens))
+    Ok(oidc::no_store_json(tokens))
 }

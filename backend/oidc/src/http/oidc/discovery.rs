@@ -33,7 +33,7 @@ pub async fn discovery(State(config): State<Config>) -> Json<Discovery> {
         subject_types_supported: &["public"],
         id_token_signing_alg_values_supported: &["RS256"],
         scopes_supported: &["openid", "groups", "email", "profile"],
-        token_endpoint_auth_methods_supported: &["client_secret_basic"],
+        token_endpoint_auth_methods_supported: &["client_secret_basic", "client_secret_post"],
         code_challenge_methods_supported: &["S256"],
         issuer: iss,
     })
@@ -73,6 +73,11 @@ mod tests {
         assert_eq!(
             v["id_token_signing_alg_values_supported"][0], "RS256",
             "RS256 must be advertised"
+        );
+        assert_eq!(
+            v["token_endpoint_auth_methods_supported"],
+            serde_json::json!(["client_secret_basic", "client_secret_post"]),
+            "advertised auth methods must match the token endpoint implementation"
         );
     }
 

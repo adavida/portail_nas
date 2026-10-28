@@ -1,4 +1,8 @@
-use axum::{Json, http::StatusCode, response::IntoResponse};
+use axum::{
+    Json,
+    http::{StatusCode, header},
+    response::IntoResponse,
+};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -14,6 +18,7 @@ pub enum AppError {
     Internal(String),
     Unauthorized(String),
     Forbidden(String),
+    InvalidClient(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -25,6 +30,7 @@ impl std::fmt::Display for AppError {
             Self::Internal(m) => write!(f, "internal: {m}"),
             Self::Unauthorized(m) => write!(f, "unauthorized: {m}"),
             Self::Forbidden(m) => write!(f, "forbidden: {m}"),
+            Self::InvalidClient(m) => write!(f, "invalid client: {m}"),
         }
     }
 }
@@ -33,28 +39,39 @@ impl std::error::Error for AppError {}
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
-        let (status, msg) = match self {
+        let (status, msg, client_auth_required) = match self {
             Self::NotFound(m) => {
                 tracing::warn!("404 {}", m);
-                (StatusCode::NOT_FOUND, m)
+                (StatusCode::NOT_FOUND, m, false)
             }
             Self::BadRequest(m) => {
                 tracing::warn!("400 {}", m);
-                (StatusCode::BAD_REQUEST, m)
+                (StatusCode::BAD_REQUEST, m, false)
             }
             Self::Unauthorized(m) => {
                 tracing::warn!("401 {}", m);
-                (StatusCode::UNAUTHORIZED, m)
+                (StatusCode::UNAUTHORIZED, m, false)
+            }
+            Self::InvalidClient(m) => {
+                tracing::warn!("401 invalid client {}", m);
+                (StatusCode::UNAUTHORIZED, m, true)
             }
             Self::Forbidden(m) => {
                 tracing::warn!("403 {}", m);
-                (StatusCode::FORBIDDEN, m)
+                (StatusCode::FORBIDDEN, m, false)
             }
             Self::Ldap(m) | Self::Internal(m) => {
                 tracing::error!("500 {}", m);
-                (StatusCode::INTERNAL_SERVER_ERROR, m)
+                (StatusCode::INTERNAL_SERVER_ERROR, m, false)
             }
         };
-        (status, Json(ApiError { error: msg })).into_response()
+        let mut response = (status, Json(ApiError { error: msg })).into_response();
+        if client_auth_required {
+            response.headers_mut().insert(
+                header::WWW_AUTHENTICATE,
+                axum::http::HeaderValue::from_static("Basic"),
+            );
+        }
+        response
     }
 }
