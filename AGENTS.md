@@ -6,5 +6,5 @@
 ## Layout
 
 - `devenv.nix` / `devenv.yaml` / `devenv.lock` at repo root
-- `backend/{core,directory,oidc,server}/src/` (crates: core=config+AppError, directory=users/groups+LDAP, oidc=provider+auth, server=assemblage+bin), `frontend/src/` (`App.svelte`, `main.ts`, `App.test.ts`, `vite.config.ts`)
+- `backend/{core,db,directory,oidc,server}/src/` (crates: core=config+AppError, db=SQLite+rusqlite isolé, directory=users/groups+LDAP, oidc=provider+auth, server=assemblage+bin), `frontend/src/` (`App.svelte`, `main.ts`, `App.test.ts`, `vite.config.ts`)
 - `.vscode/{settings,extensions}.json`, `.gitignore` excludes `.devenv/`, `target/`, `node_modules/`, `frontend/dist/`

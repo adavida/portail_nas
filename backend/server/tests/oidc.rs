@@ -199,9 +199,22 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "userinfo must accept our token");
+    let config = portail_core::config::Config::global();
+    let expected_sub =
+        portail_oidc::auth::subject::subject_for(config, &client_id, user.uid.as_str())
+            .expect("persisted pairwise subject should compute");
     assert_eq!(
-        body["sub"], user.uid,
-        "userinfo sub must match the authenticated uid"
+        body["sub"], expected_sub,
+        "userinfo sub must be the persisted pairwise uuid for this client"
+    );
+    assert_ne!(
+        body["sub"].as_str().unwrap_or_default(),
+        user.uid.as_str(),
+        "sub must not leak the username"
+    );
+    assert_eq!(
+        body["preferred_username"], user.uid,
+        "preferred_username keeps the readable uid"
     );
     assert!(
         body["groups"].as_array().unwrap().contains(&json!("user")),

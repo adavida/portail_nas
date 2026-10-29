@@ -1,5 +1,6 @@
 app_url = "http://localhost:5173"
 bind_addr = "0.0.0.0:3000"
+db_path = ".devenv/state/db-test/portail.db"
 ldap_url = "ldap://127.0.0.1:3891"
 ldap_base_dn = "dc=test,dc=example,dc=com"
 ldap_people_ou = "people"

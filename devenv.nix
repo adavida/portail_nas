@@ -178,6 +178,7 @@ in
     openssl
     pkg-config
     rtk
+    sqlite
     uv
     xdg-utils
   ];
@@ -187,6 +188,7 @@ in
       cat > "$PORTAIL_CONFIG_FILE" <<EOF
       app_url = "$APP_URL"
       bind_addr = "$BIND_ADDR"
+      db_path = "db/portail.db"
       ldap_url = "$LDAP_URL"
       ldap_base_dn = "$LDAP_BASE_DN"
       ldap_tls_ca = "$LDAP_TLS_CA"

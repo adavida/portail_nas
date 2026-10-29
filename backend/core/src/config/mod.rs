@@ -15,11 +15,13 @@ pub const DEFAULT_SESSION_TTL_SECS: u64 = 12 * 3600;
 pub const DEFAULT_PASSWORD_MIN_LENGTH: usize = 8;
 pub const DEFAULT_LOGIN_MAX_ATTEMPTS: u32 = 10;
 pub const DEFAULT_OIDC_ID_BYTES: usize = 16;
+pub const DEFAULT_DB_PATH: &str = "portail.db";
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub app_url: String,
     pub bind_addr: String,
+    pub db_path: String,
     pub ldap_url: String,
     pub ldap_base_dn: String,
     pub ldap_people_ou: String,
@@ -48,6 +50,8 @@ pub struct Config {
 struct RawConfig {
     app_url: String,
     bind_addr: String,
+    #[serde(default = "default_db_path")]
+    db_path: String,
     ldap_url: String,
     ldap_base_dn: String,
     #[serde(default = "default_people_ou")]
@@ -92,6 +96,10 @@ fn default_people_ou() -> String {
 
 fn default_groups_ou() -> String {
     "groups".to_string()
+}
+
+fn default_db_path() -> String {
+    DEFAULT_DB_PATH.to_string()
 }
 
 fn default_true() -> bool {
@@ -143,6 +151,7 @@ impl Config {
         Ok(Self {
             app_url: parsed.app_url,
             bind_addr: parsed.bind_addr,
+            db_path: resolve_path(base_dir, &parsed.db_path),
             ldap_url: parsed.ldap_url,
             ldap_base_dn: parsed.ldap_base_dn,
             ldap_people_ou: parsed.ldap_people_ou,
@@ -189,6 +198,7 @@ impl Config {
         tracing::info!(
             app_url = %self.app_url,
             bind_addr = %self.bind_addr,
+            db_path = %self.db_path,
             ldap_url = %self.ldap_url,
             ldap_base_dn = %self.ldap_base_dn,
             ldap_people_ou = %self.ldap_people_ou,
@@ -254,6 +264,11 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
         );
         assert_eq!(config.ldap_tls_ca, "", "default empty TLS CA expected");
         assert_eq!(
+            config.db_path,
+            format!("{}/portail.db", std::env::temp_dir().display()),
+            "default db path resolved against the config dir expected"
+        );
+        assert_eq!(
             config.oidc_key_bits, DEFAULT_KEY_BITS,
             "default RSA key size expected"
         );
@@ -314,7 +329,7 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
         let path = write_temp_config(
             "custom",
             &format!(
-                "{}ldap_admin_pw_file = \"{}\"\nldap_people_ou = \"humains\"\noidc_code_ttl_secs = 90\noidc_key_bits = 4096\npassword_min_length = 12\nlogin_max_attempts = 5\noidc_access_ttl_secs = 120\noidc_id_bytes = 32\n",
+                "{}ldap_admin_pw_file = \"{}\"\ndb_path = \"data/portail.db\"\nldap_people_ou = \"humains\"\noidc_code_ttl_secs = 90\noidc_key_bits = 4096\npassword_min_length = 12\nlogin_max_attempts = 5\noidc_access_ttl_secs = 120\noidc_id_bytes = 32\n",
                 minimal_toml(),
                 pw_file.to_str().unwrap()
             ),
@@ -327,6 +342,11 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
             "secret file content (newline trimmed) expected"
         );
         assert_eq!(config.ldap_people_ou, "humains", "custom OU expected");
+        assert_eq!(
+            config.db_path,
+            format!("{}/data/portail.db", std::env::temp_dir().display()),
+            "custom db path resolved against the config dir expected"
+        );
         assert_eq!(
             config.oidc_code_ttl,
             Duration::from_secs(90),

@@ -84,6 +84,7 @@ let
     {
       app_url = cfg.appUrl;
       bind_addr = cfg.bindAddress;
+      db_path = cfg.dbPath;
       ldap_url = cfg.ldap.url;
       ldap_base_dn = cfg.ldap.baseDn;
       ldap_people_ou = cfg.ldap.peopleOu;
@@ -128,6 +129,18 @@ in
       type = lib.types.str;
       default = "127.0.0.1:3000";
       description = "Backend listen address (BIND_ADDR). In prod, 127.0.0.1 behind nginx.";
+    };
+
+    dbPath = lib.mkOption {
+      type = lib.types.str;
+      default = "/var/lib/portail/portail.db";
+      description = ''
+        Path of the SQLite database (generated `config.toml` key `db_path`)
+        holding pairwise subject identifiers and future portal tables. The
+        backend creates the file (mode 0600) and its parent directory on
+        first start: the parent must be writable by the `portail` service
+        user (`StateDirectory = "portail"` covers the default).
+      '';
     };
 
     oidcClientId = lib.mkOption {

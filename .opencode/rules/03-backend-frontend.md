@@ -2,14 +2,15 @@
 
 > Skills: `backend-format` (trigger `*.rs`), `backend-structure` (trigger `http/`, `controllers/`, `domain/`), `frontend-format` + `frontend-structure` (trigger `frontend/src`, `*.svelte`).
 
-## Backend workspace — 4 crates (Axum 0.8, Tokio full)
+## Backend workspace — 5 crates (Axum 0.8, Tokio full)
 
-- Workspace `Cargo.toml` `members = ["backend/core", "backend/directory", "backend/oidc", "backend/server"]`.
+- Workspace `Cargo.toml` `members = ["backend/core", "backend/db", "backend/directory", "backend/oidc", "backend/server"]`.
 - `portail-core` (`backend/core`): `config/` (TOML, `Config`/`ConfigError`) + `error` (AppError + `IntoResponse`) — dépendance de tous.
+- `portail-db` (`backend/db`): workspace SQLite isolé — `connect.rs` (ouverture + schéma + 0600), `path.rs`, `subjects/{find,insert}` — seul crate avec `rusqlite`/SQL (règle `15-db-workspace.md`).
 - `portail-directory` (`backend/directory`): `domain/{users,groups}`, `repository/ldap`, `controllers/{users,groups}`, `http/{users,groups}` — routers **sans middleware**, `ldap3`/`native-tls` isolés ici.
-- `portail-oidc` (`backend/oidc`): `auth/` (dont middleware `require_auth`/`require_admin`), `domain/oidc`, `controllers/oidc`, `http/{oidc,auth}` — dépend directory (login authentifie via LDAP).
-- `portail-server` (`backend/server`): assemblage `router()` (`lib.rs` `pub use http::router as app`), health, `main.rs` (bin `portail-backend` via `[[bin]]`), `tests/` intégration — dépend les trois autres.
-- Graphe acyclique imposée: server → oidc → directory → core. Aucun crate métier ne câble de middleware; l'assemblage est seul dans server.
+- `portail-oidc` (`backend/oidc`): `auth/` (dont middleware `require_auth`/`require_admin`), `domain/oidc`, `controllers/oidc`, `http/{oidc,auth}` — dépend directory (login authentifie via LDAP) et db (subs).
+- `portail-server` (`backend/server`): assemblage `router()` (`lib.rs` `pub use http::router as app`), health, `main.rs` (bin `portail-backend` via `[[bin]]`), `tests/` intégration — dépend core, directory et oidc (db par transitif).
+- Graphe acyclique imposée: server → oidc → {directory → core, db → core}. Aucun crate métier ne câble de middleware; l'assemblage est seul dans server.
 
 ## Tests API — `backend/server/tests/`
 

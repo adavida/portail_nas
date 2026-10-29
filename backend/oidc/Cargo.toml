@@ -6,6 +6,7 @@ license = "GPL-2.0-or-later"
 
 [dependencies]
 portail-core = { path = "../core" }
+portail-db = { path = "../db" }
 portail-directory = { path = "../directory" }
 axum = "0.8.9"
 base64 = "0.23.1"

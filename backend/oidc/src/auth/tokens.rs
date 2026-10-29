@@ -88,9 +88,10 @@ fn now() -> usize {
         .unwrap_or(0)
 }
 
-fn claims(config: &Config, flow: &store::AuthFlow) -> Claims {
-    Claims {
-        sub: flow.sub.clone(),
+fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppError> {
+    Ok(Claims {
+        sub: crate::auth::subject::subject_for(config, &flow.client_id, &flow.sub)
+            .map_err(AppError::Internal)?,
         aud: flow.client_id.clone(),
         iss: issuer(config),
         iat: now(),
@@ -103,7 +104,7 @@ fn claims(config: &Config, flow: &store::AuthFlow) -> Claims {
         preferred_username: Some(flow.sub.clone()),
         nonce: flow.nonce.clone(),
         azp: None,
-    }
+    })
 }
 
 fn sign(claims: &Claims) -> Result<String, AppError> {
@@ -119,9 +120,9 @@ fn sign(claims: &Claims) -> Result<String, AppError> {
 }
 
 pub fn tokens_for(config: &Config, flow: &store::AuthFlow) -> Result<TokenResponse, AppError> {
-    let mut id_claims = claims(config, flow);
+    let mut id_claims = claims(config, flow)?;
     id_claims.azp = Some(flow.client_id.clone());
-    let mut access_claims = claims(config, flow);
+    let mut access_claims = claims(config, flow)?;
     access_claims.nonce = None;
     Ok(TokenResponse {
         access_token: sign(&access_claims)?,
@@ -179,6 +180,8 @@ mod tests {
             std::env::temp_dir().display(),
             std::process::id()
         );
+        std::fs::create_dir_all(&config.oidc_secrets_dir).unwrap();
+        config.db_path = format!("{}/portail.db", config.oidc_secrets_dir);
         config.oidc_clients = vec![portail_core::config::ClientEntry {
             id: PUBLIC_ID.into(),
             secret_file: None,
@@ -307,7 +310,18 @@ mod tests {
         );
         let claims = verify_any_aud(&config, &tokens.access_token)
             .expect("token for another audience must verify for userinfo");
-        assert_eq!(claims.sub, "tester", "userinfo verification keeps sub");
+        assert_eq!(
+            claims.sub,
+            crate::auth::subject::subject_for(&config, PUBLIC_ID, "tester").unwrap(),
+            "sub must be the persisted pairwise uuid for this client+user"
+        );
+        assert_eq!(claims.sub.len(), 36, "sub must be a dashed uuid");
+        assert_ne!(claims.sub, "tester", "sub must not leak the uid");
+        assert_eq!(
+            claims.preferred_username.as_deref(),
+            Some("tester"),
+            "preferred_username keeps the readable uid"
+        );
     }
 
     #[test]
@@ -438,6 +452,7 @@ mod tests {
             scopes: vec!["openid".into()],
         }];
         std::fs::create_dir_all(&config.oidc_secrets_dir).unwrap();
+        config.db_path = format!("{}/portail.db", config.oidc_secrets_dir);
         std::fs::write(
             crate::auth::secrets::secret_path(&config, "confid_secret"),
             "s3cr3t\n",
