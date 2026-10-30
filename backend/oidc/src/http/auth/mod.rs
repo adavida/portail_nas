@@ -9,6 +9,8 @@ use portail_core::config::Config;
 
 pub mod callback;
 pub mod config;
+pub mod debug;
+pub mod debug_claims;
 pub mod oidc_test;
 
 pub fn auth_router(config: Config) -> Router<Config> {
@@ -19,7 +21,10 @@ pub fn auth_router(config: Config) -> Router<Config> {
 }
 
 pub fn protected_auth_router() -> Router<Config> {
-    let r = Router::new().route("/me", get(me));
+    let r = Router::new()
+        .route("/me", get(me))
+        .route("/debug", get(debug::debug))
+        .route("/debug/claims", get(debug_claims::debug_claims));
 
     #[cfg(feature = "test-api")]
     let r = r.route("/oidc-test", post(oidc_test::oidc_test));

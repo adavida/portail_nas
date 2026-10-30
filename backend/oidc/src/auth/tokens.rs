@@ -88,7 +88,7 @@ fn now() -> usize {
         .unwrap_or(0)
 }
 
-fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppError> {
+pub fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppError> {
     Ok(Claims {
         sub: crate::auth::subject::subject_for(config, &flow.client_id, &flow.sub)
             .map_err(AppError::Internal)?,

@@ -1,21 +1,21 @@
 <script lang="ts">
   import Callback from "./pages/Callback.svelte";
+  import Debug from "./pages/Debug.svelte";
   import Groups from "./pages/Groups.svelte";
   import Home from "./pages/Home.svelte";
   import Login from "./pages/Login.svelte";
   import Users from "./pages/Users.svelte";
   import Toaster from "./components/Toaster.svelte";
-  import ThemeLangControls from "./components/ThemeLangControls.svelte";
+  import Sidebar from "./components/Sidebar.svelte";
   import { whoami } from "./api/auth";
-  import { clearTokens, getToken, login, logout } from "./auth/oidc";
+  import { clearTokens, getToken, login } from "./auth/oidc";
   import { t } from "./i18n";
   import "./App.scss";
 
   const isCallback = window.location.pathname === "/callback";
   const isLogin = window.location.pathname === "/login";
 
-  let tab = $state<"home" | "users" | "groups">("home");
-  let menuOpen = $state(false);
+  let tab = $state<"home" | "users" | "groups" | "debug">("home");
   let checked = $state(false);
   let admin = $state(false);
   const token = getToken();
@@ -69,70 +69,16 @@
   <p class="muted" data-testid="checking">{$t("auth.checking")}</p>
 {:else}
   <div class="layout">
-    <aside class="sidebar" class:open={menuOpen}>
-      <div class="brand">
-        <span class="brand-badge">P</span>
-        <span>Portail</span>
-      </div>
-      <button
-        class="nav-item nav-burger"
-        type="button"
-        aria-label={$t("nav.menu")}
-        aria-expanded={menuOpen}
-        data-testid="nav-burger"
-        onclick={() => (menuOpen = !menuOpen)}
-      >
-        {menuOpen ? "✕" : "☰"}
-      </button>
-      <div class="sidebar-menu">
-        <nav class="nav">
-          <button
-            class={tab === "home" ? "nav-item active" : "nav-item"}
-            data-testid="tab-home"
-            onclick={() => {
-              tab = "home";
-              menuOpen = false;
-            }}
-          >
-            {$t("nav.home")}
-          </button>
-          {#if admin}
-            <button
-              class={tab === "users" ? "nav-item active" : "nav-item"}
-              data-testid="tab-users"
-              onclick={() => {
-                tab = "users";
-                menuOpen = false;
-              }}
-            >
-              {$t("nav.users")}
-            </button>
-            <button
-              class={tab === "groups" ? "nav-item active" : "nav-item"}
-              data-testid="tab-groups"
-              onclick={() => {
-                tab = "groups";
-                menuOpen = false;
-              }}
-            >
-              {$t("nav.groups")}
-            </button>
-          {/if}
-        </nav>
-        <div class="sidebar-spacer"></div>
-        <ThemeLangControls />
-        <button class="nav-item logout" data-testid="logout" onclick={logout}>
-          {$t("nav.logout")}
-        </button>
-      </div>
-    </aside>
+    <Sidebar {admin} bind:tab />
     <main class="content">
       {#if tab === "home"}
         <Home />
       {:else if tab === "users"}
         <Users />
-      {:else}
+      {:else if tab === "groups"}
         <Groups />
+      {:else}
+        <Debug />
       {/if}
     </main>
     <Toaster />
