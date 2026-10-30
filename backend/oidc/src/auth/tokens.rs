@@ -93,7 +93,7 @@ pub fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppErro
     let mut custom_claims = HashMap::new();
     if let Some(entry) = config.oidc_clients.iter().find(|e| e.id == flow.client_id) {
         for rule in &entry.custom_claims {
-            if rule.group.is_empty() || flow.groups.contains(&rule.group) {
+            if rule.applies_to(&flow.groups) {
                 custom_claims.insert(rule.name.clone(), rule.value.clone());
             }
         }
@@ -213,11 +213,19 @@ mod tests {
                     name: "role".into(),
                     value: "tester".into(),
                     group: String::new(),
+                    not_group: String::new(),
                 },
                 portail_core::config::CustomClaim {
                     name: "superpower".into(),
                     value: "fly".into(),
                     group: "birds".into(),
+                    not_group: String::new(),
+                },
+                portail_core::config::CustomClaim {
+                    name: "grounded".into(),
+                    value: "yes".into(),
+                    group: String::new(),
+                    not_group: "birds".into(),
                 },
             ],
         }];
@@ -419,6 +427,11 @@ mod tests {
             "group-scoped rule must be signed for a member of that group"
         );
         assert!(
+            !claims.custom_claims.contains_key("grounded"),
+            "not_group rule must be skipped for a member of the excluded group: {:?}",
+            claims.custom_claims
+        );
+        assert!(
             claims.groups.is_empty(),
             "groups claim itself stays filtered by scope, got {:?}",
             claims.groups
@@ -448,6 +461,15 @@ mod tests {
             !claims.custom_claims.contains_key("superpower"),
             "non-members must not get the group-scoped claim: {:?}",
             claims.custom_claims
+        );
+        let grounded = claims
+            .custom_claims
+            .get("grounded")
+            .cloned()
+            .unwrap_or_default();
+        assert_eq!(
+            grounded, "yes",
+            "not_group rule must be signed for a user outside that group"
         );
         let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }

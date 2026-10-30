@@ -75,7 +75,12 @@ let
         ;
       redirect_uris = c.redirectUris;
       scopes = c.scopes;
-      custom_claims = c.customClaims;
+      custom_claims = map (r: {
+        name = r.name;
+        value = r.value;
+        group = r.group;
+        not_group = r.notGroup;
+      }) c.customClaims;
     }
     // lib.optionalAttrs (!c.public) {
       secret_file = c.secretRef;
@@ -316,7 +321,12 @@ in
                           group = lib.mkOption {
                             type = lib.types.str;
                             default = "";
-                            description = "LDAP group gating the claim: sent only to users that are members. Empty (default) = always sent.";
+                            description = "LDAP group gating the claim: sent only to users that are members. Mutually exclusive with `notGroup`. Empty (default) with no `notGroup` = always sent.";
+                          };
+                          notGroup = lib.mkOption {
+                            type = lib.types.str;
+                            default = "";
+                            description = "Inverse LDAP group gate: claim sent only to users that are NOT members of this group. Mutually exclusive with `group`.";
                           };
                         };
                       });
@@ -402,6 +412,10 @@ in
           ) c.customClaims
         ) oidcClients;
         message = "apps entries with oidc.customClaims need a non-empty name that does not shadow a reserved claim (iss, sub, aud, exp, iat, nbf, nonce, azp, email, groups, preferred_username)";
+      }
+      {
+        assertion = lib.all (c: lib.all (r: r.group == "" || r.notGroup == "") c.customClaims) oidcClients;
+        message = "apps entries with oidc.customClaims cannot set both group and notGroup on the same claim";
       }
       {
         assertion = lib.all (c: c.user == "" || (c.group != "" && !c.public && c.generated)) oidcClients;

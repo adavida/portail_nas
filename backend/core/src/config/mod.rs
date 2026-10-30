@@ -175,6 +175,12 @@ impl Config {
                         entry.id, rule.name
                     )));
                 }
+                if !rule.group.is_empty() && !rule.not_group.is_empty() {
+                    return Err(ConfigError(format!(
+                        "client {}: custom claim '{}' cannot set both group and not_group",
+                        entry.id, rule.name
+                    )));
+                }
             }
         }
         Ok(Self {
@@ -463,14 +469,14 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
             "customclaims",
             &minimal_toml().replace(
                 r#"scopes = ["openid"] }]"#,
-                r#"scopes = ["openid"], custom_claims = [{ name = "env", value = "test" }, { name = "role", value = "admin", group = "admins" }] }]"#,
+                r#"scopes = ["openid"], custom_claims = [{ name = "env", value = "test" }, { name = "role", value = "admin", group = "admins" }, { name = "outsider", value = "yes", not_group = "admins" }] }]"#,
             ),
         );
 
         let config = Config::load(&path).unwrap();
         let rules = &config.oidc_clients[0].custom_claims;
 
-        assert_eq!(rules.len(), 2, "two custom claim rules expected");
+        assert_eq!(rules.len(), 3, "three custom claim rules expected");
         assert_eq!(
             rules[0].group, "",
             "first rule should be unconditional (empty group)"
@@ -478,6 +484,29 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
         assert_eq!(
             rules[1].group, "admins",
             "second rule should be scoped to the admins group"
+        );
+        assert_eq!(
+            rules[2].not_group, "admins",
+            "third rule should exclude the admins group"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_conflicting_group_gates() {
+        let path = write_temp_config(
+            "conflict",
+            &minimal_toml().replace(
+                r#"scopes = ["openid"] }]"#,
+                r#"scopes = ["openid"], custom_claims = [{ name = "x", value = "y", group = "a", not_group = "b" }] }]"#,
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("both group and not_group"),
+            "a rule setting both gates must be rejected: {err}"
         );
         let _ = std::fs::remove_file(&path);
     }

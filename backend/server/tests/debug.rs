@@ -135,6 +135,11 @@ async fn debug_claims_returns_pairwise_sub_for_seeded_user() {
         body.get("power").is_none(),
         "group-scoped claim must be absent for a user outside the admin group: {body}"
     );
+    assert_eq!(
+        body["outsider"].as_str(),
+        Some("yes"),
+        "not_group claim must be present for a user outside the admin group, got {body}"
+    );
 
     user.delete().await;
 }

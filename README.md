@@ -86,14 +86,15 @@ Le frontend du portail utilise les mêmes endpoints (c'est un client OIDC de lui
 
 Les clients OIDC vivent inline dans le fichier de config généré (`oidc_clients` dans `config.toml`). **Seul Nix/devenv l'écrit** (depuis les options `apps` du module, ou le heredoc `backend.exec` en dev) ; le backend le **lit au démarrage** — ajouter un client ou l'activer = `nixos-rebuild switch` (ou relancer `devenv up`), puis redémarrage du service. Les secrets ne sont **jamais dans le TOML** : un client confidentiel référence dans `secret_file` le fichier qui contient son secret — nom relatif dans `oidc.secretsDir`, ou chemin absolu (`secretFile` agenix/sops) ; le backend génère les fichiers manquants au premier démarrage (0600, jamais écrasés une fois non vides — un fichier vide est régénéré). `oidc.enable = true` enregistre l'app comme client OIDC **et l'active** (`enabled` réécrit à `true` à chaque rebuild).
 
-| Champ           | Rôle                                                             |
-| --------------- | ---------------------------------------------------------------- |
-| `id`            | client_id                                                        |
-| `secret_file`   | fichier du secret ; `null` = client public (PKCE obligatoire)    |
-| `enabled`       | activation ; écrit `true` par le module, `false` possible en dev |
-| `redirect_uris` | URLs exactes autorisées au authorize                             |
-| `scopes`        | scopes accordables par ce client                                 |
-| `managed`       | interne Nix : géré par le module (purgé si l'app quitte `apps`)  |
+| Champ           | Rôle                                                                                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`            | client_id                                                                                                                                                       |
+| `secret_file`   | fichier du secret ; `null` = client public (PKCE obligatoire)                                                                                                   |
+| `enabled`       | activation ; écrit `true` par le module, `false` possible en dev                                                                                                |
+| `redirect_uris` | URLs exactes autorisées au authorize                                                                                                                            |
+| `scopes`        | scopes accordables par ce client                                                                                                                                |
+| `custom_claims` | claims statiques `{ name, value, group \| not_group }` — émis si membre du groupe LDAP (`group`) ou si non-membre (`not_group`), les deux vides = toujours émis |
+| `managed`       | interne Nix : géré par le module (purgé si l'app quitte `apps`)                                                                                                 |
 
 ```json
 [
@@ -112,6 +113,11 @@ Les clients OIDC vivent inline dans le fichier de config généré (`oidc_client
       "https://cloud.portail.example.com/apps/oauth2/redirect_ui"
     ],
     "scopes": ["openid", "profile", "email", "groups"],
+    "custom_claims": [
+      { "name": "role", "value": "user" },
+      { "name": "role", "value": "admin", "group": "admins" },
+      { "name": "guest", "value": "true", "not_group": "staff" }
+    ],
     "managed": true
   }
 ]
@@ -119,7 +125,7 @@ Les clients OIDC vivent inline dans le fichier de config généré (`oidc_client
 
 ### Applications affichées
 
-`services.portail.apps` alimente la page d'accueil : chaque entrée = un lien (nom + URL, description et icône optionnelles), trié par nom. Le module le rend dans un `/apps.json` statique servi par le vhost nginx — le backend n'intervient pas. En dev, la liste vient de `frontend/public/apps.json` (servie par vite, modifiable à chaud). Chaque entrée accepte un sous-objet `oidc` désactivé par défaut : `oidc.enable = true` enregistre l'application comme client OIDC **activé** du portail dans le `config.toml` généré (`oidc_clients`), avec `clientId` (défaut : nom en minuscules), `redirectUris`, `scopes`, un `secret_file` (`null` si `public = true` ; sinon `oidc.secretsDir/<clientId>_secret`, généré par le backend au premier démarrage — 0600, jamais écrasé une fois non vide — ou chemin absolu surchargeable par `secretFile` agenix/sops). `oidc.user`/`oidc.group` (défaut : vides) déclarent le user/groupe linux dotés d'un **ACL de lecture** sur le secret généré et de **traversée** sur `oidc.secretsDir` (ré-appliqués par le backend à chaque démarrage, `ensure()` — aucune capacité requise). Une app retirée de `apps` disparaît du config généré au rebuild suivant (son secret généré reste sur disque).
+`services.portail.apps` alimente la page d'accueil : chaque entrée = un lien (nom + URL, description et icône optionnelles), trié par nom. Le module le rend dans un `/apps.json` statique servi par le vhost nginx — le backend n'intervient pas. En dev, la liste vient de `frontend/public/apps.json` (servie par vite, modifiable à chaud). Chaque entrée accepte un sous-objet `oidc` désactivé par défaut : `oidc.enable = true` enregistre l'application comme client OIDC **activé** du portail dans le `config.toml` généré (`oidc_clients`), avec `clientId` (défaut : nom en minuscules), `redirectUris`, `scopes`, `customClaims` (liste de règles `{ name, value, group | notGroup }` injectant des claims statiques dans les tokens émis à ce client : `group` = émis seulement si l'utilisateur est membre du groupe LDAP, `notGroup` = émis seulement s'il n'en est PAS membre — exclusifs, aucun des deux = toujours émis ; règles évaluées dans l'ordre, la dernière matchante gagne ; les noms réservés (`sub`, `iss`, `groups`…) sont rejetés à l'éval Nix et au chargement backend), un `secret_file` (`null` si `public = true` ; sinon `oidc.secretsDir/<clientId>_secret`, généré par le backend au premier démarrage — 0600, jamais écrasé une fois non vide — ou chemin absolu surchargeable par `secretFile` agenix/sops). `oidc.user`/`oidc.group` (défaut : vides) déclarent le user/groupe linux dotés d'un **ACL de lecture** sur le secret généré et de **traversée** sur `oidc.secretsDir` (ré-appliqués par le backend à chaque démarrage, `ensure()` — aucune capacité requise). Une app retirée de `apps` disparaît du config généré au rebuild suivant (son secret généré reste sur disque).
 
 ```nix
 services.portail.apps = [
@@ -133,6 +139,11 @@ services.portail.apps = [
       enable = true;
       clientId = "nextcloud";
       redirectUris = [ "https://cloud.portail.example.com/apps/oauth2/redirect_ui" ];
+      customClaims = [
+        { name = "role"; value = "user"; }
+        { name = "role"; value = "admin"; group = "admins"; }
+        { name = "guest"; value = "true"; notGroup = "staff"; }
+      ];
     };
   }
 ];
@@ -256,14 +267,15 @@ The portal frontend uses the same endpoints (it is a client of itself) plus `GET
 
 OIDC clients live inline in the generated config file (`oidc_clients` in `config.toml`). **Only Nix/devenv writes it** (from the module `apps` options, or the `backend.exec` heredoc in dev); the backend **reads it at startup** — adding or activating a client = `nixos-rebuild switch` (or re-run `devenv up`), then service restart. Secrets are **never in the TOML**: a confidential client references through `secret_file` the file holding its secret — a name relative to `oidc.secretsDir`, or an absolute path (`secretFile` agenix/sops); the backend generates missing files on first start (0600, never overwritten once non-empty — an empty file is regenerated). `oidc.enable = true` registers the app as an OIDC client **and enables it** (`enabled` rewritten to `true` at every rebuild).
 
-| Field           | Purpose                                                           |
-| --------------- | ----------------------------------------------------------------- |
-| `id`            | client_id                                                         |
-| `secret_file`   | secret file; `null` = public client (PKCE mandatory)              |
-| `enabled`       | activation; written `true` by the module, `false` possible in dev |
-| `redirect_uris` | exact URLs allowed at authorize                                   |
-| `scopes`        | scopes this client may request                                    |
-| `managed`       | Nix internal: module-managed (pruned when the app leaves `apps`)  |
+| Field           | Purpose                                                                                                                                                              |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`            | client_id                                                                                                                                                            |
+| `secret_file`   | secret file; `null` = public client (PKCE mandatory)                                                                                                                 |
+| `enabled`       | activation; written `true` by the module, `false` possible in dev                                                                                                    |
+| `redirect_uris` | exact URLs allowed at authorize                                                                                                                                      |
+| `scopes`        | scopes this client may request                                                                                                                                       |
+| `custom_claims` | static claims `{ name, value, group \| not_group }` — sent if the user is a member of the LDAP group (`group`) or outside it (`not_group`), both empty = always sent |
+| `managed`       | Nix internal: module-managed (pruned when the app leaves `apps`)                                                                                                     |
 
 ```json
 [
@@ -282,6 +294,11 @@ OIDC clients live inline in the generated config file (`oidc_clients` in `config
       "https://cloud.portail.example.com/apps/oauth2/redirect_ui"
     ],
     "scopes": ["openid", "profile", "email", "groups"],
+    "custom_claims": [
+      { "name": "role", "value": "user" },
+      { "name": "role", "value": "admin", "group": "admins" },
+      { "name": "guest", "value": "true", "not_group": "staff" }
+    ],
     "managed": true
   }
 ]
@@ -289,7 +306,7 @@ OIDC clients live inline in the generated config file (`oidc_clients` in `config
 
 #### Listed applications
 
-`services.portail.apps` feeds the home page: each entry = a link (name + URL, optional description and icon), sorted by name. The module renders it into a static `/apps.json` served by the nginx vhost — the backend is not involved. In dev, the list comes from `frontend/public/apps.json` (served by vite, hot-editable). Each entry accepts an `oidc` sub-object, disabled by default: `oidc.enable = true` registers the app as an **enabled** OIDC client of the portal in the generated `config.toml` (`oidc_clients`), with `clientId` (default: lowercased name), `redirectUris`, `scopes`, a `secret_file` (`null` when `public = true`; otherwise `oidc.secretsDir/<clientId>_secret`, generated by the backend on first start — 0600, never overwritten once non-empty — or an absolute path overridable with `secretFile` agenix/sops). `oidc.user`/`oidc.group` (default: empty) declare the Linux user/group granted **read ACL** on the generated secret and **traverse** on `oidc.secretsDir` (re-applied by the backend at every startup, `ensure()` — no capabilities needed). An app removed from `apps` disappears from the generated config at the next rebuild (its generated secret file remains on disk).
+`services.portail.apps` feeds the home page: each entry = a link (name + URL, optional description and icon), sorted by name. The module renders it into a static `/apps.json` served by the nginx vhost — the backend is not involved. In dev, the list comes from `frontend/public/apps.json` (served by vite, hot-editable). Each entry accepts an `oidc` sub-object, disabled by default: `oidc.enable = true` registers the app as an **enabled** OIDC client of the portal in the generated `config.toml` (`oidc_clients`), with `clientId` (default: lowercased name), `redirectUris`, `scopes`, `customClaims` (list of `{ name, value, group | notGroup }` rules injecting static claims into the tokens issued to this client: `group` = sent only when the user is a member of the LDAP group, `notGroup` = sent only when the user is NOT a member — mutually exclusive, neither set = always sent; rules are evaluated in order, the last matching one wins per name; reserved names (`sub`, `iss`, `groups`…) are rejected at Nix eval and at backend load), a `secret_file` (`null` when `public = true`; otherwise `oidc.secretsDir/<clientId>_secret`, generated by the backend on first start — 0600, never overwritten once non-empty — or an absolute path overridable with `secretFile` agenix/sops). `oidc.user`/`oidc.group` (default: empty) declare the Linux user/group granted **read ACL** on the generated secret and **traverse** on `oidc.secretsDir` (re-applied by the backend at every startup, `ensure()` — no capabilities needed). An app removed from `apps` disappears from the generated config at the next rebuild (its generated secret file remains on disk).
 
 ```nix
 services.portail.apps = [
@@ -303,6 +320,11 @@ services.portail.apps = [
       enable = true;
       clientId = "nextcloud";
       redirectUris = [ "https://cloud.portail.example.com/apps/oauth2/redirect_ui" ];
+      customClaims = [
+        { name = "role"; value = "user"; }
+        { name = "role"; value = "admin"; group = "admins"; }
+        { name = "guest"; value = "true"; notGroup = "staff"; }
+      ];
     };
   }
 ];
