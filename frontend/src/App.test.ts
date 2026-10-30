@@ -22,7 +22,11 @@ beforeEach(() => {
         redirect_uri: "http://localhost:5173/callback",
       });
     if (u.includes("/api/auth/me"))
-      return mockJson({ sub: "admin", groups: ["admin"] });
+      return mockJson({
+        sub: "admin",
+        groups: ["admin"],
+        is_admin: true,
+      });
     return mockJson([]);
   });
 });

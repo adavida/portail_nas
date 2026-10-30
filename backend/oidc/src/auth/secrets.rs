@@ -279,6 +279,8 @@ mod tests {
             redirect_uris: vec!["http://localhost/cb".into()],
             scopes: vec![],
             custom_claims: Default::default(),
+            required_group: String::new(),
+            forbidden_group: String::new(),
         }
     }
 
@@ -365,6 +367,8 @@ mod tests {
             redirect_uris: vec![],
             scopes: vec![],
             custom_claims: Default::default(),
+            required_group: String::new(),
+            forbidden_group: String::new(),
         }];
 
         let err = clients(&config).unwrap_err();

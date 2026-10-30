@@ -143,3 +143,50 @@ async fn debug_claims_returns_pairwise_sub_for_seeded_user() {
 
     user.delete().await;
 }
+
+#[tokio::test]
+async fn debug_claims_denied_for_user_outside_required_group() {
+    let user = TestUser::new("gatden");
+    let (created, _) = user.create().await;
+    if created == StatusCode::INTERNAL_SERVER_ERROR {
+        return;
+    }
+    let uri = format!("/api/auth/debug/claims?uid={}&client_id=gated", user.uid);
+
+    let (status, body) = send(Method::GET, &uri, None).await;
+
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "a user outside the required group must get 403, got {status}: {body}"
+    );
+    assert!(
+        body["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("required group 'admin'"),
+        "error must name the required group, got {body}"
+    );
+
+    user.delete().await;
+}
+
+#[tokio::test]
+async fn debug_claims_allowed_for_user_outside_forbidden_group() {
+    let user = TestUser::new("gateok");
+    let (created, _) = user.create().await;
+    if created == StatusCode::INTERNAL_SERVER_ERROR {
+        return;
+    }
+    let uri = format!("/api/auth/debug/claims?uid={}&client_id=blocked", user.uid);
+
+    let (status, body) = send(Method::GET, &uri, None).await;
+
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "a user outside the forbidden group must be allowed, got {status}: {body}"
+    );
+
+    user.delete().await;
+}

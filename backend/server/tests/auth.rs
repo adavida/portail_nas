@@ -3,7 +3,7 @@ use serde_json::json;
 
 #[allow(dead_code)]
 mod common;
-use common::http::{req::req, req_with_app::req_with_app};
+use common::http::{req::req, req_with_app::req_with_app, send::send};
 
 #[tokio::test]
 async fn protected_endpoints_return_401_without_token() {
@@ -157,7 +157,6 @@ async fn user_gets_403_on_admin_endpoints() {
     let admin_endpoints = vec![
         (Method::GET, "/api/users", None),
         (Method::GET, "/api/groups", None),
-        (Method::GET, "/api/auth/me", None),
         (
             Method::POST,
             "/api/users",
@@ -179,4 +178,34 @@ async fn user_gets_403_on_admin_endpoints() {
             uri
         );
     }
+}
+
+#[tokio::test]
+async fn user_can_access_me_without_admin() {
+    let user_app = common::http::test_app_as_user::test_app_as_user();
+
+    let status = req_with_app(user_app, Method::GET, "/api/auth/me", None).await;
+
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "GET /api/auth/me user should be 200, got {status}"
+    );
+}
+
+#[tokio::test]
+async fn me_reports_is_admin_and_groups_for_admin() {
+    let (status, body) = send(Method::GET, "/api/auth/me", None).await;
+
+    assert_eq!(status, StatusCode::OK, "admin /me should be 200");
+    assert_eq!(
+        body["is_admin"].as_bool(),
+        Some(true),
+        "admin /me must report is_admin true, got {body}"
+    );
+    assert_eq!(
+        body["preferred_username"].as_str(),
+        Some("admin"),
+        "/me must expose the logged-in username, got {body}"
+    );
 }

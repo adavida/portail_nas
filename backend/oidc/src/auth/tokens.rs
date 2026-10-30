@@ -79,6 +79,13 @@ pub fn exchange(
     if !check_pkce(verifier, flow.challenge.as_deref()) {
         return Err(AppError::BadRequest("invalid_grant".into()));
     }
+    if let Some(entry) = config.oidc_clients.iter().find(|e| e.id == client_id) {
+        if let Some(reason) = entry.gate_denial(&flow.groups) {
+            return Err(AppError::Forbidden(format!(
+                "access to client '{client_id}' denied: {reason}"
+            )));
+        }
+    }
     tokens_for(config, &flow)
 }
 
@@ -228,6 +235,8 @@ mod tests {
                     not_group: "birds".into(),
                 },
             ],
+            required_group: String::new(),
+            forbidden_group: String::new(),
         }];
         config
     }
@@ -571,6 +580,8 @@ mod tests {
             redirect_uris: vec![PUBLIC_REDIRECT.into()],
             scopes: vec!["openid".into()],
             custom_claims: Default::default(),
+            required_group: String::new(),
+            forbidden_group: String::new(),
         }];
         std::fs::create_dir_all(&config.oidc_secrets_dir).unwrap();
         config.db_path = format!("{}/portail.db", config.oidc_secrets_dir);
@@ -615,6 +626,59 @@ mod tests {
         let tokens = exchange(&config, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None)
             .expect("secret from the file must authenticate the client");
         assert!(!tokens.access_token.is_empty(), "tokens expected");
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+    }
+
+    #[test]
+    fn exchange_denied_by_required_group_gate() {
+        let mut config = env_with_secret_client("gate", true);
+        config.oidc_clients[0].required_group = "vpn".into();
+        let code = store::save_code(store::AuthFlow {
+            client_id: "confid".into(),
+            redirect_uri: PUBLIC_REDIRECT.into(),
+            state: None,
+            nonce: None,
+            scopes: vec!["openid".into()],
+            challenge: None,
+            sub: "tester".into(),
+            groups: vec!["devs".into()],
+            email: None,
+        })
+        .unwrap();
+
+        let err = exchange(&config, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None).unwrap_err();
+
+        assert!(
+            matches!(&err, AppError::Forbidden(m) if m.contains("required group 'vpn'")),
+            "non-member of the required group must be denied with 403, got {err}"
+        );
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+    }
+
+    #[test]
+    fn exchange_allowed_by_required_group_gate_for_member() {
+        let mut config = env_with_secret_client("gate-ok", true);
+        config.oidc_clients[0].required_group = "vpn".into();
+        let code = store::save_code(store::AuthFlow {
+            client_id: "confid".into(),
+            redirect_uri: PUBLIC_REDIRECT.into(),
+            state: None,
+            nonce: None,
+            scopes: vec!["openid".into()],
+            challenge: None,
+            sub: "tester".into(),
+            groups: vec!["vpn".into()],
+            email: None,
+        })
+        .unwrap();
+
+        let tokens = exchange(&config, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None)
+            .expect("member of the required group must get tokens");
+
+        assert!(
+            !tokens.access_token.is_empty(),
+            "member of the required group must be allowed"
+        );
         let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
     }
 

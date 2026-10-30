@@ -17,6 +17,8 @@ let
           description
           icon
           ;
+        required_group = a.oidc.requiredGroup;
+        forbidden_group = a.oidc.forbiddenGroup;
       }) sortedApps
     )
   );
@@ -32,6 +34,8 @@ let
       redirectUris = a.oidc.redirectUris;
       scopes = a.oidc.scopes;
       customClaims = a.oidc.customClaims;
+      requiredGroup = a.oidc.requiredGroup;
+      forbiddenGroup = a.oidc.forbiddenGroup;
       user = a.oidc.user;
       group = a.oidc.group;
       generated = a.oidc.secretFile == null;
@@ -75,6 +79,8 @@ let
         ;
       redirect_uris = c.redirectUris;
       scopes = c.scopes;
+      required_group = c.requiredGroup;
+      forbidden_group = c.forbiddenGroup;
       custom_claims = map (r: {
         name = r.name;
         value = r.value;
@@ -333,6 +339,16 @@ in
                     default = [ ];
                     description = "Generated `config.toml` `custom_claims` entries — static claims added to id_token/access_token of this client, optionally scoped to an LDAP group membership.";
                   };
+                  requiredGroup = lib.mkOption {
+                    type = lib.types.str;
+                    default = "";
+                    description = "LDAP group whose membership is required to see this app on the home page and to complete its OIDC token exchange (403 otherwise). Empty (default) = no requirement.";
+                  };
+                  forbiddenGroup = lib.mkOption {
+                    type = lib.types.str;
+                    default = "";
+                    description = "LDAP group whose membership hides this app from the home page and blocks its OIDC token exchange (403). Empty (default) = no block.";
+                  };
                   public = lib.mkOption {
                     type = lib.types.bool;
                     default = false;
@@ -416,6 +432,10 @@ in
       {
         assertion = lib.all (c: lib.all (r: r.group == "" || r.notGroup == "") c.customClaims) oidcClients;
         message = "apps entries with oidc.customClaims cannot set both group and notGroup on the same claim";
+      }
+      {
+        assertion = lib.all (c: c.requiredGroup == "" || c.requiredGroup != c.forbiddenGroup) oidcClients;
+        message = "apps entries cannot set oidc.requiredGroup and oidc.forbiddenGroup to the same group: nobody could ever connect";
       }
       {
         assertion = lib.all (c: c.user == "" || (c.group != "" && !c.public && c.generated)) oidcClients;

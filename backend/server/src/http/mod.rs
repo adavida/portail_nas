@@ -12,6 +12,9 @@ use portail_oidc::{
 
 pub fn router() -> Router {
     let config = Config::global().clone();
+    let user: Router<Config> = Router::<Config>::new()
+        .nest("/api/auth", auth::user_auth_router())
+        .layer(middleware::from_fn_with_state(config.clone(), require_auth));
     let admin: Router<Config> = Router::<Config>::new()
         .nest("/api/users", users_router())
         .nest("/api/groups", groups_router())
@@ -23,6 +26,7 @@ pub fn router() -> Router {
         .route("/api/health", get(health::health))
         .nest("/api/auth", auth::auth_router(config.clone()))
         .merge(oidc::oidc_router(config.clone()))
+        .merge(user)
         .merge(admin)
         .layer(TraceLayer::new_for_http())
         .with_state(config)

@@ -10,6 +10,8 @@ pub struct DebugClient {
     has_secret: bool,
     redirect_uris: Vec<String>,
     scopes: Vec<String>,
+    required_group: String,
+    forbidden_group: String,
 }
 
 impl DebugClient {
@@ -20,6 +22,8 @@ impl DebugClient {
             has_secret: entry.secret_file.is_some(),
             redirect_uris: entry.redirect_uris.clone(),
             scopes: entry.scopes.clone(),
+            required_group: entry.required_group.clone(),
+            forbidden_group: entry.forbidden_group.clone(),
         }
     }
 }

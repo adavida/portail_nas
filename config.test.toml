@@ -26,4 +26,14 @@ oidc_clients = [
         { name = "power", value = "admin-tools", group = "admin" },
         { name = "outsider", value = "yes", not_group = "admin" },
     ] },
+    { id = "gated", enabled = true, redirect_uris = [
+        "http://localhost:5173/callback",
+    ], scopes = [
+        "openid",
+    ], required_group = "admin", forbidden_group = "banned" },
+    { id = "blocked", enabled = true, redirect_uris = [
+        "http://localhost:5173/callback",
+    ], scopes = [
+        "openid",
+    ], forbidden_group = "banned" }
 ]

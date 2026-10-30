@@ -6,6 +6,8 @@ export type DebugClient = {
   has_secret: boolean;
   redirect_uris: string[];
   scopes: string[];
+  required_group: string;
+  forbidden_group: string;
 };
 
 export type DebugInfo = {

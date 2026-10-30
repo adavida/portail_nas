@@ -87,6 +87,8 @@
             <th>has_secret</th>
             <th>redirect_uris</th>
             <th>scopes</th>
+            <th>required_group</th>
+            <th>forbidden_group</th>
           </tr>
         </thead>
         <tbody>
@@ -97,6 +99,8 @@
               <td>{client.has_secret}</td>
               <td>{client.redirect_uris.join(", ")}</td>
               <td>{client.scopes.join(", ")}</td>
+              <td>{client.required_group || "—"}</td>
+              <td>{client.forbidden_group || "—"}</td>
             </tr>
           {/each}
         </tbody>

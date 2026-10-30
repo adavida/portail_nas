@@ -18,6 +18,7 @@
   let tab = $state<"home" | "users" | "groups" | "debug">("home");
   let checked = $state(false);
   let admin = $state(false);
+  let groups = $state<string[]>([]);
   const token = getToken();
 
   $effect(() => {
@@ -35,7 +36,8 @@
         void login();
         return;
       }
-      admin = s === "admin";
+      admin = s.is_admin;
+      groups = s.groups;
       checked = true;
       sessionStorage.removeItem("login_in_progress");
     });
@@ -72,7 +74,7 @@
     <Sidebar {admin} bind:tab />
     <main class="content">
       {#if tab === "home"}
-        <Home />
+        <Home {groups} />
       {:else if tab === "users"}
         <Users />
       {:else if tab === "groups"}

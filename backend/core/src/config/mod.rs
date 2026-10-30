@@ -182,6 +182,12 @@ impl Config {
                     )));
                 }
             }
+            if !entry.required_group.is_empty() && entry.required_group == entry.forbidden_group {
+                return Err(ConfigError(format!(
+                    "client {}: required_group and forbidden_group are the same group, nobody could ever connect",
+                    entry.id
+                )));
+            }
         }
         Ok(Self {
             app_url: parsed.app_url,

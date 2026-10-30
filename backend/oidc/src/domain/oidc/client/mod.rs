@@ -86,6 +86,8 @@ mod tests {
             redirect_uris: vec!["http://localhost:5173/callback".into()],
             scopes: vec!["openid".into(), "groups".into()],
             custom_claims: Default::default(),
+            required_group: String::new(),
+            forbidden_group: String::new(),
         }
     }
 
@@ -163,6 +165,8 @@ mod tests {
             redirect_uris: vec![],
             scopes: vec![],
             custom_claims: Default::default(),
+            required_group: String::new(),
+            forbidden_group: String::new(),
         }])
         .unwrap_err();
 
