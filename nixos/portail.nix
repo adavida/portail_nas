@@ -31,6 +31,7 @@ let
       public = a.oidc.public;
       redirectUris = a.oidc.redirectUris;
       scopes = a.oidc.scopes;
+      customClaims = a.oidc.customClaims;
       user = a.oidc.user;
       group = a.oidc.group;
       generated = a.oidc.secretFile == null;
@@ -74,6 +75,7 @@ let
         ;
       redirect_uris = c.redirectUris;
       scopes = c.scopes;
+      custom_claims = c.customClaims;
     }
     // lib.optionalAttrs (!c.public) {
       secret_file = c.secretRef;
@@ -298,6 +300,29 @@ in
                     ];
                     description = "Scopes granted to this client.";
                   };
+                  customClaims = lib.mkOption {
+                    type =
+                      with lib.types;
+                      listOf (submodule {
+                        options = {
+                          name = lib.mkOption {
+                            type = lib.types.str;
+                            description = "Claim key added to the tokens issued to this client (must not shadow a reserved claim).";
+                          };
+                          value = lib.mkOption {
+                            type = lib.types.str;
+                            description = "String value of the claim.";
+                          };
+                          group = lib.mkOption {
+                            type = lib.types.str;
+                            default = "";
+                            description = "LDAP group gating the claim: sent only to users that are members. Empty (default) = always sent.";
+                          };
+                        };
+                      });
+                    default = [ ];
+                    description = "Generated `config.toml` `custom_claims` entries — static claims added to id_token/access_token of this client, optionally scoped to an LDAP group membership.";
+                  };
                   public = lib.mkOption {
                     type = lib.types.bool;
                     default = false;
@@ -354,6 +379,29 @@ in
       {
         assertion = lib.all (c: c.redirectUris != [ ]) oidcClients;
         message = "each services.portail.apps entry with oidc.enable = true needs non-empty oidc.redirectUris";
+      }
+      {
+        assertion = lib.all (
+          c:
+          lib.all (
+            r:
+            r.name != ""
+            && !lib.elem r.name [
+              "iss"
+              "sub"
+              "aud"
+              "exp"
+              "iat"
+              "nbf"
+              "nonce"
+              "azp"
+              "email"
+              "groups"
+              "preferred_username"
+            ]
+          ) c.customClaims
+        ) oidcClients;
+        message = "apps entries with oidc.customClaims need a non-empty name that does not shadow a reserved claim (iss, sub, aud, exp, iat, nbf, nonce, azp, email, groups, preferred_username)";
       }
       {
         assertion = lib.all (c: c.user == "" || (c.group != "" && !c.public && c.generated)) oidcClients;
