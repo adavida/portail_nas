@@ -15,6 +15,7 @@ pub(crate) async fn inject_admin(mut req: Request, next: Next) -> Result<Respons
         preferred_username: Some("admin".into()),
         nonce: None,
         azp: None,
+        custom_claims: Default::default(),
     };
     req.extensions_mut().insert(AuthUser(claims));
     Ok(next.run(req).await)

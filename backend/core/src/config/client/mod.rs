@@ -1,6 +1,14 @@
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct CustomClaim {
+    pub name: String,
+    pub value: String,
+    #[serde(default)]
+    pub group: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct ClientEntry {
     pub id: String,
     #[serde(default)]
@@ -10,4 +18,6 @@ pub struct ClientEntry {
     pub redirect_uris: Vec<String>,
     #[serde(default)]
     pub scopes: Vec<String>,
+    #[serde(default)]
+    pub custom_claims: Vec<CustomClaim>,
 }

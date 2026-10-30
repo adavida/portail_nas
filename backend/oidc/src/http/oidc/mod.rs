@@ -121,10 +121,8 @@ pub(crate) async fn enrich_flow(flow: &mut crate::auth::store::AuthFlow) -> Resu
     let Some(user) = user else {
         return Ok(());
     };
-    if flow.scopes.iter().any(|s| s == "groups") {
-        flow.groups = user.groups.iter().map(|g| g.as_str().to_string()).collect();
-    }
-    if flow.scopes.iter().any(|s| s == "email") && !user.email.as_str().is_empty() {
+    flow.groups = user.groups.iter().map(|g| g.as_str().to_string()).collect();
+    if !user.email.as_str().is_empty() {
         flow.email = Some(user.email.as_str().to_string());
     }
     Ok(())

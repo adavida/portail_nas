@@ -278,6 +278,7 @@ mod tests {
             enabled: true,
             redirect_uris: vec!["http://localhost/cb".into()],
             scopes: vec![],
+            custom_claims: Default::default(),
         }
     }
 
@@ -363,6 +364,7 @@ mod tests {
             enabled: true,
             redirect_uris: vec![],
             scopes: vec![],
+            custom_claims: Default::default(),
         }];
 
         let err = clients(&config).unwrap_err();

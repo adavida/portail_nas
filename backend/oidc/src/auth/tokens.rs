@@ -5,6 +5,7 @@ use base64::{
 use jsonwebtoken::{Algorithm, Header, Validation, decode, encode};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
@@ -89,6 +90,19 @@ fn now() -> usize {
 }
 
 pub fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppError> {
+    let mut custom_claims = HashMap::new();
+    if let Some(entry) = config.oidc_clients.iter().find(|e| e.id == flow.client_id) {
+        for rule in &entry.custom_claims {
+            if rule.group.is_empty() || flow.groups.contains(&rule.group) {
+                custom_claims.insert(rule.name.clone(), rule.value.clone());
+            }
+        }
+    }
+    let groups = if flow.scopes.iter().any(|s| s == "groups") {
+        flow.groups.clone()
+    } else {
+        Vec::new()
+    };
     Ok(Claims {
         sub: crate::auth::subject::subject_for(config, &flow.client_id, &flow.sub)
             .map_err(AppError::Internal)?,
@@ -96,7 +110,7 @@ pub fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppErro
         iss: issuer(config),
         iat: now(),
         exp: now() + config.oidc_access_ttl.as_secs() as usize,
-        groups: flow.groups.clone(),
+        groups,
         email: flow
             .email
             .clone()
@@ -104,6 +118,7 @@ pub fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppErro
         preferred_username: Some(flow.sub.clone()),
         nonce: flow.nonce.clone(),
         azp: None,
+        custom_claims,
     })
 }
 
@@ -193,6 +208,18 @@ mod tests {
                 "email".into(),
                 "groups".into(),
             ],
+            custom_claims: vec![
+                portail_core::config::CustomClaim {
+                    name: "role".into(),
+                    value: "tester".into(),
+                    group: String::new(),
+                },
+                portail_core::config::CustomClaim {
+                    name: "superpower".into(),
+                    value: "fly".into(),
+                    group: "birds".into(),
+                },
+            ],
         }];
         config
     }
@@ -206,7 +233,7 @@ mod tests {
             scopes: vec!["openid".into()],
             challenge: challenge.map(String::from),
             sub: "tester".into(),
-            groups: vec![],
+            groups: vec!["birds".into()],
             email: None,
         }
     }
@@ -355,6 +382,77 @@ mod tests {
     }
 
     #[test]
+    fn issued_id_token_carries_client_custom_claims() {
+        let config = env_with_public_client("customclaims");
+        let code = store::save_code(public_flow(Some(
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+        )))
+        .unwrap();
+
+        let tokens = exchange(
+            &config,
+            PUBLIC_ID,
+            "",
+            &code,
+            PUBLIC_REDIRECT,
+            Some("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+        )
+        .expect("public client with PKCE should get tokens");
+        let claims = verify_any_aud(&config, &tokens.id_token).expect("id_token must verify");
+
+        let role = claims
+            .custom_claims
+            .get("role")
+            .cloned()
+            .unwrap_or_default();
+        let superpower = claims
+            .custom_claims
+            .get("superpower")
+            .cloned()
+            .unwrap_or_default();
+        assert_eq!(
+            role, "tester",
+            "unconditional rule must be signed into the id_token"
+        );
+        assert_eq!(
+            superpower, "fly",
+            "group-scoped rule must be signed for a member of that group"
+        );
+        assert!(
+            claims.groups.is_empty(),
+            "groups claim itself stays filtered by scope, got {:?}",
+            claims.groups
+        );
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+    }
+
+    #[test]
+    fn group_scoped_custom_claim_absent_for_non_member() {
+        let config = env_with_public_client("customclaimsneg");
+        let mut flow = public_flow(Some("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"));
+        flow.groups = vec![];
+        let code = store::save_code(flow).unwrap();
+
+        let tokens = exchange(
+            &config,
+            PUBLIC_ID,
+            "",
+            &code,
+            PUBLIC_REDIRECT,
+            Some("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+        )
+        .expect("public client with PKCE should get tokens");
+        let claims = verify_any_aud(&config, &tokens.id_token).expect("id_token must verify");
+
+        assert!(
+            !claims.custom_claims.contains_key("superpower"),
+            "non-members must not get the group-scoped claim: {:?}",
+            claims.custom_claims
+        );
+        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+    }
+
+    #[test]
     fn exchange_public_client_without_pkce_is_rejected() {
         let config = env_with_public_client("nopkce");
         let code = store::save_code(public_flow(None)).unwrap();
@@ -450,6 +548,7 @@ mod tests {
             enabled,
             redirect_uris: vec![PUBLIC_REDIRECT.into()],
             scopes: vec!["openid".into()],
+            custom_claims: Default::default(),
         }];
         std::fs::create_dir_all(&config.oidc_secrets_dir).unwrap();
         config.db_path = format!("{}/portail.db", config.oidc_secrets_dir);

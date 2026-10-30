@@ -21,5 +21,8 @@ oidc_clients = [
         "profile",
         "email",
         "groups",
+    ], custom_claims = [
+        { name = "env", value = "test" },
+        { name = "power", value = "admin-tools", group = "admin" },
     ] },
 ]

@@ -4,7 +4,7 @@ use std::time::Duration;
 pub mod client;
 pub mod errors;
 mod global;
-pub use client::ClientEntry;
+pub use client::{ClientEntry, CustomClaim};
 pub use errors::ConfigError;
 
 pub const DEFAULT_KEY_BITS: usize = 2048;
@@ -16,6 +16,19 @@ pub const DEFAULT_PASSWORD_MIN_LENGTH: usize = 8;
 pub const DEFAULT_LOGIN_MAX_ATTEMPTS: u32 = 10;
 pub const DEFAULT_OIDC_ID_BYTES: usize = 16;
 pub const DEFAULT_DB_PATH: &str = "portail.db";
+pub const RESERVED_CLAIM_NAMES: [&str; 11] = [
+    "iss",
+    "sub",
+    "aud",
+    "exp",
+    "iat",
+    "nbf",
+    "nonce",
+    "azp",
+    "email",
+    "groups",
+    "preferred_username",
+];
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -147,6 +160,22 @@ impl Config {
             return Err(ConfigError(format!(
                 "oidc_id_bytes must stay at least {DEFAULT_OIDC_ID_BYTES} (got {oidc_id_bytes})"
             )));
+        }
+        for entry in &parsed.oidc_clients {
+            for rule in &entry.custom_claims {
+                if rule.name.is_empty() {
+                    return Err(ConfigError(format!(
+                        "client {}: custom claim rule needs a non-empty name",
+                        entry.id
+                    )));
+                }
+                if RESERVED_CLAIM_NAMES.contains(&rule.name.as_str()) {
+                    return Err(ConfigError(format!(
+                        "client {}: custom claim '{}' shadows a reserved claim",
+                        entry.id, rule.name
+                    )));
+                }
+            }
         }
         Ok(Self {
             app_url: parsed.app_url,
@@ -405,6 +434,50 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
             config.oidc_secrets_dir,
             format!("{config_dir}/.devenv/state/secrets"),
             "relative path should anchor at the config file directory"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_reserved_custom_claim_name() {
+        let path = write_temp_config(
+            "reserved",
+            &minimal_toml().replace(
+                r#"scopes = ["openid"] }]"#,
+                r#"scopes = ["openid"], custom_claims = [{ name = "sub", value = "evil" }] }]"#,
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("reserved claim") && err.0.contains("sub"),
+            "a custom claim shadowing a reserved name must be rejected: {err}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_reads_group_scoped_custom_claims() {
+        let path = write_temp_config(
+            "customclaims",
+            &minimal_toml().replace(
+                r#"scopes = ["openid"] }]"#,
+                r#"scopes = ["openid"], custom_claims = [{ name = "env", value = "test" }, { name = "role", value = "admin", group = "admins" }] }]"#,
+            ),
+        );
+
+        let config = Config::load(&path).unwrap();
+        let rules = &config.oidc_clients[0].custom_claims;
+
+        assert_eq!(rules.len(), 2, "two custom claim rules expected");
+        assert_eq!(
+            rules[0].group, "",
+            "first rule should be unconditional (empty group)"
+        );
+        assert_eq!(
+            rules[1].group, "admins",
+            "second rule should be scoped to the admins group"
         );
         let _ = std::fs::remove_file(&path);
     }

@@ -126,6 +126,15 @@ async fn debug_claims_returns_pairwise_sub_for_seeded_user() {
     );
     assert_eq!(sub.len(), 36, "sub must be a pairwise uuid, got {sub}");
     assert_ne!(sub, user.uid, "sub must not leak the uid");
+    assert_eq!(
+        body["env"].as_str(),
+        Some("test"),
+        "unconditional custom claim must appear in the preview, got {body}"
+    );
+    assert!(
+        body.get("power").is_none(),
+        "group-scoped claim must be absent for a user outside the admin group: {body}"
+    );
 
     user.delete().await;
 }

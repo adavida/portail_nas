@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Claims {
@@ -17,6 +18,8 @@ pub struct Claims {
     pub nonce: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub azp: Option<String>,
+    #[serde(default, flatten)]
+    pub custom_claims: HashMap<String, String>,
 }
 
 impl Claims {

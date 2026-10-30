@@ -85,6 +85,7 @@ mod tests {
             enabled,
             redirect_uris: vec!["http://localhost:5173/callback".into()],
             scopes: vec!["openid".into(), "groups".into()],
+            custom_claims: Default::default(),
         }
     }
 
@@ -161,6 +162,7 @@ mod tests {
             enabled: true,
             redirect_uris: vec![],
             scopes: vec![],
+            custom_claims: Default::default(),
         }])
         .unwrap_err();
 
