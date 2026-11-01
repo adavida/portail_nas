@@ -298,7 +298,8 @@ mod repo {
         nanos::nanos, new_group_with_member::new_group_with_member, seed_user::seed_user,
     };
     use portail_core::error::AppError;
-    use portail_directory::domain::groups::{Description, Gid, Name, UpdateGroup};
+    use portail_directory::domain::groups::UpdateGroup;
+    use portail_directory::domain::ldap::{Description, Gid, Name};
     use portail_directory::repository::ldap::groups::{
         create_group, delete_group, list_groups, update_group,
     };

@@ -10,7 +10,7 @@ pub use users::{
     update_user_password,
 };
 
-use crate::domain::{groups::Gid, users::Uid};
+use crate::domain::ldap::{Gid, Uid};
 use portail_core::error::AppError;
 
 pub(crate) fn ldap_url() -> &'static String {

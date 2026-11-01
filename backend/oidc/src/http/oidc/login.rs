@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{auth::store, http::oidc};
 use portail_core::config::Config;
 use portail_core::error::AppError;
-use portail_directory::domain::users::{Password, Uid};
+use portail_directory::domain::ldap::{Password, Uid};
 
 #[derive(Serialize)]
 pub struct Login {

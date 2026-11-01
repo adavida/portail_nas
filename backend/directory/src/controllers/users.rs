@@ -1,6 +1,7 @@
 use crate::{
-    domain::groups::{Description, Gid, Members, Name, NewGroup},
-    domain::users::{NewUser, Password, Uid, UpdateUser, User},
+    domain::groups::NewGroup,
+    domain::ldap::{Description, Gid, Members, Name, Password, Uid},
+    domain::users::{NewUser, UpdateUser, User},
     repository::ldap as ldap_repo,
 };
 use portail_core::error::AppError;

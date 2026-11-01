@@ -1,4 +1,4 @@
-use crate::domain::groups::Gid;
+use crate::domain::ldap::Gid;
 
 use super::gen_uid::gen_uid;
 

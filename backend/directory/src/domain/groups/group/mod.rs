@@ -3,7 +3,8 @@ pub use errors::GroupError;
 
 use serde::Serialize;
 
-use super::{Description, Gid, Name};
+use crate::domain::ldap::Gid;
+use crate::domain::ldap::{Description, Name};
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Group {

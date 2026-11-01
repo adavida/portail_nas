@@ -1,5 +1,5 @@
 use crate::{
-    domain::users::Uid,
+    domain::ldap::Uid,
     repository::ldap::{MapLdap, connect, find_user_dn},
 };
 use portail_core::error::AppError;

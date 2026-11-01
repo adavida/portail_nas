@@ -1,4 +1,4 @@
-use crate::{domain::users::Uid, repository::ldap::create_user};
+use crate::{domain::ldap::Uid, repository::ldap::create_user};
 use portail_core::error::AppError;
 
 use super::{ensure_clean::ensure_clean, new_user::new_user};

@@ -1,5 +1,5 @@
 use crate::{
-    domain::users::{Password, Uid},
+    domain::ldap::{Password, Uid},
     repository::ldap::authenticate_user,
 };
 

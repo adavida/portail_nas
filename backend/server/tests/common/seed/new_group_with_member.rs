@@ -1,6 +1,6 @@
 use portail_directory::domain::{
-    groups::{Description, Gid, Members, Name, NewGroup},
-    users::Uid,
+    groups::NewGroup,
+    ldap::{Description, Gid, Members, Name, Uid},
 };
 
 use super::nanos::nanos;

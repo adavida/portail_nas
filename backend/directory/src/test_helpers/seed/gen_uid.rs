@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::domain::users::Uid;
+use crate::domain::ldap::Uid;
 
 pub(crate) fn gen_uid(prefix: &str) -> Uid {
     let suffix = SystemTime::now()

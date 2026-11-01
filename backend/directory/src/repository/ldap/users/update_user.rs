@@ -2,7 +2,8 @@ use ldap3::Mod;
 use std::collections::HashSet;
 
 use crate::{
-    domain::users::{Uid, UpdateUser},
+    domain::ldap::Uid,
+    domain::users::UpdateUser,
     repository::ldap::{MapLdap, connect, find_user_dn},
 };
 use portail_core::error::AppError;

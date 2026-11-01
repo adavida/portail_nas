@@ -1,7 +1,6 @@
 use serde::Deserialize;
 
-use super::Name;
-use super::{Email, Password, Uid};
+use crate::domain::ldap::{Email, Name, Password, Uid};
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct NewUser {

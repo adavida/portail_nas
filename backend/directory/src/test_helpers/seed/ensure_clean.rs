@@ -1,7 +1,7 @@
 use ldap3::LdapConnAsync;
 
 use crate::{
-    domain::users::Uid,
+    domain::ldap::Uid,
     repository::ldap::{ldap_base, ldap_url, user_dn},
 };
 

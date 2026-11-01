@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
-use super::{Description, Gid, Members, Name};
+use crate::domain::ldap::Gid;
+use crate::domain::ldap::{Description, Members, Name};
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct NewGroup {
@@ -40,7 +41,7 @@ impl NewGroup {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::users::Uid;
+    use crate::domain::ldap::Uid;
 
     fn test_group() -> NewGroup {
         NewGroup {

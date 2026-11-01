@@ -1,5 +1,5 @@
 use crate::{
-    domain::groups::Gid,
+    domain::ldap::Gid,
     repository::ldap::{MapLdap, connect, find_group_dn},
 };
 use portail_core::error::AppError;

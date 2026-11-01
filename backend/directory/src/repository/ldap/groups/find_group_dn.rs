@@ -1,7 +1,7 @@
 use ldap3::{Scope, SearchEntry};
 
 use crate::{
-    domain::groups::Gid,
+    domain::ldap::Gid,
     repository::ldap::{MapLdap, groups_search_base},
 };
 use portail_core::error::AppError;

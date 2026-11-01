@@ -1,9 +1,7 @@
 use serde::Serialize;
 
-use super::Name;
 use super::user_error::UserError;
-use super::{Email, Uid};
-use crate::domain::groups::Gid;
+use crate::domain::ldap::{Email, Gid, Name, Uid};
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct User {

@@ -3,7 +3,7 @@ pub use errors::MembersError;
 
 use serde::Deserialize;
 
-use crate::domain::users::Uid;
+use crate::domain::ldap::Uid;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Members(Vec<Uid>);

@@ -1,5 +1,6 @@
 use portail_core::error::AppError;
-use portail_directory::domain::users::{Email, Name, NewUser, Password, Uid};
+use portail_directory::domain::ldap::{Email, Name, Password, Uid};
+use portail_directory::domain::users::NewUser;
 use portail_directory::repository::ldap::users::create_user;
 
 use crate::common::ldap::ensure_clean::ensure_clean;

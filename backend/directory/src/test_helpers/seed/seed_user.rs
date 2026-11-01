@@ -1,4 +1,4 @@
-use crate::domain::users::Uid;
+use crate::domain::ldap::Uid;
 
 use super::{gen_uid::gen_uid, seed_and_create_user::seed_and_create_user};
 

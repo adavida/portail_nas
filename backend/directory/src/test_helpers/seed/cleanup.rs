@@ -1,5 +1,5 @@
 use crate::{
-    domain::{groups::Gid, users::Uid},
+    domain::ldap::{Gid, Uid},
     repository::ldap::delete_group,
 };
 

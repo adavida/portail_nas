@@ -1,7 +1,7 @@
 use crate::{
     domain::{
-        groups::{Description, Gid, Members, Name, NewGroup},
-        users::Uid,
+        groups::NewGroup,
+        ldap::{Description, Gid, Members, Name, Uid},
     },
     repository::ldap::create_group,
 };

@@ -1,5 +1,5 @@
-use super::Gid;
-use crate::domain::users::{Uid, User};
+use crate::domain::ldap::{Gid, Uid};
+use crate::domain::users::User;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GroupUids {

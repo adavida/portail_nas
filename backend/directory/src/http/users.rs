@@ -3,7 +3,8 @@ use serde::Serialize;
 
 use crate::{
     controllers::users::{authenticate, create, delete, list, update, update_password},
-    domain::users::{NewUser, Uid, UpdatePassword, UpdateUser, User},
+    domain::ldap::{Uid, UpdatePassword},
+    domain::users::{NewUser, UpdateUser, User},
 };
 use portail_core::error::AppError;
 

@@ -1,6 +1,6 @@
 use crate::{
-    domain::groups::{Gid, Group, NewGroup, UpdateGroup, group_uids::Members},
-    domain::users::Uid,
+    domain::groups::{Group, NewGroup, UpdateGroup, group_uids::Members},
+    domain::ldap::{Gid, Uid},
     repository::ldap as ldap_repo,
 };
 use portail_core::error::AppError;
@@ -45,6 +45,7 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
         ));
     }
     let group = ldap_repo::list_uids()
+    let maybe_group = ldap_repo::list_uids()
         .await?
         .into_iter()
         .find(|g| g.gid == gid);
@@ -53,6 +54,12 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
             .members
             .iter()
             .all(|m| *m == Members::Uid(uid.clone()));
+    if let Some(group) = maybe_group {
+        let is_last = group.members.iter().all(|m| match m {
+            Members::Uid(u) => u == &uid,
+            Members::Cn(_) => false,
+        });
+        tracing::info!("{:#?}", group.members);
         if is_last && is_protected(&gid) {
             return Err(AppError::Forbidden(format!(
                 "group {} must keep at least one member",
@@ -61,7 +68,11 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
         }
         if is_last {
             return ldap_repo::delete_group(gid).await;
+            ldap_repo::delete_group(gid).await
+        } else {
+            ldap_repo::remove_member(gid, uid).await
         }
+    } else {
+        ldap_repo::remove_member(gid, uid).await
     }
-    ldap_repo::remove_member(gid, uid).await
 }

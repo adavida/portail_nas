@@ -2,8 +2,8 @@ use axum::{Json, Router, extract::Path, http::StatusCode, routing::get, routing:
 
 use crate::{
     controllers::groups::{add_member, create, delete, list, remove_member, update},
-    domain::groups::{Gid, Group, NewGroup, UpdateGroup},
-    domain::users::Uid,
+    domain::groups::{Group, NewGroup, UpdateGroup},
+    domain::ldap::{Gid, Uid},
 };
 use portail_core::error::AppError;
 

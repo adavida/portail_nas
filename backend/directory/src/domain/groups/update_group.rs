@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::{Description, Name};
+use crate::domain::ldap::{Description, Name};
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct UpdateGroup {

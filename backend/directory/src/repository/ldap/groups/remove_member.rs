@@ -1,8 +1,8 @@
 use ldap3::Mod;
 
 use crate::{
-    domain::groups::Gid,
-    domain::users::Uid,
+    domain::ldap::Gid,
+    domain::ldap::Uid,
     repository::ldap::{MapLdap, connect, find_group_dn, find_user_dn},
 };
 use portail_core::error::AppError;
