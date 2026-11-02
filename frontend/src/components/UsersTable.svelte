@@ -5,6 +5,7 @@
   import UserModal from "./UserModal.svelte";
   import UserCreateModal from "./UserCreateModal.svelte";
   import ConfirmModal from "./ConfirmModal.svelte";
+  import Table, { type Row } from "./Table.svelte";
   import { t, translate } from "../i18n";
   import { toast } from "./toast";
   import { createGroupWithMember, saveGroups } from "./user_groups";
@@ -40,6 +41,26 @@
   );
   let passwords = $state<Record<string, string>>({});
   let creating = $state(false);
+
+  const mobile_rows = $derived<Row[]>(
+    users.map((u) => {
+      const visibleGroups = (u.groups ?? []).filter((g) => g !== "user");
+      return {
+        testid: `user-row-${u.uid}`,
+        cls: "clickable",
+        onclick: () => (editingUid = u.uid),
+        cells: [
+          u.uid,
+          u.name,
+          u.email,
+          {
+            text: visibleGroups.length ? visibleGroups.join(" ") : "-",
+            testid: `cell-groups-${u.uid}`,
+          },
+        ],
+      };
+    }),
+  );
 
   async function submitPassword(user: User) {
     const password = passwords[user.uid] ?? "";
@@ -102,45 +123,14 @@
 {/if}
 
 {#if mobile}
-  <div class="table-scroll">
-    <table data-testid="users-table" class="table">
-      <thead>
-        <tr>
-          <th>UID</th>
-          <th>{$t("col.name")}</th>
-          <th>{$t("col.email")}</th>
-          <th>{$t("col.groups")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#if users.length === 0}
-          <tr>
-            <td colSpan={4} class="center" data-testid="users-empty">
-              {$t("users.empty")}
-            </td>
-          </tr>
-        {:else}
-          {#each users as u (u.uid)}
-            {@const visibleGroups = (u.groups ?? []).filter((g) => g !== "user")}
-            <tr
-              data-testid={`user-row-${u.uid}`}
-              class="clickable"
-              tabindex="0"
-              onclick={() => (editingUid = u.uid)}
-              onkeydown={(e) => e.key === "Enter" && (editingUid = u.uid)}
-            >
-              <td>{u.uid}</td>
-              <td>{u.name}</td>
-              <td>{u.email}</td>
-              <td data-testid={`cell-groups-${u.uid}`}>
-                {visibleGroups.length ? visibleGroups.join(" ") : "-"}
-              </td>
-            </tr>
-          {/each}
-        {/if}
-      </tbody>
-    </table>
-  </div>
+  <Table
+    testid="users-table"
+    head={["UID", $t("col.name"), $t("col.email"), $t("col.groups")]}
+    empty={$t("users.empty")}
+    emptyTestid="users-empty"
+    isEmpty={users.length === 0}
+    data={mobile_rows}
+  />
 
   {#if editingUser}
     <UserModal
@@ -152,99 +142,92 @@
     />
   {/if}
 {:else}
-  <div class="table-scroll">
-    <table data-testid="users-table" class="table">
-      <thead>
-        <tr>
-          <th>UID</th>
-          <th>{$t("col.name")}</th>
-          <th>{$t("col.email")}</th>
-          <th>{$t("col.groups")}</th>
-          <th>{$t("col.password")}</th>
-          <th>{$t("col.action")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#if users.length === 0}
-          <tr>
-            <td colSpan={6} class="center" data-testid="users-empty">
-              {$t("users.empty")}
+  <Table
+    testid="users-table"
+    head={[
+      "UID",
+      $t("col.name"),
+      $t("col.email"),
+      $t("col.groups"),
+      $t("col.password"),
+      $t("col.action"),
+    ]}
+    empty={$t("users.empty")}
+    emptyTestid="users-empty"
+    isEmpty={users.length === 0}
+  >
+    {#snippet rows()}
+      {#each users as u (u.uid)}
+        {@const groups = u.groups ?? []}
+        {@const visibleGroups = groups.filter((g) => g !== "user")}
+        <tr data-testid={`user-row-${u.uid}`}>
+          <td>{u.uid}</td>
+          <EditableCell
+            value={u.name}
+            field="name"
+            rowId={u.uid}
+            onSave={(f, v) => saveField(u, f, v)}
+          />
+          <EditableCell
+            value={u.email}
+            field="email"
+            rowId={u.uid}
+            onSave={(f, v) => saveField(u, f, v)}
+          />
+          {#if editingGroupsUid !== u.uid}
+            <td
+              data-testid={`cell-groups-${u.uid}`}
+              class="editable"
+              onclick={() => (editingGroupsUid = u.uid)}
+            >
+              {visibleGroups.length ? visibleGroups.join(" ") : "-"}
             </td>
-          </tr>
-        {:else}
-          {#each users as u (u.uid)}
-            {@const groups = u.groups ?? []}
-            {@const visibleGroups = groups.filter((g) => g !== "user")}
-            <tr data-testid={`user-row-${u.uid}`}>
-              <td>{u.uid}</td>
-              <EditableCell
-                value={u.name}
-                field="name"
-                rowId={u.uid}
-                onSave={(f, v) => saveField(u, f, v)}
+          {:else}
+            <td>
+              <GroupsEditor
+                uid={u.uid}
+                {groups}
+                allGroups={allGroups}
+                onSave={(next) => saveGroups(u.uid, u.groups ?? [], next, onUpdated)}
+                onCreateGroup={(gid) => createGroupWithMember(u.uid, gid, onUpdated)}
+                onCancel={() => (editingGroupsUid = null)}
+                hideActions
               />
-              <EditableCell
-                value={u.email}
-                field="email"
-                rowId={u.uid}
-                onSave={(f, v) => saveField(u, f, v)}
+            </td>
+          {/if}
+          <td>
+            <span class="row-actions">
+              <input
+                class="input"
+                data-testid={`password-input-${u.uid}`}
+                placeholder={$t("common.password_new")}
+                type="password"
+                bind:value={passwords[u.uid]}
               />
-              {#if editingGroupsUid !== u.uid}
-                <td
-                  data-testid={`cell-groups-${u.uid}`}
-                  class="editable"
-                  onclick={() => (editingGroupsUid = u.uid)}
-                >
-                  {visibleGroups.length ? visibleGroups.join(" ") : "-"}
-                </td>
-              {:else}
-                <td>
-                  <GroupsEditor
-                    uid={u.uid}
-                    {groups}
-                    allGroups={allGroups}
-                    onSave={(next) => saveGroups(u.uid, u.groups ?? [], next, onUpdated)}
-                    onCreateGroup={(gid) => createGroupWithMember(u.uid, gid, onUpdated)}
-                    onCancel={() => (editingGroupsUid = null)}
-                    hideActions
-                  />
-                </td>
-              {/if}
-              <td>
-                <span class="row-actions">
-                  <input
-                    class="input"
-                    data-testid={`password-input-${u.uid}`}
-                    placeholder={$t("common.password_new")}
-                    type="password"
-                    bind:value={passwords[u.uid]}
-                  />
-                  <button
-                    class="btn btn-primary"
-                    data-testid={`password-button-${u.uid}`}
-                    onclick={() => void submitPassword(u)}
-                    type="button"
-                  >
-                    {$t("common.edit")}
-                  </button>
-                </span>
-              </td>
-              <td>
-                <button
-                  class="btn btn-danger"
-                  data-testid={`delete-button-${u.uid}`}
-                  onclick={() => (deleteTarget = u)}
-                  type="button"
-                >
-                  {$t("common.delete")}
-                </button>
-              </td>
-            </tr>
-          {/each}
-        {/if}
-      </tbody>
-    </table>
-  </div>
+              <button
+                class="btn btn-primary"
+                data-testid={`password-button-${u.uid}`}
+                onclick={() => void submitPassword(u)}
+                type="button"
+              >
+                {$t("common.edit")}
+              </button>
+            </span>
+          </td>
+          <td>
+            <button
+              class="btn btn-danger"
+              data-testid={`delete-button-${u.uid}`}
+              onclick={() => (deleteTarget = u)}
+              type="button"
+            >
+              {$t("common.delete")}
+            </button>
+          </td>
+        </tr>
+      {/each}
+    {/snippet}
+  </Table>
 {/if}
 
 {#if deleteTarget}
