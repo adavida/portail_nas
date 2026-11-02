@@ -48,9 +48,9 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
         .await?
         .into_iter()
         .find(|g| g.gid == gid);
-    let user_member = ldap_repo::find_user_members(&uid).await?;
+    ldap_repo::find_user_members(&uid).await?;
     if let Some(group) = maybe_group {
-        let is_last = group.members.iter().all(|m| *m == user_member);
+        let is_last = group.members.iter().all(|m| m.name() == uid.as_str());
         tracing::info!("{:#?}", group.members);
         if is_last && is_protected(&gid) {
             return Err(AppError::Forbidden(format!(

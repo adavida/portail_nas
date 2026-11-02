@@ -28,11 +28,15 @@ impl Members {
         }
     }
 
-    fn contains_user(&self, user: &User) -> bool {
+    pub fn name(&self) -> &str {
         match self {
-            Members::Uid(uid) => uid == &user.uid,
-            Members::Cn(gid) => gid.as_str() == user.uid.as_str(),
+            Members::Uid(uid) => uid.as_str(),
+            Members::Cn(cn) => cn.as_str(),
         }
+    }
+
+    fn contains_user(&self, user: &User) -> bool {
+        self.name() == user.uid.as_str()
     }
 }
 
@@ -121,6 +125,15 @@ mod tests {
         let member = Members::from("uid=Alice!,ou=people,dc=dev,dc=example,dc=com");
 
         assert_eq!(member, None, "invalid uid characters should yield None");
+    }
+
+    #[test]
+    fn name_returns_value_regardless_of_variant() {
+        let uid_member = Members::Uid(Uid::try_new("alice".into()).unwrap());
+        let cn_member = Members::Cn(Cn::try_new("devs".into()).unwrap());
+
+        assert_eq!(uid_member.name(), "alice");
+        assert_eq!(cn_member.name(), "devs");
     }
 
     #[test]
