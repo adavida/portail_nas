@@ -2,7 +2,7 @@ use ldap3::{Scope, SearchEntry};
 
 use crate::{
     domain::groups::Group,
-    repository::ldap::{MapLdap, connect, groups_search_base, ldap_url},
+    repository::ldap::{MapLdap, connect, groups_search_base},
 };
 use portail_core::error::AppError;
 
@@ -12,11 +12,6 @@ pub async fn list_groups() -> Result<Vec<Group>, AppError> {
 
     let mut ldap = connect().await?;
 
-    tracing::info!(
-        "list_groups url = {} search = {}",
-        &ldap_url(),
-        &search_base
-    );
     let (rs, _res) = ldap
         .search(
             &search_base,
