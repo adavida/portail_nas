@@ -1,7 +1,4 @@
-// PKCE: login() doit générer + stocker un code_verifier et poser
-// code_challenge/code_challenge_method sur l'URL d'autorisation Authelia;
-// handleCallback() doit renvoyer le verifier au backend.
-// @ts-expect-error — node:crypto absent du tsconfig DOM (jsdom)
+// @ts-expect-error — node:crypto missing from the DOM tsconfig (jsdom)
 import { webcrypto as nodeCrypto } from "node:crypto";
 import { beforeEach, expect, test } from "vitest";
 import { b64url } from "../test/b64url";
@@ -9,7 +6,6 @@ import { mockFetch } from "../test/mock_fetch";
 import { redirectTarget } from "../test/redirect_target";
 import { handleCallback } from "./oidc";
 
-// jsdom ne fournit pas WebCrypto — on injecte node:crypto/webcrypto.
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
@@ -28,7 +24,6 @@ test("login adds PKCE S256 challenge and stores verifier", async () => {
   expect(verifier, "verifier should be stored in sessionStorage").toBeTruthy();
   expect(url.searchParams.get("code_challenge_method")).toBe("S256");
 
-  // Arrange: expected challenge = base64url(SHA-256(verifier))
   const digest = await nodeCrypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(verifier!),

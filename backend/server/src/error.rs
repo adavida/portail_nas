@@ -1,0 +1,24 @@
+#[derive(Debug)]
+pub enum AppError {
+    Ldap(String),
+    NotFound(String),
+    BadRequest(String),
+    Internal(String),
+    Unauthorized(String),
+    Forbidden(String),
+}
+
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ldap(m) => write!(f, "ldap: {m}"),
+            Self::NotFound(m) => write!(f, "not found: {m}"),
+            Self::BadRequest(m) => write!(f, "bad request: {m}"),
+            Self::Internal(m) => write!(f, "internal: {m}"),
+            Self::Unauthorized(m) => write!(f, "unauthorized: {m}"),
+            Self::Forbidden(m) => write!(f, "forbidden: {m}"),
+        }
+    }
+}
+
+impl std::error::Error for AppError {}

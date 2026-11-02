@@ -3,6 +3,7 @@
   import EditableCell from "./EditableCell.svelte";
   import GroupModal from "./GroupModal.svelte";
   import ConfirmModal from "./ConfirmModal.svelte";
+  import Table, { type Row } from "./Table.svelte";
   import { t, translate } from "../i18n";
   import { toast } from "./toast";
 
@@ -12,7 +13,6 @@
     onDeleted?: () => void;
   };
 
-  // $bp-narrow des tokens — doit rester synchronisé
   const MOBILE_QUERY = "(max-width: 720px)";
   const PROTECTED_GIDS = ["admin", "user"];
   const isProtected = (gid: string) => PROTECTED_GIDS.includes(gid);
@@ -21,6 +21,15 @@
   let { groups, onUpdated, onDeleted }: Props = $props();
 
   const visible = $derived(groups.filter((g) => !isHidden(g.gid)));
+
+  const mobile_rows = $derived<Row[]>(
+    visible.map((g) => ({
+      testid: `group-row-${g.gid}`,
+      cls: "clickable",
+      onclick: () => (editingGid = g.gid),
+      cells: [g.gid, g.name, g.description],
+    })),
+  );
 
   let mobile = $state(false);
   let editingGid = $state<string | null>(null);
@@ -70,40 +79,14 @@
 </script>
 
 {#if mobile}
-  <div class="table-scroll">
-    <table data-testid="groups-table" class="table">
-      <thead>
-        <tr>
-          <th>GID</th>
-          <th>{$t("col.name")}</th>
-          <th>{$t("col.description")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#if visible.length === 0}
-          <tr>
-            <td colSpan={3} class="center" data-testid="groups-empty">
-              {$t("groups.empty")}
-            </td>
-          </tr>
-        {:else}
-          {#each visible as g (g.gid)}
-            <tr
-              data-testid={`group-row-${g.gid}`}
-              class="clickable"
-              tabindex="0"
-              onclick={() => (editingGid = g.gid)}
-              onkeydown={(e) => e.key === "Enter" && (editingGid = g.gid)}
-            >
-              <td>{g.gid}</td>
-              <td>{g.name}</td>
-              <td>{g.description}</td>
-            </tr>
-          {/each}
-        {/if}
-      </tbody>
-    </table>
-  </div>
+  <Table
+    testid="groups-table"
+    head={["GID", $t("col.name"), $t("col.description")]}
+    empty={$t("groups.empty")}
+    emptyTestid="groups-empty"
+    isEmpty={visible.length === 0}
+    data={mobile_rows}
+  />
 
   {#if editingGroup}
     <GroupModal
@@ -115,57 +98,45 @@
     />
   {/if}
 {:else}
-  <div class="table-scroll">
-    <table data-testid="groups-table" class="table">
-      <thead>
-        <tr>
-          <th>GID</th>
-          <th>{$t("col.name")}</th>
-          <th>{$t("col.description")}</th>
-          <th>{$t("col.action")}</th>
+  <Table
+    testid="groups-table"
+    head={["GID", $t("col.name"), $t("col.description"), $t("col.action")]}
+    empty={$t("groups.empty")}
+    emptyTestid="groups-empty"
+    isEmpty={visible.length === 0}
+  >
+    {#snippet rows()}
+      {#each visible as g (g.gid)}
+        <tr data-testid={`group-row-${g.gid}`}>
+          <td>{g.gid}</td>
+          <EditableCell
+            value={g.name}
+            field="name"
+            rowId={g.gid}
+            onSave={(f, v) => saveField(g, f, v)}
+          />
+          <EditableCell
+            value={g.description}
+            field="description"
+            rowId={g.gid}
+            onSave={(f, v) => saveField(g, f, v)}
+          />
+          <td>
+            {#if !isProtected(g.gid)}
+              <button
+                class="btn btn-danger"
+                data-testid={`group-delete-button-${g.gid}`}
+                onclick={() => (deleteTarget = g)}
+                type="button"
+              >
+                {$t("common.delete")}
+              </button>
+            {/if}
+          </td>
         </tr>
-      </thead>
-      <tbody>
-        {#if visible.length === 0}
-          <tr>
-            <td colSpan={4} class="center" data-testid="groups-empty">
-              {$t("groups.empty")}
-            </td>
-          </tr>
-        {:else}
-          {#each visible as g (g.gid)}
-            <tr data-testid={`group-row-${g.gid}`}>
-              <td>{g.gid}</td>
-              <EditableCell
-                value={g.name}
-                field="name"
-                rowId={g.gid}
-                onSave={(f, v) => saveField(g, f, v)}
-              />
-              <EditableCell
-                value={g.description}
-                field="description"
-                rowId={g.gid}
-                onSave={(f, v) => saveField(g, f, v)}
-              />
-              <td>
-                {#if !isProtected(g.gid)}
-                  <button
-                    class="btn btn-danger"
-                    data-testid={`group-delete-button-${g.gid}`}
-                    onclick={() => (deleteTarget = g)}
-                    type="button"
-                  >
-                    {$t("common.delete")}
-                  </button>
-                {/if}
-              </td>
-            </tr>
-          {/each}
-        {/if}
-      </tbody>
-    </table>
-  </div>
+      {/each}
+    {/snippet}
+  </Table>
 {/if}
 
 {#if deleteTarget}

@@ -5,6 +5,7 @@
   import { toast } from "../components/toast";
   import "./Home.scss";
 
+  let { groups = [] } = $props();
   let apps = $state<App[] | null>(null);
   let error = $state<string | null>(null);
 
@@ -18,19 +19,27 @@
   }
 
   onMount(fetchApps);
+
+  let visible = $derived(
+    apps?.filter(
+      (app) =>
+        (!app.required_group || groups.includes(app.required_group)) &&
+        (!app.forbidden_group || !groups.includes(app.forbidden_group)),
+    ),
+  );
 </script>
 
 <section>
   <h2>{$t("apps.title")}</h2>
   {#if error}
     <p data-testid="apps-error">{$t("common.error", { error: error ?? "" })}</p>
-  {:else if apps === null}
+  {:else if visible === undefined}
     <p data-testid="apps-loading">{$t("common.loading")}</p>
-  {:else if apps.length === 0}
+  {:else if visible.length === 0}
     <p data-testid="apps-empty">{$t("apps.empty")}</p>
   {:else}
     <ul class="apps">
-      {#each apps as app, i (`${app.name}-${app.url}`)}
+      {#each visible as app, i (`${app.name}-${app.url}`)}
         <li data-testid={`app-${i}`}>
           <a
             class="app-link"

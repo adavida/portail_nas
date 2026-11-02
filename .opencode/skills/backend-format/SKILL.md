@@ -1,6 +1,6 @@
 ---
 name: backend-format
-description: Enforce Rust backend formatting (rustfmt via treefmt) + clippy lints — use when editing backend/src, Cargo.toml, or any .rs file.
+description: Enforce Rust backend formatting (rustfmt via treefmt) + clippy lints — use when editing backend/*/src, Cargo.toml, or any .rs file.
 ---
 
 # backend-format

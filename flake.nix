@@ -1,5 +1,5 @@
 {
-  description = "Portail — backend Rust axum + frontend React Vite, NixOS module (backend service only — nginx/OpenLDAP/Authelia provisioned by the host)";
+  description = "Portail — backend Rust axum + frontend React Vite, NixOS module (backend service only — nginx/OpenLDAP provisioned by the host)";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
@@ -26,10 +26,12 @@
 
       devShells.${system}.default = pkgs.mkShell {
         packages = with pkgs; [
+          acl
           cargo
           clippy
           openssl
           pkg-config
+          rtk
           rustc
           rustfmt
         ];

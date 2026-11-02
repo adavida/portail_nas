@@ -1,16 +1,16 @@
 ---
 name: backend-structure
-description: Enforce backend file layout domain/http/controllers + serde JSON contracts — use when adding http handlers, controllers, or domain types in backend/src.
+description: Enforce backend file layout domain/http/controllers + serde JSON contracts — use when adding http handlers, controllers, or domain types in backend/*/src.
 ---
 
 # backend-structure
 
 ## Rule — `main.rs` + `http/` seuls axum, `lib.rs` re-export, `controllers/`/`domain`/`error.rs` sans axum
 
-Source of truth: `backend/src/main.rs:4` + `backend/src/http/mod.rs:1` + `backend/src/lib.rs:6` re-export.
+Source of truth: `backend/server/src/main.rs` + `backend/server/src/http/mod.rs` + `backend/server/src/lib.rs` re-export.
 
 ```
-backend/src/
+backend/*/src/
   main.rs                  # boot seul: app() + TcpListener + axum::serve (seul avec http/ a le droit d'importer axum)
   lib.rs                   # pub mod domain/http/controllers/error/repository + pub use http::router as app (pas de use axum)
   http/mod.rs              # pub mod error/health/users + pub fn router()->Router + pub use Router (axum ici)
@@ -59,11 +59,11 @@ backend/src/
 
 ### Axum isolation — seul `main.rs` + `http/`
 
-- Seuls `main.rs` (`axum::serve`) et `http/**` (`Router`, `Json`, `IntoResponse`) importent `axum` en prod. Interdit en prod: `use axum` dans `lib.rs` (hors `#[cfg(test)]`), `controllers/**`, `domain/**`, `error.rs`, `repository/**`. Vérif: `rg -n "use axum|axum\." backend/src --glob '!http/**' --glob '!main.rs' | grep -v "cfg(test)"` doit être vide.
+- Seuls `main.rs` (`axum::serve`) et `http/**` (`Router`, `Json`, `IntoResponse`) importent `axum` en prod. Interdit en prod: `use axum` dans `lib.rs` (hors `#[cfg(test)]`), `controllers/**`, `domain/**`, `error.rs`, `repository/**`. Vérif: `rg -n "use axum|axum\." backend/*/src --glob '!http/**' --glob '!main.rs' | grep -v "cfg(test)"` doit être vide.
 
 ### Ldap isolation — seul `repository/ldap.rs`
 
-- Seul `repository/ldap.rs` importe `ldap3` (LdapConnAsync, Mod, Scope, SearchEntry). Interdit: `use ldap3` dans `controllers/**`, `domain/**`, `http/**`, `error.rs`. `domain/*/from_search` prend `HashMap` pur, pas `SearchEntry`. Vérif: `rg -n "ldap3" backend/src/domain backend/src/controllers backend/src/http backend/src/error.rs` doit être vide.
+- Seul `repository/ldap.rs` importe `ldap3` (LdapConnAsync, Mod, Scope, SearchEntry). Interdit: `use ldap3` dans `controllers/**`, `domain/**`, `http/**`, `error.rs`. `domain/*/from_search` prend `HashMap` pur, pas `SearchEntry`. Vérif: `rg -n "ldap3" backend/oidc/src backend/server/src` doit être vide.
 
 ### Serde contracts
 
@@ -77,6 +77,6 @@ backend/src/
 ```bash
 devenv shell -- cargo clippy -- -D warnings   # 0 warning
 devenv shell -- cargo test                    # collocalisés
-rg -n "pub enum.*Error" backend/src --glob '*/mod.rs'   # vide (hors sub-modules)
-rg -n "allow\(clippy::module_inception\)" backend/src   # vide
+rg -n "pub enum.*Error" backend/*/src --glob '*/mod.rs'   # vide (hors sub-modules)
+rg -n "allow\(clippy::module_inception\)" backend/*/src   # vide
 ```

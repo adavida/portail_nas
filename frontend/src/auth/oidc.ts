@@ -2,7 +2,7 @@ export function getToken(): string | null {
   return localStorage.getItem("access_token");
 }
 
-export function setTokens(data: {
+function setTokens(data: {
   access_token: string;
   id_token?: string;
   refresh_token?: string;
@@ -23,21 +23,6 @@ export function authHeader(): Record<string, string> {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-export function isAdmin(): boolean {
-  const token = localStorage.getItem("id_token") ?? getToken();
-  if (!token) return false;
-  try {
-    const payload = token.split(".")[1];
-    const json = JSON.parse(
-      atob(payload.replace(/-/g, "+").replace(/_/g, "/")),
-    );
-    const groups: string[] = json.groups ?? [];
-    return groups.includes("admin");
-  } catch {
-    return false;
-  }
-}
-
 export function installAuthFetch() {
   const orig = window.fetch;
   window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
@@ -50,7 +35,8 @@ export function installAuthFetch() {
       resp.status === 401 &&
       !String(input).includes("/api/auth/config") &&
       !String(input).includes("/api/auth/callback") &&
-      !String(input).includes("/api/auth/me")
+      !String(input).includes("/api/auth/me") &&
+      !String(input).includes("/api/oidc/login")
     ) {
       if (sessionStorage.getItem("login_in_progress") !== "1") {
         clearTokens();
@@ -62,7 +48,7 @@ export function installAuthFetch() {
   };
 }
 
-export async function fetchAuthConfig(): Promise<{
+async function fetchAuthConfig(): Promise<{
   issuer: string;
   client_id: string;
   redirect_uri: string;
@@ -79,9 +65,6 @@ function b64url(bytes: Uint8Array): string {
     .replace(/=+$/, "");
 }
 
-// PKCE S256: Authelia exige un code_challenge pour l'authorization_code flow.
-// Sauve le verifier en sessionStorage — `login()` le crée, `handleCallback()`
-// l'envoie au backend qui le passe à l'endpoint token.
 async function savePkce(): Promise<string> {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const digest = await crypto.subtle.digest(
@@ -97,7 +80,6 @@ export async function login() {
   const state =
     globalThis.crypto?.randomUUID?.() ??
     Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-  // Authelia exige state >= 8 chars
   const safeState = state.replace(/-/g, "").slice(0, 32).padEnd(16, "0");
   sessionStorage.setItem("oidc_state", safeState);
   const challenge = await savePkce();
@@ -136,9 +118,5 @@ export async function logout() {
   const { OIDC_ISSUER_URL, APP_URL } = await import("../env");
   clearTokens();
   sessionStorage.setItem("logged_out", "1");
-  // Navigation top-level vers le /logout natif d'Authelia: same-site donc
-  // session cookie envoyé, le portal POST /api/logout lui-même (iframe POST
-  // cross-site = cookie SameSite=Lax non envoyé = session survivait).
-  // `rd` doit matcher le domaine du cookie (127.0.0.1) pour revenir au portail.
   window.location.href = `${OIDC_ISSUER_URL}/logout?rd=${encodeURIComponent(`${APP_URL}/`)}`;
 }

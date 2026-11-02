@@ -16,7 +16,6 @@
 
   let { group, canDelete, onClose, onUpdated, onDeleted }: Props = $props();
 
-  // draft initialisé une fois : le modal est remonté à chaque ouverture
   let name = $state(untrack(() => group.name));
   let description = $state(untrack(() => group.description));
   let confirmDelete = $state(false);

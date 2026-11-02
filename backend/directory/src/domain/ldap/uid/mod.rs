@@ -1,0 +1,116 @@
+pub mod errors;
+pub use errors::UidError;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct Uid(String);
+
+impl Uid {
+    pub fn try_new(raw: String) -> Result<Self, UidError> {
+        let trimmed = raw.trim().to_string();
+        if trimmed.is_empty() {
+            return Err(UidError::Empty);
+        }
+        if trimmed.len() < 2 || trimmed.len() > 32 {
+            return Err(UidError::InvalidFormat);
+        }
+        if !trimmed.chars().all(|c| {
+            c.is_ascii_lowercase() || c.is_ascii_digit() || c == '.' || c == '_' || c == '-'
+        }) {
+            return Err(UidError::InvalidFormat);
+        }
+        Ok(Self(trimmed))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Uid {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = String::deserialize(deserializer)?;
+        Self::try_new(raw).map_err(serde::de::Error::custom)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_valid() {
+        let uid = Uid::try_new("bob".into()).unwrap();
+
+        assert_eq!(uid.as_str(), "bob", "valid uid should be kept as is");
+    }
+
+    #[test]
+    fn trims_whitespace() {
+        let uid = Uid::try_new("  bob  ".into()).unwrap();
+
+        assert_eq!(uid.as_str(), "bob", "uid should be trimmed");
+    }
+
+    #[test]
+    fn rejects_empty() {
+        let err = Uid::try_new("".into()).unwrap_err();
+
+        assert_eq!(err, UidError::Empty, "empty uid should be Empty");
+    }
+
+    #[test]
+    fn rejects_blank() {
+        let err = Uid::try_new("   ".into()).unwrap_err();
+
+        assert_eq!(err, UidError::Empty, "blank uid should be Empty");
+    }
+
+    #[test]
+    fn rejects_invalid_chars() {
+        let err = Uid::try_new("Bob".into()).unwrap_err();
+
+        assert_eq!(err, UidError::InvalidFormat, "uppercase should be invalid");
+    }
+
+    #[test]
+    fn rejects_too_short() {
+        let err = Uid::try_new("a".into()).unwrap_err();
+
+        assert_eq!(err, UidError::InvalidFormat, "uid len <2 should be invalid");
+    }
+
+    #[test]
+    fn rejects_too_long() {
+        let err = Uid::try_new("a".repeat(33)).unwrap_err();
+
+        assert_eq!(
+            err,
+            UidError::InvalidFormat,
+            "uid len >32 should be invalid"
+        );
+    }
+
+    #[test]
+    fn deserialize_validates() {
+        let json = "\"bob\"";
+
+        let uid: Uid = serde_json::from_str(json).unwrap();
+
+        assert_eq!(uid.as_str(), "bob");
+    }
+
+    #[test]
+    fn deserialize_rejects_invalid() {
+        let json = "\"\"";
+
+        let err = serde_json::from_str::<Uid>(json).unwrap_err();
+
+        assert!(
+            err.to_string().contains("uid is empty"),
+            "deserialize should propagate UidError"
+        );
+    }
+}

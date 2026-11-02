@@ -5,6 +5,8 @@ export type App = {
   url: string;
   description?: string;
   icon?: string | null;
+  required_group?: string;
+  forbidden_group?: string;
 };
 
 export function listApps() {

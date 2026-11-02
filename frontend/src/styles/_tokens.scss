@@ -1,7 +1,7 @@
-// Design tokens — toutes les valeurs du portail vivent ici.
-// Les couleurs thémées sont générées en variables CSS dans `_theme.scss`.
+// Design tokens — all portal values live here.
+// Themed colors are generated as CSS variables in `_theme.scss`.
 
-// Couleurs (variables CSS injectées par _theme.scss)
+// Colors (CSS variables injected by _theme.scss)
 @use "sass:map";
 
 $themes: (
@@ -63,7 +63,7 @@ $themes: (
   }
 }
 
-// Échelle d'espacement
+// Spacing scale
 $s-0: 0;
 $s-1: 1px;
 $s-2: 2px;
@@ -78,13 +78,13 @@ $s-20: 20px;
 $s-28: 28px;
 $s-32: 32px;
 
-// Rayons
+// Radii
 $r-sm: 8px;
 $r: 10px;
 $r-md: 12px;
 $r-pill: 999px;
 
-// Typo
+// Typography
 $font-family:
   system-ui,
   -apple-system,
@@ -106,7 +106,7 @@ $fw-heading: 650;
 $fw-bold: 700;
 $ls-caps: 0.03em;
 
-// Tailles & infra
+// Sizes & infra
 $pct: 100%;
 $lh-tight: 1;
 $sidebar-w: 248px;
