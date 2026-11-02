@@ -19,6 +19,7 @@ pub enum AppError {
     Unauthorized(String),
     Forbidden(String),
     InvalidClient(String),
+    MemberError(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -31,6 +32,7 @@ impl std::fmt::Display for AppError {
             Self::Unauthorized(m) => write!(f, "unauthorized: {m}"),
             Self::Forbidden(m) => write!(f, "forbidden: {m}"),
             Self::InvalidClient(m) => write!(f, "invalid client: {m}"),
+            Self::MemberError(m) => write!(f, "member: {m}"),
         }
     }
 }
@@ -60,7 +62,7 @@ impl IntoResponse for AppError {
                 tracing::warn!("403 {}", m);
                 (StatusCode::FORBIDDEN, m, false)
             }
-            Self::Ldap(m) | Self::Internal(m) => {
+            Self::Ldap(m) | Self::Internal(m) | Self::MemberError(m) => {
                 tracing::error!("500 {}", m);
                 (StatusCode::INTERNAL_SERVER_ERROR, m, false)
             }

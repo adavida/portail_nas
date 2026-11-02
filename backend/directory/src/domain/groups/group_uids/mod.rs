@@ -1,4 +1,4 @@
-use crate::domain::ldap::{Gid, Uid};
+use crate::domain::ldap::{Cn, Gid, Uid};
 use crate::domain::users::User;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -10,10 +10,24 @@ pub struct GroupUids {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Members {
     Uid(Uid),
-    Cn(Gid),
+    Cn(Cn),
 }
 
 impl Members {
+    pub fn member_uids(member_dns: &[String]) -> Vec<Self> {
+        member_dns.iter().filter_map(|dn| Self::from(dn)).collect()
+    }
+
+    pub fn from(dn: &str) -> Option<Self> {
+        let (kind, rest) = dn.split_once('=')?;
+        let first = rest.split(',').next()?;
+        match kind.to_ascii_lowercase().as_str() {
+            "uid" => Uid::try_new(first.to_string()).map(Self::Uid).ok(),
+            "cn" => Cn::try_new(first.to_string()).map(Self::Cn).ok(),
+            _ => None,
+        }
+    }
+
     fn contains_user(&self, user: &User) -> bool {
         match self {
             Members::Uid(uid) => uid == &user.uid,
@@ -27,7 +41,7 @@ impl GroupUids {
         let gid = Gid::try_new(cn?).ok()?;
         Some(Self {
             gid,
-            members: member_uids(member_dns),
+            members: Members::member_uids(member_dns),
         })
     }
 
@@ -39,21 +53,6 @@ impl GroupUids {
     }
 }
 
-pub fn member_uids(member_dns: &[String]) -> Vec<Members> {
-    member_dns
-        .iter()
-        .filter_map(|dn| {
-            let (kind, rest) = dn.split_once('=')?;
-            let first = rest.split(',').next()?;
-            match kind.to_ascii_lowercase().as_str() {
-                "uid" => Uid::try_new(first.to_string()).map(Members::Uid).ok(),
-                "cn" => Gid::try_new(first.to_string()).map(Members::Cn).ok(),
-                _ => None,
-            }
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,7 +62,7 @@ mod tests {
     #[test]
     fn member_dns_map_to_members() {
         let base = "dc=dev,dc=example,dc=com";
-        let members = member_uids(&[
+        let members = Members::member_uids(&[
             format!("uid=alice,ou=people,{base}"),
             format!("uid=bob,ou=people,{base}"),
             format!("cn=devs,ou=groups,{base}"),
@@ -78,10 +77,50 @@ mod tests {
             members[1],
             Members::Uid(Uid::try_new("bob".into()).unwrap())
         );
+        assert_eq!(members[2], Members::Cn(Cn::try_new("devs".into()).unwrap()));
+    }
+
+    #[test]
+    fn from_parses_uid_dn() {
+        let member = Members::from("uid=alice,ou=people,dc=dev,dc=example,dc=com");
+
         assert_eq!(
-            members[2],
-            Members::Cn(Gid::try_new("devs".into()).unwrap())
+            member,
+            Some(Members::Uid(Uid::try_new("alice".into()).unwrap())),
+            "uid DN should decode to Members::Uid"
         );
+    }
+
+    #[test]
+    fn from_parses_cn_dn() {
+        let member = Members::from("cn=devs,ou=groups,dc=dev,dc=example,dc=com");
+
+        assert_eq!(
+            member,
+            Some(Members::Cn(Cn::try_new("devs".into()).unwrap())),
+            "cn DN should decode to Members::Cn"
+        );
+    }
+
+    #[test]
+    fn from_rejects_unknown_kind() {
+        let member = Members::from("ou=people,dc=dev,dc=example,dc=com");
+
+        assert_eq!(member, None, "non uid/cn kind should yield None");
+    }
+
+    #[test]
+    fn from_rejects_dn_without_equals() {
+        let member = Members::from("alice-people-dev");
+
+        assert_eq!(member, None, "DN without '=' should yield None");
+    }
+
+    #[test]
+    fn from_rejects_invalid_uid() {
+        let member = Members::from("uid=Alice!,ou=people,dc=dev,dc=example,dc=com");
+
+        assert_eq!(member, None, "invalid uid characters should yield None");
     }
 
     #[test]

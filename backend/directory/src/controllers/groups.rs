@@ -1,5 +1,5 @@
 use crate::{
-    domain::groups::{Group, NewGroup, UpdateGroup, group_uids::Members},
+    domain::groups::{Group, NewGroup, UpdateGroup},
     domain::ldap::{Gid, Uid},
     repository::ldap as ldap_repo,
 };
@@ -44,21 +44,13 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
             "group user is mandatory: members cannot be removed".to_string(),
         ));
     }
-    let group = ldap_repo::list_uids()
     let maybe_group = ldap_repo::list_uids()
         .await?
         .into_iter()
         .find(|g| g.gid == gid);
-    if let Some(group) = group {
-        let is_last = group
-            .members
-            .iter()
-            .all(|m| *m == Members::Uid(uid.clone()));
+    let user_member = ldap_repo::find_user_members(&uid).await?;
     if let Some(group) = maybe_group {
-        let is_last = group.members.iter().all(|m| match m {
-            Members::Uid(u) => u == &uid,
-            Members::Cn(_) => false,
-        });
+        let is_last = group.members.iter().all(|m| *m == user_member);
         tracing::info!("{:#?}", group.members);
         if is_last && is_protected(&gid) {
             return Err(AppError::Forbidden(format!(
@@ -67,12 +59,11 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
             )));
         }
         if is_last {
-            return ldap_repo::delete_group(gid).await;
             ldap_repo::delete_group(gid).await
         } else {
             ldap_repo::remove_member(gid, uid).await
         }
     } else {
-        ldap_repo::remove_member(gid, uid).await
+        Ok(())
     }
 }
