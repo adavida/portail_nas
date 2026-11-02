@@ -86,6 +86,15 @@
     color: var(--c-muted);
   }
 
+  &.param-table {
+    width: auto;
+
+    th,
+    td {
+      text-align: left;
+    }
+  }
+
   td {
     vertical-align: top;
   }
@@ -159,6 +168,10 @@
 .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll + .table-scroll {
+  margin-top: $s-16;
 }
 
 .row-actions {
