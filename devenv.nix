@@ -189,15 +189,19 @@ in
       app_url = "$APP_URL"
       bind_addr = "$BIND_ADDR"
       db_path = "db/portail.db"
-      ldap_url = "$LDAP_URL"
-      ldap_base_dn = "$LDAP_BASE_DN"
-      ldap_tls_ca = "$LDAP_TLS_CA"
-      oidc_issuer_url = "$OIDC_ISSUER_URL"
-      oidc_client_id = "$OIDC_CLIENT_ID"
-      oidc_redirect_uri = "$OIDC_REDIRECT_URI"
-      oidc_secrets_dir = "$OIDC_SECRETS_DIR"
-      oidc_clients = [{ id = "$OIDC_CLIENT_ID", secret_file = "$OIDC_CLIENT_ID_secret", enabled = true, redirect_uris = ["$OIDC_REDIRECT_URI"], scopes = ["openid","profile","email","groups"] }, { id = "oauth-debugger", enabled = false, redirect_uris = ["http://127.0.0.1:3030/callback"], scopes = ["openid","profile","email","groups"] }]
       system_sensors = ["memory","cpu","network","disk"]
+
+      [ldap]
+      url = "$LDAP_URL"
+      base_dn = "$LDAP_BASE_DN"
+      tls_ca = "$LDAP_TLS_CA"
+
+      [oidc]
+      issuer_url = "$OIDC_ISSUER_URL"
+      client_id = "$OIDC_CLIENT_ID"
+      redirect_uri = "$OIDC_REDIRECT_URI"
+      secrets_dir = "$OIDC_SECRETS_DIR"
+      clients = [{ id = "$OIDC_CLIENT_ID", secret_file = "$OIDC_CLIENT_ID_secret", enabled = true, redirect_uris = ["$OIDC_REDIRECT_URI"], scopes = ["openid","profile","email","groups"] }, { id = "oauth-debugger", enabled = false, redirect_uris = ["http://127.0.0.1:3030/callback"], scopes = ["openid","profile","email","groups"] }]
       EOF
       cargo watch -w backend -x "run -p portail-server -- --config $PORTAIL_CONFIG_FILE"
     '';

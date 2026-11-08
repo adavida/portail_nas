@@ -9,7 +9,7 @@ Un nom de variable/fonction/paramètre/struct/VO s'exprime en **anglais, complet
 ## Noms
 
 - Anglais partout: identifiants, paramètres, noms de tests (`concurrent_creates_both_join_the_default_group`), messages d'assertion.
-- Précis sur le domaine: `oidc_key_bits` pas `bits`; `generate_signing_key` pas `gen_key`; booléens en `is_/has_/allows_`.
+- Précis sur le domaine: `oidc.key_bits` pas `bits`; `generate_signing_key` pas `gen_key`; booléens en `is_/has_/allows_`.
 - Un nom trop court pour être clair est un mauvais nom — pas une raison pour écrire un commentaire.
 - Abréviations acceptées seulement si déjà universelles dans le code: `uid`, `gid`, `dn`, `ou`, `vo`, `pkce`, `jwks`, `oidc`, `pem`.
 

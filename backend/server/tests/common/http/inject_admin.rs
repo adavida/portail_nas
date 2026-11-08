@@ -5,10 +5,12 @@ pub async fn inject_admin(mut req: Request, next: Next) -> Result<Response, Stat
     let claims = Claims {
         sub: "admin".into(),
         aud: portail_core::config::Config::global()
-            .oidc_client_id
+            .oidc
+            .client_id
             .clone(),
         iss: portail_core::config::Config::global()
-            .oidc_issuer_url
+            .oidc
+            .issuer_url
             .as_str()
             .to_string(),
         iat: 0,

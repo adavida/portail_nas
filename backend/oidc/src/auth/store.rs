@@ -33,7 +33,7 @@ fn store() -> &'static Mutex<Store> {
 }
 
 pub(crate) fn random_id() -> Result<String, String> {
-    let mut buf = vec![0u8; Config::global().oidc_id_bytes];
+    let mut buf = vec![0u8; Config::global().oidc.id_bytes];
     let mut file = std::fs::File::open("/dev/urandom")
         .map_err(|e| format!("cannot read /dev/urandom: {e}"))?;
     file.read_exact(&mut buf)
@@ -49,14 +49,14 @@ fn prune<T>(map: &mut HashMap<String, (T, Instant)>, ttl: Duration) {
 pub fn save_pending(flow: AuthFlow) -> Result<String, String> {
     let id = random_id()?;
     let mut guard = store().lock().map_err(|e| e.to_string())?;
-    prune(&mut guard.pending, Config::global().oidc_pending_ttl);
+    prune(&mut guard.pending, Config::global().oidc.pending_ttl);
     guard.pending.insert(id.clone(), (flow, Instant::now()));
     Ok(id)
 }
 
 pub fn take_pending(id: &str) -> Option<AuthFlow> {
     let mut guard = store().lock().ok()?;
-    prune(&mut guard.pending, Config::global().oidc_pending_ttl);
+    prune(&mut guard.pending, Config::global().oidc.pending_ttl);
     let flow = guard.pending.remove(id).map(|(f, _)| f);
     if flow.is_some() {
         guard.login_failures.remove(id);
@@ -68,7 +68,7 @@ pub fn record_login_failure(req_id: &str) {
     let Ok(mut guard) = store().lock() else {
         return;
     };
-    prune(&mut guard.login_failures, Config::global().oidc_pending_ttl);
+    prune(&mut guard.login_failures, Config::global().oidc.pending_ttl);
     guard
         .login_failures
         .entry(req_id.to_string())
@@ -80,12 +80,12 @@ pub fn login_attempts_exceeded(req_id: &str) -> bool {
     let Ok(guard) = store().lock() else {
         return false;
     };
-    let max_attempts = Config::global().login_max_attempts;
+    let max_attempts = Config::global().security.login_max_attempts;
     guard
         .login_failures
         .get(req_id)
         .is_some_and(|(count, born)| {
-            *count >= max_attempts && born.elapsed() < Config::global().oidc_pending_ttl
+            *count >= max_attempts && born.elapsed() < Config::global().oidc.pending_ttl
         })
 }
 
@@ -96,27 +96,27 @@ pub fn has_pending(id: &str) -> bool {
     guard
         .pending
         .get(id)
-        .is_some_and(|(_, born)| born.elapsed() < Config::global().oidc_pending_ttl)
+        .is_some_and(|(_, born)| born.elapsed() < Config::global().oidc.pending_ttl)
 }
 
 pub fn save_code(flow: AuthFlow) -> Result<String, String> {
     let id = random_id()?;
     let mut guard = store().lock().map_err(|e| e.to_string())?;
-    prune(&mut guard.codes, Config::global().oidc_code_ttl);
+    prune(&mut guard.codes, Config::global().oidc.code_ttl);
     guard.codes.insert(id.clone(), (flow, Instant::now()));
     Ok(id)
 }
 
 pub fn take_code(code: &str) -> Option<AuthFlow> {
     let mut guard = store().lock().ok()?;
-    prune(&mut guard.codes, Config::global().oidc_code_ttl);
+    prune(&mut guard.codes, Config::global().oidc.code_ttl);
     guard.codes.remove(code).map(|(f, _)| f)
 }
 
 pub fn create_session(sub: &str) -> Result<String, String> {
     let id = random_id()?;
     let mut guard = store().lock().map_err(|e| e.to_string())?;
-    prune(&mut guard.sessions, Config::global().oidc_session_ttl);
+    prune(&mut guard.sessions, Config::global().oidc.session_ttl);
     guard
         .sessions
         .insert(id.clone(), (sub.to_string(), Instant::now()));
@@ -125,7 +125,7 @@ pub fn create_session(sub: &str) -> Result<String, String> {
 
 pub fn session_sub(sid: &str) -> Option<String> {
     let mut guard = store().lock().ok()?;
-    prune(&mut guard.sessions, Config::global().oidc_session_ttl);
+    prune(&mut guard.sessions, Config::global().oidc.session_ttl);
     guard.sessions.get(sid).map(|(sub, _)| sub.clone())
 }
 
@@ -158,7 +158,7 @@ mod tests {
         let req = "fail-counter-req";
         let exceeded_before = login_attempts_exceeded(req);
 
-        for _ in 0..Config::global().login_max_attempts {
+        for _ in 0..Config::global().security.login_max_attempts {
             record_login_failure(req);
         }
         let exceeded_after = login_attempts_exceeded(req);
@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn take_pending_clears_login_failures() {
         let req = save_pending(flow("erin")).unwrap();
-        for _ in 0..Config::global().login_max_attempts {
+        for _ in 0..Config::global().security.login_max_attempts {
             record_login_failure(&req);
         }
 

@@ -125,7 +125,8 @@ mod tests {
 
     fn env_redirect() -> String {
         portail_core::config::Config::global()
-            .oidc_redirect_uri
+            .oidc
+            .redirect_uri
             .clone()
     }
 
@@ -150,7 +151,8 @@ mod tests {
     async fn authorize_rejects_unregistered_redirect_uri() {
         let app = app();
         let client_id = portail_core::config::Config::global()
-            .oidc_client_id
+            .oidc
+            .client_id
             .as_str();
         let req = Request::builder()
             .uri(format!("/api/oidc/authorization?client_id={client_id}&redirect_uri=https%3A%2F%2Fevil.example&response_type=code"))
@@ -173,7 +175,7 @@ mod tests {
         let req = Request::builder()
             .uri(format!(
                 "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=code&scope=openid&state=state123456&code_challenge=chal&code_challenge_method=S256",
-                config.oidc_client_id,
+                config.oidc.client_id,
                 urlencoding(&env_redirect()),
             ))
             .body(Body::empty())
@@ -212,7 +214,7 @@ mod tests {
         let req = Request::builder()
             .uri(format!(
                 "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=token&scope=openid&state=stabc",
-                config.oidc_client_id,
+                config.oidc.client_id,
                 urlencoding(&env_redirect()),
             ))
             .body(Body::empty())
@@ -245,7 +247,7 @@ mod tests {
         let req = Request::builder()
             .uri(format!(
                 "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=code&scope=groups%20email",
-                config.oidc_client_id,
+                config.oidc.client_id,
                 urlencoding(&env_redirect()),
             ))
             .body(Body::empty())
@@ -272,7 +274,7 @@ mod tests {
         let req = Request::builder()
             .uri(format!(
                 "/api/oidc/authorization?client_id={}&redirect_uri={}&response_type=code&scope=openid&code_challenge=chal&code_challenge_method=plain",
-                config.oidc_client_id,
+                config.oidc.client_id,
                 urlencoding(&env_redirect()),
             ))
             .body(Body::empty())

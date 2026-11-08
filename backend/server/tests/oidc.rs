@@ -21,7 +21,8 @@ async fn discovery_advertises_endpoints() {
 
     assert_eq!(status, StatusCode::OK, "discovery must be 200");
     let iss = portail_core::config::Config::global()
-        .oidc_issuer_url
+        .oidc
+        .issuer_url
         .as_str()
         .trim_end_matches('/')
         .to_string();
@@ -46,13 +47,15 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         return;
     }
     let redirect_uri = portail_core::config::Config::global()
-        .oidc_redirect_uri
+        .oidc
+        .redirect_uri
         .as_str();
     let state = "state1234567890";
 
     let url = auth_url(
         portail_core::config::Config::global()
-            .oidc_client_id
+            .oidc
+            .client_id
             .as_str(),
         redirect_uri,
         state,
@@ -167,7 +170,8 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         Method::GET,
         &auth_url(
             portail_core::config::Config::global()
-                .oidc_client_id
+                .oidc
+                .client_id
                 .as_str(),
             redirect_uri,
             "state2",
@@ -272,12 +276,14 @@ async fn token_rejects_wrong_pkce_verifier() {
         return;
     }
     let redirect_uri = portail_core::config::Config::global()
-        .oidc_redirect_uri
+        .oidc
+        .redirect_uri
         .as_str();
 
     let url = auth_url(
         portail_core::config::Config::global()
-            .oidc_client_id
+            .oidc
+            .client_id
             .as_str(),
         redirect_uri,
         "stpkce",
@@ -363,12 +369,14 @@ async fn login_rejects_wrong_password() {
         return;
     }
     let redirect_uri = portail_core::config::Config::global()
-        .oidc_redirect_uri
+        .oidc
+        .redirect_uri
         .as_str();
 
     let url = auth_url(
         portail_core::config::Config::global()
-            .oidc_client_id
+            .oidc
+            .client_id
             .as_str(),
         redirect_uri,
         "stwrp",
@@ -417,11 +425,13 @@ async fn login_same_req_still_works_after_wrong_password() {
     }
     assert_eq!(status, StatusCode::CREATED);
     let redirect_uri = portail_core::config::Config::global()
-        .oidc_redirect_uri
+        .oidc
+        .redirect_uri
         .as_str();
     let url = auth_url(
         portail_core::config::Config::global()
-            .oidc_client_id
+            .oidc
+            .client_id
             .as_str(),
         redirect_uri,
         "stlsw",
@@ -511,10 +521,12 @@ async fn login_rejects_unknown_req() {
 async fn login_caps_attempts_per_req() {
     let url = auth_url(
         portail_core::config::Config::global()
-            .oidc_client_id
+            .oidc
+            .client_id
             .as_str(),
         portail_core::config::Config::global()
-            .oidc_redirect_uri
+            .oidc
+            .redirect_uri
             .as_str(),
         "stcaps",
     );
@@ -527,7 +539,10 @@ async fn login_caps_attempts_per_req() {
     let req_id = req_id_from(&location);
     assert!(!req_id.is_empty(), "authorize must hand out a login req");
 
-    for _ in 0..portail_core::config::Config::global().login_max_attempts {
+    for _ in 0..portail_core::config::Config::global()
+        .security
+        .login_max_attempts
+    {
         portail_oidc::auth::store::record_login_failure(&req_id);
     }
 
@@ -564,7 +579,8 @@ async fn login_caps_attempts_per_req() {
 async fn authorize_requires_registered_redirect_uri() {
     let url = auth_url(
         portail_core::config::Config::global()
-            .oidc_client_id
+            .oidc
+            .client_id
             .as_str(),
         "https://evil.example/cb",
         "stevil",

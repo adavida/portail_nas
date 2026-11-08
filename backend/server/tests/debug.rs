@@ -18,7 +18,8 @@ async fn debug_returns_oidc_info_for_admin() {
         body["issuer"].as_str(),
         Some(
             portail_core::config::Config::global()
-                .oidc_issuer_url
+                .oidc
+                .issuer_url
                 .as_str()
         ),
         "issuer should match the config"

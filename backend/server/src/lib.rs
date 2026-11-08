@@ -93,8 +93,8 @@ mod tests {
 
     #[tokio::test]
     async fn users_lists_seeded_user() {
-        let url = portail_core::config::Config::global().ldap_url.as_str();
-        let base = portail_core::config::Config::global().ldap_base_dn.as_str();
+        let url = portail_core::config::Config::global().ldap.url.as_str();
+        let base = portail_core::config::Config::global().ldap.base_dn.as_str();
 
         if let Ok((conn, mut ldap)) = ldap3::LdapConnAsync::new(url).await {
             ldap3::drive!(conn);

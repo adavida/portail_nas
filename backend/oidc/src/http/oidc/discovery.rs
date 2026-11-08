@@ -21,7 +21,7 @@ pub struct Discovery {
 }
 
 pub async fn discovery(State(config): State<Config>) -> Json<Discovery> {
-    let iss = config.oidc_issuer_url.trim_end_matches('/').to_string();
+    let iss = config.oidc.issuer_url.trim_end_matches('/').to_string();
     Json(Discovery {
         authorization_endpoint: format!("{iss}/api/oidc/authorization"),
         token_endpoint: format!("{iss}/api/oidc/token"),
@@ -61,7 +61,8 @@ mod tests {
         let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
         let iss = portail_core::config::Config::global()
-            .oidc_issuer_url
+            .oidc
+            .issuer_url
             .trim_end_matches('/')
             .to_string();
         assert_eq!(v["issuer"], iss, "issuer must match config");

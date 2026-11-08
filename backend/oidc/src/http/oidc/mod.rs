@@ -43,7 +43,7 @@ pub(crate) fn session_id(headers: &HeaderMap) -> Option<String> {
 }
 
 pub(crate) fn session_cookie(config: &Config, sid: &str) -> String {
-    let secure = if config.oidc_issuer_url.starts_with("https://") {
+    let secure = if config.oidc.issuer_url.starts_with("https://") {
         "; Secure"
     } else {
         ""
@@ -188,10 +188,10 @@ mod tests {
     #[test]
     fn session_cookie_secure_only_on_https_issuer() {
         let mut config = portail_core::config::Config::global().clone();
-        config.oidc_issuer_url = "https://portail.example.com".into();
+        config.oidc.issuer_url = "https://portail.example.com".into();
 
         let secure = session_cookie(&config, "sid");
-        config.oidc_issuer_url = "http://127.0.0.1:3000".into();
+        config.oidc.issuer_url = "http://127.0.0.1:3000".into();
         let plain = session_cookie(&config, "sid");
 
         assert!(

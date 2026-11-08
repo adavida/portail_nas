@@ -10,7 +10,7 @@ pub struct Password(String);
 
 impl Password {
     pub fn try_new(raw: String) -> Result<Self, PasswordError> {
-        let min_length = Config::global().password_min_length;
+        let min_length = Config::global().security.password_min_length;
         if raw.is_empty() {
             return Err(PasswordError::Empty);
         }

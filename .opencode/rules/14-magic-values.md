@@ -14,10 +14,10 @@ Aucun nombre « magique » (non auto-explicable) dans le code de prod. Toute val
    - entry dans `log_summary()`;
    - assertion défaut + assertion valeur custom dans les tests `config/mod.rs`;
    - lecture unique du champ (`Config::global().<x>` ou champ déjà passé en paramètre), jamais de re-dérivation.
-     Exemples en place: `oidc_*_ttl_secs`, `oidc_key_bits`, `password_min_length`, `login_max_attempts`.
-     Une valeur crypto ne peut devenir clé que **montante** avec plancher validé par `Config::load` (rejet sous le plancher) — ex: `oidc_id_bytes` (défaut = plancher = 16, 32 autorisé, 4 refusé).
+     Exemples en place: `oidc.*_ttl_secs`, `oidc.key_bits`, `security.password_min_length`, `security.login_max_attempts`.
+     Une valeur crypto ne peut devenir clé que **montante** avec plancher validé par `Config::load` (rejet sous le plancher) — ex: `oidc.id_bytes` (défaut = plancher = 16, 32 autorisé, 4 refusé).
 2. **Constante de protocole ou de force cryptographique → `const` nommée, jamais configurable** (une fausse valeur = faille ou interop cassée): codes résultat LDAP (`LDAP_RESULT_SUCCESS`, `LDAP_RESULT_INVALID_CREDENTIALS`), algorithmes (`RS256`), `SESSION_COOKIE`.
-3. **Invariant de VO (règle 05) → bornes dans `try_new`** tant que le concept n'est pas déployable-variable: format `uid` 2..32 + regex, `name` ≤100, `email` ≤254. Une borne de VO qui devient tunable par déploiement migre en catégorie 1 (ex: `password_min_length`).
+3. **Invariant de VO (règle 05) → bornes dans `try_new`** tant que le concept n'est pas déployable-variable: format `uid` 2..32 + regex, `name` ≤100, `email` ≤254. Une borne de VO qui devient tunable par déploiement migre en catégorie 1 (ex: `security.password_min_length`).
 
 ## Interdits
 

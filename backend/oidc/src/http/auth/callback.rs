@@ -27,12 +27,12 @@ pub async fn callback(
     );
     let redirect_uri = payload
         .redirect_uri
-        .unwrap_or_else(|| config.oidc_redirect_uri.clone());
+        .unwrap_or_else(|| config.oidc.redirect_uri.clone());
     let clients = tokens::clients(&config)?;
-    let client = Client::find_in(&clients, &config.oidc_client_id).ok_or_else(|| {
+    let client = Client::find_in(&clients, &config.oidc.client_id).ok_or_else(|| {
         AppError::Internal(format!(
             "portal client '{}' not found in clients file",
-            config.oidc_client_id
+            config.oidc.client_id
         ))
     })?;
     let secret = crate::auth::secrets::stored_secret(&config, client)

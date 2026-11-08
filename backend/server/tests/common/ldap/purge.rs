@@ -5,9 +5,9 @@ use crate::common::config::set_test_config::set_test_config;
 
 async fn purge_ou(ou: &str) {
     let config = Config::global();
-    let url = config.ldap_url.clone();
-    let base = config.ldap_base_dn.clone();
-    let admin_pw = config.ldap_admin_pw.clone();
+    let url = config.ldap.url.clone();
+    let base = config.ldap.base_dn.clone();
+    let admin_pw = config.ldap.admin_pw.clone();
     let search_base = format!("ou={ou},{base}");
 
     let Ok((conn, mut ldap)) = LdapConnAsync::new(&url).await else {

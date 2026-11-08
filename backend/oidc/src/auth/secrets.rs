@@ -14,7 +14,7 @@ use portail_core::config::Config;
 pub const KEY_FILE: &str = "signing-key.pem";
 
 pub fn key_path(config: &Config) -> PathBuf {
-    Path::new(&config.oidc_secrets_dir).join(KEY_FILE)
+    Path::new(&config.oidc.secrets_dir).join(KEY_FILE)
 }
 
 pub fn secret_path(config: &Config, name: &str) -> PathBuf {
@@ -22,11 +22,11 @@ pub fn secret_path(config: &Config, name: &str) -> PathBuf {
     if path.is_absolute() {
         return path.to_path_buf();
     }
-    Path::new(&config.oidc_secrets_dir).join(path)
+    Path::new(&config.oidc.secrets_dir).join(path)
 }
 
 pub fn clients(config: &Config) -> Result<Vec<Client>, String> {
-    Client::from_entries(&config.oidc_clients).map_err(|e| e.to_string())
+    Client::from_entries(&config.oidc.clients).map_err(|e| e.to_string())
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -36,7 +36,7 @@ struct ClientOwner {
 }
 
 pub fn ensure(config: &Config) -> Result<(), String> {
-    let dir = &config.oidc_secrets_dir;
+    let dir = &config.oidc.secrets_dir;
     std::fs::create_dir_all(dir)
         .map_err(|e| format!("cannot create OIDC secrets dir {dir}: {e}"))?;
     std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
@@ -82,7 +82,7 @@ fn grant_dir_traverse(config: &Config, owners: Vec<&ClientOwner>, dir: &str) -> 
 
     setfacl(&[Path::new(dir)], &entries, None)
         .map_err(|e| format!("cannot set traverse ACL on {dir}: {e}"))?;
-    if config.oidc_secret_logs {
+    if config.oidc.secret_logs {
         let r = owners
             .iter()
             .map(|o| format!("u: {} g: {}", o.user, o.group))
@@ -94,11 +94,11 @@ fn grant_dir_traverse(config: &Config, owners: Vec<&ClientOwner>, dir: &str) -> 
 }
 
 fn parse_owners(config: &Config) -> Result<BTreeMap<String, ClientOwner>, String> {
-    if config.oidc_client_owners.trim().is_empty() {
+    if config.oidc.client_owners.trim().is_empty() {
         return Ok(BTreeMap::new());
     }
-    serde_json::from_str(&config.oidc_client_owners)
-        .map_err(|e| format!("cannot parse oidc_client_owners: {e}"))
+    serde_json::from_str(&config.oidc.client_owners)
+        .map_err(|e| format!("cannot parse oidc.client_owners: {e}"))
 }
 
 fn grant_owner_read(config: &Config, path: &Path, owner: &ClientOwner) -> Result<(), String> {
@@ -114,7 +114,7 @@ fn grant_owner_read(config: &Config, path: &Path, owner: &ClientOwner) -> Result
     entries.push(AclEntry::allow_group(&owner.group, Perm::READ, None));
     setfacl(&[path], &entries, None)
         .map_err(|e| format!("cannot set ACL on {}: {e}", path.display()))?;
-    if config.oidc_secret_logs {
+    if config.oidc.secret_logs {
         tracing::info!(
             "OIDC secret ACL read granted {}:{} on {}",
             owner.user,
@@ -162,10 +162,10 @@ pub(crate) fn read_key(config: &Config) -> Result<String, String> {
 }
 
 fn generate_signing_key(config: &Config) -> Result<String, String> {
-    let key = RsaPrivateKey::new(&mut rand::rngs::OsRng, config.oidc_key_bits).map_err(|e| {
+    let key = RsaPrivateKey::new(&mut rand::rngs::OsRng, config.oidc.key_bits).map_err(|e| {
         format!(
             "cannot generate {}-bit RSA signing key: {e}",
-            config.oidc_key_bits
+            config.oidc.key_bits
         )
     })?;
     key.to_pkcs8_pem(LineEnding::LF)
@@ -191,7 +191,7 @@ fn write_new(
                 .map(|m| m.len() > 0)
                 .unwrap_or(false)
             {
-                if config.oidc_secret_logs {
+                if config.oidc.secret_logs {
                     tracing::info!(
                         "OIDC secret file already exists, kept as-is: {}",
                         path.display()
@@ -229,7 +229,7 @@ fn write_new(
     if let Some(owner) = owner {
         grant_owner_read(config, path, owner)?;
     }
-    if config.oidc_secret_logs {
+    if config.oidc.secret_logs {
         tracing::info!("generated OIDC secret file: {}", path.display());
     }
     Ok(())
@@ -249,7 +249,7 @@ mod tests {
             tag,
             std::process::id()
         );
-        config.oidc_secrets_dir = dir.clone();
+        config.oidc.secrets_dir = dir.clone();
         config
     }
 
@@ -286,7 +286,7 @@ mod tests {
 
     fn confidential_clients(config: &Config, ids: &[&str]) -> Config {
         let mut config = config.clone();
-        config.oidc_clients = ids
+        config.oidc.clients = ids
             .iter()
             .map(|id| entry(id, Some(&format!("{id}_secret"))))
             .collect();
@@ -311,7 +311,7 @@ mod tests {
             "generated secret must be non-empty"
         );
         assert_eq!(mode, 0o600, "generated secret mode must be 0600");
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
@@ -327,7 +327,7 @@ mod tests {
             content, "admin-placed\n",
             "existing secret must be kept as-is"
         );
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
@@ -343,7 +343,7 @@ mod tests {
             !generated.trim().is_empty(),
             "an empty secret file must be regenerated, not kept as-is"
         );
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn clients_rejects_invalid_entry() {
         let mut config = test_env("invalid");
-        config.oidc_clients = vec![ClientEntry {
+        config.oidc.clients = vec![ClientEntry {
             id: "app1".into(),
             secret_file: None,
             enabled: true,
@@ -393,13 +393,13 @@ mod tests {
             Some("s3cr3t"),
             "secret must be read from the file, whitespace trimmed"
         );
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
     fn stored_secret_is_none_for_public_client() {
         let mut config = test_env("public");
-        config.oidc_clients = vec![entry("pub1", None)];
+        config.oidc.clients = vec![entry("pub1", None)];
         let clients = clients(&config).unwrap();
 
         let secret = stored_secret(&config, &clients[0]).unwrap();
@@ -421,14 +421,14 @@ mod tests {
         );
         assert!(!key.n.is_empty(), "modulus should be non-empty");
         assert!(!key.e.is_empty(), "exponent should be non-empty");
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
     fn ensure_grants_declared_owner_read_acl() {
         let (user, group) = current_owner();
         let mut config = confidential_clients(&test_env("acl"), &["app1"]);
-        config.oidc_client_owners =
+        config.oidc.client_owners =
             format!(r#"{{"app1": {{"user": "{user}", "group": "{group}"}}}}"#);
 
         ensure(&config).unwrap();
@@ -442,19 +442,19 @@ mod tests {
             .any(|e| e.name == group && e.perms.contains(Perm::READ));
         assert!(has_user, "declared user must have ACL read: {entries:?}");
         assert!(has_group, "declared group must have ACL read: {entries:?}");
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
     fn ensure_grants_owner_execute_acl_on_secrets_dir() {
         let (user, group) = current_owner();
         let mut config = confidential_clients(&test_env("dir-acl"), &["app1"]);
-        config.oidc_client_owners =
+        config.oidc.client_owners =
             format!(r#"{{"app1": {{"user": "{user}", "group": "{group}"}}}}"#);
 
         ensure(&config).unwrap();
 
-        let entries = getfacl(Path::new(&config.oidc_secrets_dir), None).unwrap();
+        let entries = getfacl(Path::new(&config.oidc.secrets_dir), None).unwrap();
         let has_user = entries
             .iter()
             .any(|e| e.name == user && e.perms.contains(Perm::EXECUTE));
@@ -466,13 +466,13 @@ mod tests {
             "owner needs dir traverse to reach its secret: {entries:?}"
         );
         assert!(has_group, "owner group needs dir traverse: {entries:?}");
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
     fn ensure_skips_acl_for_absent_declared_secret() {
         let mut config = test_env("acl-absent");
-        config.oidc_client_owners =
+        config.oidc.client_owners =
             r#"{"app2": {"user": "no-such-user-zz", "group": "no-such-group-zz"}}"#.to_string();
 
         let result = ensure(&config);
@@ -481,13 +481,13 @@ mod tests {
             result.is_ok(),
             "owner declared for a client absent from the entries should be skipped: {result:?}"
         );
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
     fn ensure_rejects_unknown_owner_of_existing_secret() {
         let mut config = confidential_clients(&test_env("acl-unknown"), &["app3"]);
-        config.oidc_client_owners =
+        config.oidc.client_owners =
             r#"{"app3": {"user": "no-such-user-zz", "group": "portail-no-such-zz"}}"#.to_string();
 
         let err = ensure(&config).unwrap_err();
@@ -496,18 +496,18 @@ mod tests {
             err.contains("unknown OIDC secret owner user"),
             "unknown user should be reported: {err}"
         );
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
     fn ensure_rejects_unparsable_owners() {
         let mut config = test_env("owners-bad");
-        config.oidc_client_owners = "not-json".to_string();
+        config.oidc.client_owners = "not-json".to_string();
 
         let err = ensure(&config).unwrap_err();
 
         assert!(
-            err.contains("cannot parse oidc_client_owners"),
+            err.contains("cannot parse oidc.client_owners"),
             "invalid JSON should be reported: {err}"
         );
     }
@@ -521,7 +521,7 @@ mod tests {
 
         assert_eq!(
             relative,
-            PathBuf::from(&config.oidc_secrets_dir).join("app1_secret"),
+            PathBuf::from(&config.oidc.secrets_dir).join("app1_secret"),
             "relative secret_file belongs in the secrets dir"
         );
         assert_eq!(

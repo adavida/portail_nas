@@ -39,7 +39,7 @@ pub async fn debug_claims(
         email: None,
     };
     enrich_flow(&mut flow).await?;
-    if let Some(entry) = config.oidc_clients.iter().find(|e| e.id == q.client_id) {
+    if let Some(entry) = config.oidc.clients.iter().find(|e| e.id == q.client_id) {
         if let Some(reason) = entry.gate_denial(&flow.groups) {
             return Err(AppError::Forbidden(format!(
                 "access to client '{}' denied: {reason}",

@@ -36,7 +36,7 @@ pub fn clients(config: &Config) -> Result<Vec<Client>, AppError> {
 }
 
 pub fn issuer(config: &Config) -> String {
-    config.oidc_issuer_url.trim_end_matches('/').to_string()
+    config.oidc.issuer_url.trim_end_matches('/').to_string()
 }
 
 fn secrets_match(presented: &str, stored: &str) -> bool {
@@ -79,7 +79,7 @@ pub fn exchange(
     if !check_pkce(verifier, flow.challenge.as_deref()) {
         return Err(AppError::BadRequest("invalid_grant".into()));
     }
-    if let Some(entry) = config.oidc_clients.iter().find(|e| e.id == client_id) {
+    if let Some(entry) = config.oidc.clients.iter().find(|e| e.id == client_id) {
         if let Some(reason) = entry.gate_denial(&flow.groups) {
             return Err(AppError::Forbidden(format!(
                 "access to client '{client_id}' denied: {reason}"
@@ -98,7 +98,7 @@ fn now() -> usize {
 
 pub fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppError> {
     let mut custom_claims = HashMap::new();
-    if let Some(entry) = config.oidc_clients.iter().find(|e| e.id == flow.client_id) {
+    if let Some(entry) = config.oidc.clients.iter().find(|e| e.id == flow.client_id) {
         for rule in &entry.custom_claims {
             if rule.applies_to(&flow.groups) {
                 custom_claims.insert(rule.name.clone(), rule.value.clone());
@@ -116,7 +116,7 @@ pub fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppErro
         aud: flow.client_id.clone(),
         iss: issuer(config),
         iat: now(),
-        exp: now() + config.oidc_access_ttl.as_secs() as usize,
+        exp: now() + config.oidc.access_ttl.as_secs() as usize,
         groups,
         email: flow
             .email
@@ -150,12 +150,12 @@ pub fn tokens_for(config: &Config, flow: &store::AuthFlow) -> Result<TokenRespon
         access_token: sign(&access_claims)?,
         id_token: sign(&id_claims)?,
         token_type: "Bearer",
-        expires_in: config.oidc_access_ttl.as_secs(),
+        expires_in: config.oidc.access_ttl.as_secs(),
     })
 }
 
 pub fn verify(config: &Config, token: &str) -> Result<Claims, AppError> {
-    decode_token(config, token, Some(&config.oidc_client_id))
+    decode_token(config, token, Some(&config.oidc.client_id))
 }
 
 pub fn verify_with_aud(config: &Config, token: &str, aud: &str) -> Result<Claims, AppError> {
@@ -197,14 +197,14 @@ mod tests {
 
     fn env_with_public_client(tag: &str) -> Config {
         let mut config = portail_core::config::Config::global().clone();
-        config.oidc_secrets_dir = format!(
+        config.oidc.secrets_dir = format!(
             "{}/portail-public-test-{tag}-{}",
             std::env::temp_dir().display(),
             std::process::id()
         );
-        std::fs::create_dir_all(&config.oidc_secrets_dir).unwrap();
-        config.db_path = format!("{}/portail.db", config.oidc_secrets_dir);
-        config.oidc_clients = vec![portail_core::config::ClientEntry {
+        std::fs::create_dir_all(&config.oidc.secrets_dir).unwrap();
+        config.db_path = format!("{}/portail.db", config.oidc.secrets_dir);
+        config.oidc.clients = vec![portail_core::config::ClientEntry {
             id: PUBLIC_ID.into(),
             secret_file: None,
             enabled: true,
@@ -445,7 +445,7 @@ mod tests {
             "groups claim itself stays filtered by scope, got {:?}",
             claims.groups
         );
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
@@ -480,7 +480,7 @@ mod tests {
             grounded, "yes",
             "not_group rule must be signed for a user outside that group"
         );
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
@@ -568,12 +568,12 @@ mod tests {
 
     fn env_with_secret_client(tag: &str, enabled: bool) -> Config {
         let mut config = portail_core::config::Config::global().clone();
-        config.oidc_secrets_dir = format!(
+        config.oidc.secrets_dir = format!(
             "{}/portail-confid-test-{tag}-{}",
             std::env::temp_dir().display(),
             std::process::id()
         );
-        config.oidc_clients = vec![portail_core::config::ClientEntry {
+        config.oidc.clients = vec![portail_core::config::ClientEntry {
             id: "confid".into(),
             secret_file: Some("confid_secret".into()),
             enabled,
@@ -583,8 +583,8 @@ mod tests {
             required_group: String::new(),
             forbidden_group: String::new(),
         }];
-        std::fs::create_dir_all(&config.oidc_secrets_dir).unwrap();
-        config.db_path = format!("{}/portail.db", config.oidc_secrets_dir);
+        std::fs::create_dir_all(&config.oidc.secrets_dir).unwrap();
+        config.db_path = format!("{}/portail.db", config.oidc.secrets_dir);
         std::fs::write(
             crate::auth::secrets::secret_path(&config, "confid_secret"),
             "s3cr3t\n",
@@ -626,13 +626,13 @@ mod tests {
         let tokens = exchange(&config, "confid", "s3cr3t", &code, PUBLIC_REDIRECT, None)
             .expect("secret from the file must authenticate the client");
         assert!(!tokens.access_token.is_empty(), "tokens expected");
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
     fn exchange_denied_by_required_group_gate() {
         let mut config = env_with_secret_client("gate", true);
-        config.oidc_clients[0].required_group = "vpn".into();
+        config.oidc.clients[0].required_group = "vpn".into();
         let code = store::save_code(store::AuthFlow {
             client_id: "confid".into(),
             redirect_uri: PUBLIC_REDIRECT.into(),
@@ -652,13 +652,13 @@ mod tests {
             matches!(&err, AppError::Forbidden(m) if m.contains("required group 'vpn'")),
             "non-member of the required group must be denied with 403, got {err}"
         );
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
     fn exchange_allowed_by_required_group_gate_for_member() {
         let mut config = env_with_secret_client("gate-ok", true);
-        config.oidc_clients[0].required_group = "vpn".into();
+        config.oidc.clients[0].required_group = "vpn".into();
         let code = store::save_code(store::AuthFlow {
             client_id: "confid".into(),
             redirect_uri: PUBLIC_REDIRECT.into(),
@@ -679,7 +679,7 @@ mod tests {
             !tokens.access_token.is_empty(),
             "member of the required group must be allowed"
         );
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 
     #[test]
@@ -693,6 +693,6 @@ mod tests {
             matches!(&err, AppError::InvalidClient(m) if m == "invalid_client"),
             "disabled client must be invalid_client, got {err}"
         );
-        let _ = std::fs::remove_dir_all(&config.oidc_secrets_dir);
+        let _ = std::fs::remove_dir_all(&config.oidc.secrets_dir);
     }
 }

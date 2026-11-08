@@ -12,8 +12,8 @@ pub struct AuthConfig {
 
 pub async fn config(State(config): State<Config>) -> Json<AuthConfig> {
     Json(AuthConfig {
-        issuer: config.oidc_issuer_url.clone(),
-        client_id: config.oidc_client_id.clone(),
-        redirect_uri: config.oidc_redirect_uri.clone(),
+        issuer: config.oidc.issuer_url.clone(),
+        client_id: config.oidc.client_id.clone(),
+        redirect_uri: config.oidc.redirect_uri.clone(),
     })
 }

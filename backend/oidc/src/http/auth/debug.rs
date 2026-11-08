@@ -43,16 +43,17 @@ pub struct DebugInfo {
 
 pub async fn debug(State(config): State<Config>) -> Json<DebugInfo> {
     Json(DebugInfo {
-        issuer: config.oidc_issuer_url.clone(),
-        client_id: config.oidc_client_id.clone(),
-        redirect_uri: config.oidc_redirect_uri.clone(),
-        key_bits: config.oidc_key_bits,
-        pending_ttl_secs: config.oidc_pending_ttl.as_secs(),
-        code_ttl_secs: config.oidc_code_ttl.as_secs(),
-        session_ttl_secs: config.oidc_session_ttl.as_secs(),
-        access_ttl_secs: config.oidc_access_ttl.as_secs(),
+        issuer: config.oidc.issuer_url.clone(),
+        client_id: config.oidc.client_id.clone(),
+        redirect_uri: config.oidc.redirect_uri.clone(),
+        key_bits: config.oidc.key_bits,
+        pending_ttl_secs: config.oidc.pending_ttl.as_secs(),
+        code_ttl_secs: config.oidc.code_ttl.as_secs(),
+        session_ttl_secs: config.oidc.session_ttl.as_secs(),
+        access_ttl_secs: config.oidc.access_ttl.as_secs(),
         clients: config
-            .oidc_clients
+            .oidc
+            .clients
             .iter()
             .map(DebugClient::from_entry)
             .collect(),

@@ -48,31 +48,46 @@ pub const RESERVED_CLAIM_NAMES: [&str; 11] = [
 ];
 
 #[derive(Debug, Clone)]
+pub struct LdapConfig {
+    pub url: String,
+    pub base_dn: String,
+    pub people_ou: String,
+    pub groups_ou: String,
+    pub admin_pw: String,
+    pub tls_ca: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct OidcConfig {
+    pub issuer_url: String,
+    pub client_id: String,
+    pub redirect_uri: String,
+    pub secrets_dir: String,
+    pub clients: Vec<ClientEntry>,
+    pub key_bits: usize,
+    pub secret_logs: bool,
+    pub client_owners: String,
+    pub pending_ttl: Duration,
+    pub code_ttl: Duration,
+    pub session_ttl: Duration,
+    pub access_ttl: Duration,
+    pub id_bytes: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct SecurityConfig {
+    pub password_min_length: usize,
+    pub login_max_attempts: u32,
+}
+
+#[derive(Debug, Clone)]
 pub struct Config {
     pub app_url: String,
     pub bind_addr: String,
     pub db_path: String,
-    pub ldap_url: String,
-    pub ldap_base_dn: String,
-    pub ldap_people_ou: String,
-    pub ldap_groups_ou: String,
-    pub ldap_admin_pw: String,
-    pub ldap_tls_ca: String,
-    pub oidc_issuer_url: String,
-    pub oidc_client_id: String,
-    pub oidc_redirect_uri: String,
-    pub oidc_secrets_dir: String,
-    pub oidc_clients: Vec<ClientEntry>,
-    pub oidc_key_bits: usize,
-    pub oidc_secret_logs: bool,
-    pub oidc_client_owners: String,
-    pub oidc_pending_ttl: Duration,
-    pub oidc_code_ttl: Duration,
-    pub oidc_session_ttl: Duration,
-    pub oidc_access_ttl: Duration,
-    pub password_min_length: usize,
-    pub login_max_attempts: u32,
-    pub oidc_id_bytes: usize,
+    pub ldap: LdapConfig,
+    pub oidc: OidcConfig,
+    pub security: SecurityConfig,
     pub system_sensors: Vec<String>,
 }
 
@@ -83,44 +98,63 @@ struct RawConfig {
     bind_addr: String,
     #[serde(default = "default_db_path")]
     db_path: String,
-    ldap_url: String,
-    ldap_base_dn: String,
+    ldap: RawLdap,
+    oidc: RawOidc,
+    #[serde(default)]
+    security: RawSecurity,
+    #[serde(default = "default_system_sensors")]
+    system_sensors: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawLdap {
+    url: String,
+    base_dn: String,
     #[serde(default = "default_people_ou")]
-    ldap_people_ou: String,
+    people_ou: String,
     #[serde(default = "default_groups_ou")]
-    ldap_groups_ou: String,
+    groups_ou: String,
     #[serde(default)]
-    ldap_admin_pw_file: Option<String>,
+    admin_pw_file: Option<String>,
     #[serde(default)]
-    ldap_tls_ca: String,
-    oidc_issuer_url: String,
-    oidc_client_id: String,
-    oidc_redirect_uri: String,
-    oidc_secrets_dir: String,
+    tls_ca: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawOidc {
+    issuer_url: String,
+    client_id: String,
+    redirect_uri: String,
+    secrets_dir: String,
     #[serde(default)]
-    oidc_clients: Vec<ClientEntry>,
+    clients: Vec<ClientEntry>,
     #[serde(default)]
-    oidc_key_bits: Option<usize>,
+    key_bits: Option<usize>,
     #[serde(default = "default_true")]
-    oidc_secret_logs: bool,
+    secret_logs: bool,
     #[serde(default)]
-    oidc_client_owners: String,
+    client_owners: String,
     #[serde(default)]
-    oidc_pending_ttl_secs: Option<u64>,
+    pending_ttl_secs: Option<u64>,
     #[serde(default)]
-    oidc_code_ttl_secs: Option<u64>,
+    code_ttl_secs: Option<u64>,
     #[serde(default)]
-    oidc_session_ttl_secs: Option<u64>,
+    session_ttl_secs: Option<u64>,
     #[serde(default)]
-    oidc_access_ttl_secs: Option<u64>,
+    access_ttl_secs: Option<u64>,
+    #[serde(default)]
+    id_bytes: Option<usize>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawSecurity {
     #[serde(default)]
     password_min_length: Option<usize>,
     #[serde(default)]
     login_max_attempts: Option<u32>,
-    #[serde(default)]
-    oidc_id_bytes: Option<usize>,
-    #[serde(default = "default_system_sensors")]
-    system_sensors: Vec<String>,
 }
 
 fn default_people_ou() -> String {
@@ -177,15 +211,15 @@ impl Config {
             .parent()
             .and_then(|p| p.to_str())
             .unwrap_or(".");
-        let ldap_admin_pw = match parsed.ldap_admin_pw_file {
+        let admin_pw = match parsed.ldap.admin_pw_file {
             Some(file) => read_secret_file(&resolve_path(base_dir, &file))
-                .map_err(|e| ConfigError(format!("ldap_admin_pw_file: {e}")))?,
+                .map_err(|e| ConfigError(format!("ldap.admin_pw_file: {e}")))?,
             None => "admin".to_string(),
         };
-        let oidc_id_bytes = parsed.oidc_id_bytes.unwrap_or(DEFAULT_OIDC_ID_BYTES);
-        if oidc_id_bytes < DEFAULT_OIDC_ID_BYTES {
+        let id_bytes = parsed.oidc.id_bytes.unwrap_or(DEFAULT_OIDC_ID_BYTES);
+        if id_bytes < DEFAULT_OIDC_ID_BYTES {
             return Err(ConfigError(format!(
-                "oidc_id_bytes must stay at least {DEFAULT_OIDC_ID_BYTES} (got {oidc_id_bytes})"
+                "oidc.id_bytes must stay at least {DEFAULT_OIDC_ID_BYTES} (got {id_bytes})"
             )));
         }
         if let Some(unknown) = parsed
@@ -198,7 +232,7 @@ impl Config {
                 SYSTEM_SENSOR_NAMES.join(", ")
             )));
         }
-        for entry in &parsed.oidc_clients {
+        for entry in &parsed.oidc.clients {
             for rule in &entry.custom_claims {
                 if rule.name.is_empty() {
                     return Err(ConfigError(format!(
@@ -230,45 +264,56 @@ impl Config {
             app_url: parsed.app_url,
             bind_addr: parsed.bind_addr,
             db_path: resolve_path(base_dir, &parsed.db_path),
-            ldap_url: parsed.ldap_url,
-            ldap_base_dn: parsed.ldap_base_dn,
-            ldap_people_ou: parsed.ldap_people_ou,
-            ldap_groups_ou: parsed.ldap_groups_ou,
-            ldap_admin_pw,
-            ldap_tls_ca: resolve_path(base_dir, &parsed.ldap_tls_ca),
-            oidc_issuer_url: parsed.oidc_issuer_url,
-            oidc_client_id: parsed.oidc_client_id,
-            oidc_redirect_uri: parsed.oidc_redirect_uri,
-            oidc_secrets_dir: resolve_path(base_dir, &parsed.oidc_secrets_dir),
-            oidc_clients: parsed.oidc_clients,
-            oidc_key_bits: parsed.oidc_key_bits.unwrap_or(DEFAULT_KEY_BITS),
-            oidc_secret_logs: parsed.oidc_secret_logs,
-            oidc_client_owners: parsed.oidc_client_owners,
-            oidc_pending_ttl: Duration::from_secs(
-                parsed
-                    .oidc_pending_ttl_secs
-                    .unwrap_or(DEFAULT_PENDING_TTL_SECS),
-            ),
-            oidc_code_ttl: Duration::from_secs(
-                parsed.oidc_code_ttl_secs.unwrap_or(DEFAULT_CODE_TTL_SECS),
-            ),
-            oidc_session_ttl: Duration::from_secs(
-                parsed
-                    .oidc_session_ttl_secs
-                    .unwrap_or(DEFAULT_SESSION_TTL_SECS),
-            ),
-            oidc_access_ttl: Duration::from_secs(
-                parsed
-                    .oidc_access_ttl_secs
-                    .unwrap_or(DEFAULT_ACCESS_TTL_SECS),
-            ),
-            password_min_length: parsed
-                .password_min_length
-                .unwrap_or(DEFAULT_PASSWORD_MIN_LENGTH),
-            login_max_attempts: parsed
-                .login_max_attempts
-                .unwrap_or(DEFAULT_LOGIN_MAX_ATTEMPTS),
-            oidc_id_bytes,
+            ldap: LdapConfig {
+                url: parsed.ldap.url,
+                base_dn: parsed.ldap.base_dn,
+                people_ou: parsed.ldap.people_ou,
+                groups_ou: parsed.ldap.groups_ou,
+                admin_pw,
+                tls_ca: resolve_path(base_dir, &parsed.ldap.tls_ca),
+            },
+            oidc: OidcConfig {
+                issuer_url: parsed.oidc.issuer_url,
+                client_id: parsed.oidc.client_id,
+                redirect_uri: parsed.oidc.redirect_uri,
+                secrets_dir: resolve_path(base_dir, &parsed.oidc.secrets_dir),
+                clients: parsed.oidc.clients,
+                key_bits: parsed.oidc.key_bits.unwrap_or(DEFAULT_KEY_BITS),
+                secret_logs: parsed.oidc.secret_logs,
+                client_owners: parsed.oidc.client_owners,
+                pending_ttl: Duration::from_secs(
+                    parsed
+                        .oidc
+                        .pending_ttl_secs
+                        .unwrap_or(DEFAULT_PENDING_TTL_SECS),
+                ),
+                code_ttl: Duration::from_secs(
+                    parsed.oidc.code_ttl_secs.unwrap_or(DEFAULT_CODE_TTL_SECS),
+                ),
+                session_ttl: Duration::from_secs(
+                    parsed
+                        .oidc
+                        .session_ttl_secs
+                        .unwrap_or(DEFAULT_SESSION_TTL_SECS),
+                ),
+                access_ttl: Duration::from_secs(
+                    parsed
+                        .oidc
+                        .access_ttl_secs
+                        .unwrap_or(DEFAULT_ACCESS_TTL_SECS),
+                ),
+                id_bytes,
+            },
+            security: SecurityConfig {
+                password_min_length: parsed
+                    .security
+                    .password_min_length
+                    .unwrap_or(DEFAULT_PASSWORD_MIN_LENGTH),
+                login_max_attempts: parsed
+                    .security
+                    .login_max_attempts
+                    .unwrap_or(DEFAULT_LOGIN_MAX_ATTEMPTS),
+            },
             system_sensors: parsed.system_sensors,
         })
     }
@@ -278,26 +323,26 @@ impl Config {
             app_url = %self.app_url,
             bind_addr = %self.bind_addr,
             db_path = %self.db_path,
-            ldap_url = %self.ldap_url,
-            ldap_base_dn = %self.ldap_base_dn,
-            ldap_people_ou = %self.ldap_people_ou,
-            ldap_groups_ou = %self.ldap_groups_ou,
-            ldap_admin_pw_configured = %!self.ldap_admin_pw.is_empty(),
-            ldap_tls_ca = %self.ldap_tls_ca,
-            oidc_issuer_url = %self.oidc_issuer_url,
-            oidc_client_id = %self.oidc_client_id,
-            oidc_secrets_dir = %self.oidc_secrets_dir,
-            oidc_client_ids = %self.oidc_clients.iter().map(|c| c.id.as_str()).collect::<Vec<_>>().join(","),
-            oidc_key_bits = %self.oidc_key_bits,
-            oidc_secret_logs = %self.oidc_secret_logs,
-            oidc_redirect_uri = %self.oidc_redirect_uri,
-            oidc_pending_ttl_secs = %self.oidc_pending_ttl.as_secs(),
-            oidc_code_ttl_secs = %self.oidc_code_ttl.as_secs(),
-            oidc_session_ttl_secs = %self.oidc_session_ttl.as_secs(),
-            oidc_access_ttl_secs = %self.oidc_access_ttl.as_secs(),
-            password_min_length = %self.password_min_length,
-            login_max_attempts = %self.login_max_attempts,
-            oidc_id_bytes = %self.oidc_id_bytes,
+            ldap_url = %self.ldap.url,
+            ldap_base_dn = %self.ldap.base_dn,
+            ldap_people_ou = %self.ldap.people_ou,
+            ldap_groups_ou = %self.ldap.groups_ou,
+            ldap_admin_pw_configured = %!self.ldap.admin_pw.is_empty(),
+            ldap_tls_ca = %self.ldap.tls_ca,
+            oidc_issuer_url = %self.oidc.issuer_url,
+            oidc_client_id = %self.oidc.client_id,
+            oidc_secrets_dir = %self.oidc.secrets_dir,
+            oidc_client_ids = %self.oidc.clients.iter().map(|c| c.id.as_str()).collect::<Vec<_>>().join(","),
+            oidc_key_bits = %self.oidc.key_bits,
+            oidc_secret_logs = %self.oidc.secret_logs,
+            oidc_redirect_uri = %self.oidc.redirect_uri,
+            oidc_pending_ttl_secs = %self.oidc.pending_ttl.as_secs(),
+            oidc_code_ttl_secs = %self.oidc.code_ttl.as_secs(),
+            oidc_session_ttl_secs = %self.oidc.session_ttl.as_secs(),
+            oidc_access_ttl_secs = %self.oidc.access_ttl.as_secs(),
+            password_min_length = %self.security.password_min_length,
+            login_max_attempts = %self.security.login_max_attempts,
+            oidc_id_bytes = %self.oidc.id_bytes,
             system_sensors = %self.system_sensors.join(","),
             "backend config loaded"
         );
@@ -319,15 +364,26 @@ mod tests {
         r#"
 app_url = "http://localhost:5173"
 bind_addr = "0.0.0.0:3000"
-ldap_url = "ldap://127.0.0.1:3890"
-ldap_base_dn = "dc=dev,dc=example,dc=com"
-oidc_issuer_url = "http://127.0.0.1:3000"
-oidc_client_id = "portail-dev"
-oidc_redirect_uri = "http://localhost:5173/callback"
-oidc_secrets_dir = "/tmp/portail-test-secrets"
-oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enabled = true, redirect_uris = ["http://localhost:5173/callback"], scopes = ["openid"] }]
+
+[ldap]
+url = "ldap://127.0.0.1:3890"
+base_dn = "dc=dev,dc=example,dc=com"
+
+[oidc]
+issuer_url = "http://127.0.0.1:3000"
+client_id = "portail-dev"
+redirect_uri = "http://localhost:5173/callback"
+secrets_dir = "/tmp/portail-test-secrets"
+clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enabled = true, redirect_uris = ["http://localhost:5173/callback"], scopes = ["openid"] }]
 "#
         .to_string()
+    }
+
+    fn with_client_claims(claims: &str) -> String {
+        minimal_toml().replace(
+            r#"scopes = ["openid"] }]"#,
+            &format!(r#"scopes = ["openid"], custom_claims = {claims} }}]"#),
+        )
     }
 
     #[test]
@@ -336,53 +392,53 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
 
         let config = Config::load(&path).unwrap();
 
-        assert_eq!(config.ldap_people_ou, "people", "default OU expected");
-        assert_eq!(config.ldap_groups_ou, "groups", "default OU expected");
+        assert_eq!(config.ldap.people_ou, "people", "default OU expected");
+        assert_eq!(config.ldap.groups_ou, "groups", "default OU expected");
         assert_eq!(
-            config.ldap_admin_pw, "admin",
+            config.ldap.admin_pw, "admin",
             "default admin password expected"
         );
-        assert_eq!(config.ldap_tls_ca, "", "default empty TLS CA expected");
+        assert_eq!(config.ldap.tls_ca, "", "default empty TLS CA expected");
         assert_eq!(
             config.db_path,
             format!("{}/portail.db", std::env::temp_dir().display()),
             "default db path resolved against the config dir expected"
         );
         assert_eq!(
-            config.oidc_key_bits, DEFAULT_KEY_BITS,
+            config.oidc.key_bits, DEFAULT_KEY_BITS,
             "default RSA key size expected"
         );
-        assert!(config.oidc_secret_logs, "secret logs default on");
+        assert!(config.oidc.secret_logs, "secret logs default on");
         assert_eq!(
-            config.oidc_pending_ttl,
+            config.oidc.pending_ttl,
             Duration::from_secs(DEFAULT_PENDING_TTL_SECS),
             "default pending ttl expected"
         );
         assert_eq!(
-            config.oidc_code_ttl,
+            config.oidc.code_ttl,
             Duration::from_secs(DEFAULT_CODE_TTL_SECS),
             "default code ttl expected"
         );
         assert_eq!(
-            config.oidc_session_ttl,
+            config.oidc.session_ttl,
             Duration::from_secs(DEFAULT_SESSION_TTL_SECS),
             "default session ttl expected"
         );
         assert_eq!(
-            config.oidc_access_ttl,
+            config.oidc.access_ttl,
             Duration::from_secs(DEFAULT_ACCESS_TTL_SECS),
             "default access token ttl expected"
         );
         assert_eq!(
-            config.password_min_length, DEFAULT_PASSWORD_MIN_LENGTH,
+            config.security.password_min_length, DEFAULT_PASSWORD_MIN_LENGTH,
             "default password min length expected"
         );
         assert_eq!(
-            config.login_max_attempts, DEFAULT_LOGIN_MAX_ATTEMPTS,
+            config.security.login_max_attempts, DEFAULT_LOGIN_MAX_ATTEMPTS,
             "default login attempt cap expected"
         );
         assert_eq!(
-            config.oidc_id_bytes, DEFAULT_OIDC_ID_BYTES,
+            config.oidc.id_bytes, DEFAULT_OIDC_ID_BYTES,
             "default id entropy expected"
         );
         assert_eq!(
@@ -400,9 +456,9 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
     fn load_rejects_unknown_system_sensor() {
         let path = write_temp_config(
             "badsensor",
-            &format!(
-                "{}system_sensors = [\"memory\", \"voltage\"]\n",
-                minimal_toml()
+            &minimal_toml().replace(
+                "bind_addr = \"0.0.0.0:3000\"\n",
+                "bind_addr = \"0.0.0.0:3000\"\nsystem_sensors = [\"memory\", \"voltage\"]\n",
             ),
         );
 
@@ -417,12 +473,12 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
 
     #[test]
     fn load_rejects_id_bytes_below_floor() {
-        let path = write_temp_config("weakid", &format!("{}oidc_id_bytes = 4\n", minimal_toml()));
+        let path = write_temp_config("weakid", &format!("{}id_bytes = 4\n", minimal_toml()));
 
         let err = Config::load(&path).unwrap_err();
 
         assert!(
-            err.0.contains("oidc_id_bytes") && err.0.contains("at least"),
+            err.0.contains("id_bytes") && err.0.contains("at least"),
             "id entropy below the floor should be rejected: {err}"
         );
         let _ = std::fs::remove_file(&path);
@@ -436,8 +492,32 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
         let path = write_temp_config(
             "custom",
             &format!(
-                "{}ldap_admin_pw_file = \"{}\"\ndb_path = \"data/portail.db\"\nldap_people_ou = \"humains\"\noidc_code_ttl_secs = 90\noidc_key_bits = 4096\npassword_min_length = 12\nlogin_max_attempts = 5\noidc_access_ttl_secs = 120\noidc_id_bytes = 32\nsystem_sensors = [\"memory\", \"fans\", \"tcp\"]\n",
-                minimal_toml(),
+                r#"app_url = "http://localhost:5173"
+bind_addr = "0.0.0.0:3000"
+db_path = "data/portail.db"
+system_sensors = ["memory", "fans", "tcp"]
+
+[ldap]
+url = "ldap://127.0.0.1:3890"
+base_dn = "dc=dev,dc=example,dc=com"
+people_ou = "humains"
+admin_pw_file = "{}"
+
+[oidc]
+issuer_url = "http://127.0.0.1:3000"
+client_id = "portail-dev"
+redirect_uri = "http://localhost:5173/callback"
+secrets_dir = "/tmp/portail-test-secrets"
+clients = [{{ id = "portail-dev", secret_file = "portail-dev_secret", enabled = true, redirect_uris = ["http://localhost:5173/callback"], scopes = ["openid"] }}]
+code_ttl_secs = 90
+key_bits = 4096
+access_ttl_secs = 120
+id_bytes = 32
+
+[security]
+password_min_length = 12
+login_max_attempts = 5
+"#,
                 pw_file.to_str().unwrap()
             ),
         );
@@ -445,36 +525,36 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
         let config = Config::load(&path).unwrap();
 
         assert_eq!(
-            config.ldap_admin_pw, "p4ss",
+            config.ldap.admin_pw, "p4ss",
             "secret file content (newline trimmed) expected"
         );
-        assert_eq!(config.ldap_people_ou, "humains", "custom OU expected");
+        assert_eq!(config.ldap.people_ou, "humains", "custom OU expected");
         assert_eq!(
             config.db_path,
             format!("{}/data/portail.db", std::env::temp_dir().display()),
             "custom db path resolved against the config dir expected"
         );
         assert_eq!(
-            config.oidc_code_ttl,
+            config.oidc.code_ttl,
             Duration::from_secs(90),
             "custom code ttl expected"
         );
-        assert_eq!(config.oidc_key_bits, 4096, "custom key size expected");
+        assert_eq!(config.oidc.key_bits, 4096, "custom key size expected");
         assert_eq!(
-            config.password_min_length, 12,
+            config.security.password_min_length, 12,
             "custom password min length expected"
         );
         assert_eq!(
-            config.login_max_attempts, 5,
+            config.security.login_max_attempts, 5,
             "custom login attempt cap expected"
         );
         assert_eq!(
-            config.oidc_access_ttl,
+            config.oidc.access_ttl,
             Duration::from_secs(120),
             "custom access token ttl expected"
         );
         assert_eq!(
-            config.oidc_id_bytes, 32,
+            config.oidc.id_bytes, 32,
             "custom id entropy should be allowed upward"
         );
         assert_eq!(
@@ -482,13 +562,13 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
             vec!["memory".to_string(), "fans".to_string(), "tcp".to_string()],
             "custom sensor selection expected"
         );
-        assert_eq!(config.oidc_clients.len(), 1, "one inline client expected");
+        assert_eq!(config.oidc.clients.len(), 1, "one inline client expected");
         assert_eq!(
-            config.oidc_clients[0].id, "portail-dev",
+            config.oidc.clients[0].id, "portail-dev",
             "inline client id expected"
         );
         assert_eq!(
-            config.oidc_clients[0].secret_file.as_deref(),
+            config.oidc.clients[0].secret_file.as_deref(),
             Some("portail-dev_secret"),
             "inline client secret_file expected"
         );
@@ -501,8 +581,8 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
         let path = write_temp_config(
             "relative",
             &minimal_toml().replace(
-                r#"oidc_secrets_dir = "/tmp/portail-test-secrets""#,
-                r#"oidc_secrets_dir = ".devenv/state/secrets""#,
+                r#"secrets_dir = "/tmp/portail-test-secrets""#,
+                r#"secrets_dir = ".devenv/state/secrets""#,
             ),
         );
         let config_dir = std::path::Path::new(&path)
@@ -514,7 +594,7 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
         let config = Config::load(&path).unwrap();
 
         assert_eq!(
-            config.oidc_secrets_dir,
+            config.oidc.secrets_dir,
             format!("{config_dir}/.devenv/state/secrets"),
             "relative path should anchor at the config file directory"
         );
@@ -525,10 +605,7 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
     fn load_rejects_reserved_custom_claim_name() {
         let path = write_temp_config(
             "reserved",
-            &minimal_toml().replace(
-                r#"scopes = ["openid"] }]"#,
-                r#"scopes = ["openid"], custom_claims = [{ name = "sub", value = "evil" }] }]"#,
-            ),
+            &with_client_claims(r#"[{ name = "sub", value = "evil" }]"#),
         );
 
         let err = Config::load(&path).unwrap_err();
@@ -544,14 +621,13 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
     fn load_reads_group_scoped_custom_claims() {
         let path = write_temp_config(
             "customclaims",
-            &minimal_toml().replace(
-                r#"scopes = ["openid"] }]"#,
-                r#"scopes = ["openid"], custom_claims = [{ name = "env", value = "test" }, { name = "role", value = "admin", group = "admins" }, { name = "outsider", value = "yes", not_group = "admins" }] }]"#,
+            &with_client_claims(
+                r#"[{ name = "env", value = "test" }, { name = "role", value = "admin", group = "admins" }, { name = "outsider", value = "yes", not_group = "admins" }]"#,
             ),
         );
 
         let config = Config::load(&path).unwrap();
-        let rules = &config.oidc_clients[0].custom_claims;
+        let rules = &config.oidc.clients[0].custom_claims;
 
         assert_eq!(rules.len(), 3, "three custom claim rules expected");
         assert_eq!(
@@ -573,10 +649,7 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
     fn load_rejects_conflicting_group_gates() {
         let path = write_temp_config(
             "conflict",
-            &minimal_toml().replace(
-                r#"scopes = ["openid"] }]"#,
-                r#"scopes = ["openid"], custom_claims = [{ name = "x", value = "y", group = "a", not_group = "b" }] }]"#,
-            ),
+            &with_client_claims(r#"[{ name = "x", value = "y", group = "a", not_group = "b" }]"#),
         );
 
         let err = Config::load(&path).unwrap_err();
@@ -644,16 +717,16 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
     fn load_reports_broken_secret_file() {
         let path = write_temp_config(
             "brokenpw",
-            &format!(
-                "{}ldap_admin_pw_file = \"/tmp/portail-no-such-secret-file\"\n",
-                minimal_toml()
+            &minimal_toml().replace(
+                "base_dn = \"dc=dev,dc=example,dc=com\"\n",
+                "base_dn = \"dc=dev,dc=example,dc=com\"\nadmin_pw_file = \"/tmp/portail-no-such-secret-file\"\n",
             ),
         );
 
         let err = Config::load(&path).unwrap_err();
 
         assert!(
-            err.0.contains("ldap_admin_pw_file") && err.0.contains("cannot read secret file"),
+            err.0.contains("admin_pw_file") && err.0.contains("cannot read secret file"),
             "unreadable secret file should be reported: {err}"
         );
         let _ = std::fs::remove_file(&path);

@@ -17,7 +17,7 @@ pub async fn oidc_test(
 ) -> Result<Json<oidc::OidcTestReport>, AppError> {
     let raw = payload
         .client_id
-        .unwrap_or_else(|| config.oidc_client_id.clone());
+        .unwrap_or_else(|| config.oidc.client_id.clone());
     let client_id = ClientId::try_new(raw).map_err(|e| AppError::BadRequest(e.to_string()))?;
     Ok(Json(oidc::test_client(client_id)?))
 }
