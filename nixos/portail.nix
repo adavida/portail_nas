@@ -111,6 +111,7 @@ let
       # String holding JSON — the backend re-parses it with serde_json.
       oidc_client_owners = builtins.toJSON clientOwners;
       oidc_clients = oidcClientsList;
+      system_sensors = cfg.systemSensors;
     }
     // lib.optionalAttrs (cfg.ldap.caCertificateFile != null) {
       ldap_tls_ca = toString cfg.ldap.caCertificateFile;
@@ -154,6 +155,37 @@ in
         first start: the parent must be writable by the `portail` service
         user (`StateDirectory = "portail"` covers the default).
       '';
+    };
+
+    systemSensors = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [
+        "memory"
+        "cpu"
+        "network"
+        "disk"
+      ];
+      description = ''
+        Blocks shown on the portal System page (generated `config.toml` key
+        `system_sensors`, forwarded to the frontend by `GET /api/system`).
+        Known names: `memory` (RAM/swap), `cpu`, `cores` (per-core detail),
+        `load`, `pressure`, `temps`, `fans`, `network`, `tcp`, `interfaces`,
+        `disk`, `diskio`, `raid`, `uptime`. Unknown names fail backend
+        startup. The default keeps RAM/swap, CPU, network throughput and disk
+        space; everything else is opt-in.
+      '';
+      example = [
+        "memory"
+        "cpu"
+        "cores"
+        "load"
+        "temps"
+        "network"
+        "disk"
+        "diskio"
+        "raid"
+        "uptime"
+      ];
     };
 
     oidcClientId = lib.mkOption {

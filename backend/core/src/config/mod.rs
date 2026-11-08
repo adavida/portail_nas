@@ -16,6 +16,23 @@ pub const DEFAULT_PASSWORD_MIN_LENGTH: usize = 8;
 pub const DEFAULT_LOGIN_MAX_ATTEMPTS: u32 = 10;
 pub const DEFAULT_OIDC_ID_BYTES: usize = 16;
 pub const DEFAULT_DB_PATH: &str = "portail.db";
+pub const SYSTEM_SENSOR_NAMES: [&str; 14] = [
+    "memory",
+    "cpu",
+    "cores",
+    "load",
+    "pressure",
+    "temps",
+    "fans",
+    "network",
+    "tcp",
+    "interfaces",
+    "disk",
+    "diskio",
+    "raid",
+    "uptime",
+];
+pub const DEFAULT_SYSTEM_SENSORS: [&str; 4] = ["memory", "cpu", "network", "disk"];
 pub const RESERVED_CLAIM_NAMES: [&str; 11] = [
     "iss",
     "sub",
@@ -56,6 +73,7 @@ pub struct Config {
     pub password_min_length: usize,
     pub login_max_attempts: u32,
     pub oidc_id_bytes: usize,
+    pub system_sensors: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -101,6 +119,8 @@ struct RawConfig {
     login_max_attempts: Option<u32>,
     #[serde(default)]
     oidc_id_bytes: Option<usize>,
+    #[serde(default = "default_system_sensors")]
+    system_sensors: Vec<String>,
 }
 
 fn default_people_ou() -> String {
@@ -117,6 +137,13 @@ fn default_db_path() -> String {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_system_sensors() -> Vec<String> {
+    DEFAULT_SYSTEM_SENSORS
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
 }
 
 fn read_secret_file(path: &str) -> Result<String, String> {
@@ -159,6 +186,16 @@ impl Config {
         if oidc_id_bytes < DEFAULT_OIDC_ID_BYTES {
             return Err(ConfigError(format!(
                 "oidc_id_bytes must stay at least {DEFAULT_OIDC_ID_BYTES} (got {oidc_id_bytes})"
+            )));
+        }
+        if let Some(unknown) = parsed
+            .system_sensors
+            .iter()
+            .find(|sensor| !SYSTEM_SENSOR_NAMES.contains(&sensor.as_str()))
+        {
+            return Err(ConfigError(format!(
+                "system_sensors contains unknown sensor '{unknown}' (known: {})",
+                SYSTEM_SENSOR_NAMES.join(", ")
             )));
         }
         for entry in &parsed.oidc_clients {
@@ -232,6 +269,7 @@ impl Config {
                 .login_max_attempts
                 .unwrap_or(DEFAULT_LOGIN_MAX_ATTEMPTS),
             oidc_id_bytes,
+            system_sensors: parsed.system_sensors,
         })
     }
 
@@ -260,6 +298,7 @@ impl Config {
             password_min_length = %self.password_min_length,
             login_max_attempts = %self.login_max_attempts,
             oidc_id_bytes = %self.oidc_id_bytes,
+            system_sensors = %self.system_sensors.join(","),
             "backend config loaded"
         );
     }
@@ -346,6 +385,33 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
             config.oidc_id_bytes, DEFAULT_OIDC_ID_BYTES,
             "default id entropy expected"
         );
+        assert_eq!(
+            config.system_sensors,
+            DEFAULT_SYSTEM_SENSORS
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+            "default NAS-relevant sensors expected"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_unknown_system_sensor() {
+        let path = write_temp_config(
+            "badsensor",
+            &format!(
+                "{}system_sensors = [\"memory\", \"voltage\"]\n",
+                minimal_toml()
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("voltage") && err.0.contains("unknown sensor"),
+            "an unknown sensor name must be rejected: {err}"
+        );
         let _ = std::fs::remove_file(&path);
     }
 
@@ -370,7 +436,7 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
         let path = write_temp_config(
             "custom",
             &format!(
-                "{}ldap_admin_pw_file = \"{}\"\ndb_path = \"data/portail.db\"\nldap_people_ou = \"humains\"\noidc_code_ttl_secs = 90\noidc_key_bits = 4096\npassword_min_length = 12\nlogin_max_attempts = 5\noidc_access_ttl_secs = 120\noidc_id_bytes = 32\n",
+                "{}ldap_admin_pw_file = \"{}\"\ndb_path = \"data/portail.db\"\nldap_people_ou = \"humains\"\noidc_code_ttl_secs = 90\noidc_key_bits = 4096\npassword_min_length = 12\nlogin_max_attempts = 5\noidc_access_ttl_secs = 120\noidc_id_bytes = 32\nsystem_sensors = [\"memory\", \"fans\", \"tcp\"]\n",
                 minimal_toml(),
                 pw_file.to_str().unwrap()
             ),
@@ -410,6 +476,11 @@ oidc_clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enable
         assert_eq!(
             config.oidc_id_bytes, 32,
             "custom id entropy should be allowed upward"
+        );
+        assert_eq!(
+            config.system_sensors,
+            vec!["memory".to_string(), "fans".to_string(), "tcp".to_string()],
+            "custom sensor selection expected"
         );
         assert_eq!(config.oidc_clients.len(), 1, "one inline client expected");
         assert_eq!(

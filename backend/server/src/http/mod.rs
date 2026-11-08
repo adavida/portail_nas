@@ -1,4 +1,5 @@
 pub mod health;
+pub mod system;
 
 use axum::{Router, middleware, routing::get};
 use tower_http::trace::TraceLayer;
@@ -18,6 +19,7 @@ pub fn router() -> Router {
     let admin: Router<Config> = Router::<Config>::new()
         .nest("/api/users", users_router())
         .nest("/api/groups", groups_router())
+        .route("/api/system", get(system::system))
         .nest("/api/auth", auth::protected_auth_router())
         .layer(middleware::from_fn(require_admin))
         .layer(middleware::from_fn_with_state(config.clone(), require_auth));

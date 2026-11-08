@@ -3,7 +3,7 @@
   import { logout } from "../auth/oidc";
   import { t } from "../i18n";
 
-  type Tab = "home" | "users" | "groups" | "debug";
+  type Tab = "home" | "users" | "groups" | "system" | "debug";
 
   let { tab = $bindable<Tab>("home"), admin = false } = $props();
   let menuOpen = $state(false);
@@ -13,6 +13,7 @@
       { id: "home", labelKey: "nav.home", testId: "tab-home", adminOnly: false },
       { id: "users", labelKey: "nav.users", testId: "tab-users", adminOnly: true },
       { id: "groups", labelKey: "nav.groups", testId: "tab-groups", adminOnly: true },
+      { id: "system", labelKey: "nav.system", testId: "tab-system", adminOnly: true },
       { id: "debug", labelKey: "nav.debug", testId: "tab-debug", adminOnly: true },
     ];
 

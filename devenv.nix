@@ -197,6 +197,7 @@ in
       oidc_redirect_uri = "$OIDC_REDIRECT_URI"
       oidc_secrets_dir = "$OIDC_SECRETS_DIR"
       oidc_clients = [{ id = "$OIDC_CLIENT_ID", secret_file = "$OIDC_CLIENT_ID_secret", enabled = true, redirect_uris = ["$OIDC_REDIRECT_URI"], scopes = ["openid","profile","email","groups"] }, { id = "oauth-debugger", enabled = false, redirect_uris = ["http://127.0.0.1:3030/callback"], scopes = ["openid","profile","email","groups"] }]
+      system_sensors = ["memory","cpu","network","disk"]
       EOF
       cargo watch -w backend -x "run -p portail-server -- --config $PORTAIL_CONFIG_FILE"
     '';

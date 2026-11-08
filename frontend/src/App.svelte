@@ -4,6 +4,7 @@
   import Groups from "./pages/Groups.svelte";
   import Home from "./pages/Home.svelte";
   import Login from "./pages/Login.svelte";
+  import System from "./pages/System.svelte";
   import Users from "./pages/Users.svelte";
   import Toaster from "./components/Toaster.svelte";
   import Sidebar from "./components/Sidebar.svelte";
@@ -15,7 +16,7 @@
   const isCallback = window.location.pathname === "/callback";
   const isLogin = window.location.pathname === "/login";
 
-  let tab = $state<"home" | "users" | "groups" | "debug">("home");
+  let tab = $state<"home" | "users" | "groups" | "system" | "debug">("home");
   let checked = $state(false);
   let admin = $state(false);
   let groups = $state<string[]>([]);
@@ -79,6 +80,8 @@
         <Users />
       {:else if tab === "groups"}
         <Groups />
+      {:else if tab === "system"}
+        <System />
       {:else}
         <Debug />
       {/if}

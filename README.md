@@ -56,31 +56,33 @@ Le frontend du portail utilise les mêmes endpoints (c'est un client OIDC de lui
     oidc.secretsDir = "/var/lib/portail/oidc";
     oidcClientId = "portail";
     package = inputs.portail.packages.x86_64-linux.portail-backend;
+    systemSensors = [ "memory" "cpu" "network" "disk" ];
   };
 }
 ```
 
-| Option                       | Défaut                        | Rôle                                                                                                       |
-| ---------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `appUrl`                     | (requis)                      | URL publique du portail = issuer OIDC (APP_URL + redirect `/callback`)                                     |
-| `package`                    | (requis)                      | binaire backend (ex: `inputs.portail.packages...`)                                                         |
-| `bindAddress`                | `127.0.0.1:3000`              | BIND_ADDR du backend                                                                                       |
-| `dbPath`                     | `/var/lib/portail/portail.db` | chemin de la base SQLite (`db_path`) : subs pairwise et tables futures ; créée au premier démarrage (0600) |
-| `oidcClientId`               | `portail`                     | client_id du portail (écrit **activé** dans `oidc_clients` du config généré)                               |
-| `oidc.secretsDir`            | `/var/lib/portail/oidc`       | répertoire des secrets OIDC (clé RSA + fichiers `<clientId>_secret`)                                       |
-| `oidc.logSecretEvents`       | `true`                        | log INFO backend/ExecStartPre sur les fichiers de secrets OIDC (générer, garder, ACL, purger)              |
-| `lang`                       | `en`                          | langue par défaut de l'interface (`fr`/`en`)                                                               |
-| `ldap.url`                   | `ldap://127.0.0.1`            | URL du serveur LDAP (`ldap://` ou `ldaps://`)                                                              |
-| `ldap.baseDn`                | `dc=example,dc=com`           | suffixe LDAP                                                                                               |
-| `ldap.peopleOu`              | `people`                      | OU des entrées utilisateurs (`LDAP_PEOPLE_OU`)                                                             |
-| `ldap.groupsOu`              | `groups`                      | OU des entrées groupes (`LDAP_GROUPS_OU`)                                                                  |
-| `ldap.caCertificateFile`     | `null`                        | bundle CA PEM validant le endpoint `ldaps://` (`SSL_CERT_FILE`)                                            |
-| `ldap.adminPasswordFile`     | (requis)                      | mot de passe `cn=admin,<baseDn>`                                                                           |
-| `vhost.enable`               | `true`                        | vhost nginx (frontend en `root` + proxy `/api`, `/jwks.json`, `/.well-known/*`, `/logout`)                 |
-| `vhost.hostName`             | (si vhost)                    | server_name nginx + CN du certificat                                                                       |
-| `vhost.forceSSL`             | `true`                        | HTTPS + redirection 80→443                                                                                 |
-| `vhost.sslCertificate{,Key}` | (si forceSSL)                 | certificat/clé TLS fournis par l'hôte (agenix/sops)                                                        |
-| `apps`                       | `[]`                          | applications listées sur la page d'accueil                                                                 |
+| Option                       | Défaut                                | Rôle                                                                                                                                                                                                                      |
+| ---------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `appUrl`                     | (requis)                              | URL publique du portail = issuer OIDC (APP_URL + redirect `/callback`)                                                                                                                                                    |
+| `package`                    | (requis)                              | binaire backend (ex: `inputs.portail.packages...`)                                                                                                                                                                        |
+| `bindAddress`                | `127.0.0.1:3000`                      | BIND_ADDR du backend                                                                                                                                                                                                      |
+| `dbPath`                     | `/var/lib/portail/portail.db`         | chemin de la base SQLite (`db_path`) : subs pairwise et tables futures ; créée au premier démarrage (0600)                                                                                                                |
+| `systemSensors`              | `[ "memory" "cpu" "network" "disk" ]` | blocs affichés sur la page Système (`system_sensors`) ; noms connus : `memory`, `cpu`, `cores` (détail par cœur), `load`, `pressure`, `temps`, `fans`, `network`, `tcp`, `interfaces`, `disk`, `diskio`, `raid`, `uptime` |
+| `oidcClientId`               | `portail`                             | client_id du portail (écrit **activé** dans `oidc_clients` du config généré)                                                                                                                                              |
+| `oidc.secretsDir`            | `/var/lib/portail/oidc`               | répertoire des secrets OIDC (clé RSA + fichiers `<clientId>_secret`)                                                                                                                                                      |
+| `oidc.logSecretEvents`       | `true`                                | log INFO backend/ExecStartPre sur les fichiers de secrets OIDC (générer, garder, ACL, purger)                                                                                                                             |
+| `lang`                       | `en`                                  | langue par défaut de l'interface (`fr`/`en`)                                                                                                                                                                              |
+| `ldap.url`                   | `ldap://127.0.0.1`                    | URL du serveur LDAP (`ldap://` ou `ldaps://`)                                                                                                                                                                             |
+| `ldap.baseDn`                | `dc=example,dc=com`                   | suffixe LDAP                                                                                                                                                                                                              |
+| `ldap.peopleOu`              | `people`                              | OU des entrées utilisateurs (`LDAP_PEOPLE_OU`)                                                                                                                                                                            |
+| `ldap.groupsOu`              | `groups`                              | OU des entrées groupes (`LDAP_GROUPS_OU`)                                                                                                                                                                                 |
+| `ldap.caCertificateFile`     | `null`                                | bundle CA PEM validant le endpoint `ldaps://` (`SSL_CERT_FILE`)                                                                                                                                                           |
+| `ldap.adminPasswordFile`     | (requis)                              | mot de passe `cn=admin,<baseDn>`                                                                                                                                                                                          |
+| `vhost.enable`               | `true`                                | vhost nginx (frontend en `root` + proxy `/api`, `/jwks.json`, `/.well-known/*`, `/logout`)                                                                                                                                |
+| `vhost.hostName`             | (si vhost)                            | server_name nginx + CN du certificat                                                                                                                                                                                      |
+| `vhost.forceSSL`             | `true`                                | HTTPS + redirection 80→443                                                                                                                                                                                                |
+| `vhost.sslCertificate{,Key}` | (si forceSSL)                         | certificat/clé TLS fournis par l'hôte (agenix/sops)                                                                                                                                                                       |
+| `apps`                       | `[]`                                  | applications listées sur la page d'accueil                                                                                                                                                                                |
 
 ### Les clients OIDC
 
@@ -240,31 +242,33 @@ The portal frontend uses the same endpoints (it is a client of itself) plus `GET
     oidc.secretsDir = "/var/lib/portail/oidc";
     oidcClientId = "portail";
     package = inputs.portail.packages.x86_64-linux.portail-backend;
+    systemSensors = [ "memory" "cpu" "network" "disk" ];
   };
 }
 ```
 
-| Option                       | Default                       | Purpose                                                                                                 |
-| ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `appUrl`                     | (required)                    | public portal URL = OIDC issuer (APP_URL + `/callback` redirect)                                        |
-| `package`                    | (required)                    | backend binary (e.g. `inputs.portail.packages...`)                                                      |
-| `bindAddress`                | `127.0.0.1:3000`              | backend BIND_ADDR                                                                                       |
-| `dbPath`                     | `/var/lib/portail/portail.db` | SQLite database path (`db_path`): pairwise subs and future portal tables; created on first start (0600) |
-| `oidcClientId`               | `portail`                     | portal client_id (written **enabled** into the generated `oidc_clients`)                                |
-| `oidc.secretsDir`            | `/var/lib/portail/oidc`       | OIDC secrets directory (RSA key + `<clientId>_secret` files)                                            |
-| `oidc.logSecretEvents`       | `true`                        | backend/ExecStartPre INFO logs on OIDC secret files (generate, keep, ACL, prune)                        |
-| `lang`                       | `en`                          | default UI language (`fr`/`en`)                                                                         |
-| `ldap.url`                   | `ldap://127.0.0.1`            | LDAP server URL (`ldap://` or `ldaps://`)                                                               |
-| `ldap.baseDn`                | `dc=example,dc=com`           | LDAP suffix                                                                                             |
-| `ldap.peopleOu`              | `people`                      | OU holding user entries (`LDAP_PEOPLE_OU`)                                                              |
-| `ldap.groupsOu`              | `groups`                      | OU holding group entries (`LDAP_GROUPS_OU`)                                                             |
-| `ldap.caCertificateFile`     | `null`                        | PEM CA bundle validating the `ldaps://` endpoint (`SSL_CERT_FILE`)                                      |
-| `ldap.adminPasswordFile`     | (required)                    | password of `cn=admin,<baseDn>`                                                                         |
-| `vhost.enable`               | `true`                        | nginx vhost (frontend as `root` + `/api`, `/jwks.json`, `/.well-known/*`, `/logout` proxy)              |
-| `vhost.hostName`             | (with vhost)                  | nginx server_name + certificate CN                                                                      |
-| `vhost.forceSSL`             | `true`                        | HTTPS + 80→443 redirect                                                                                 |
-| `vhost.sslCertificate{,Key}` | (with forceSSL)               | TLS certificate/key provided by the host (agenix/sops)                                                  |
-| `apps`                       | `[]`                          | applications listed on the home page                                                                    |
+| Option                       | Default                               | Purpose                                                                                                                                                                                                              |
+| ---------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `appUrl`                     | (required)                            | public portal URL = OIDC issuer (APP_URL + `/callback` redirect)                                                                                                                                                     |
+| `package`                    | (required)                            | backend binary (e.g. `inputs.portail.packages...`)                                                                                                                                                                   |
+| `bindAddress`                | `127.0.0.1:3000`                      | backend BIND_ADDR                                                                                                                                                                                                    |
+| `dbPath`                     | `/var/lib/portail/portail.db`         | SQLite database path (`db_path`): pairwise subs and future portal tables; created on first start (0600)                                                                                                              |
+| `systemSensors`              | `[ "memory" "cpu" "network" "disk" ]` | blocks shown on the System page (`system_sensors`); known names: `memory`, `cpu`, `cores` (per-core detail), `load`, `pressure`, `temps`, `fans`, `network`, `tcp`, `interfaces`, `disk`, `diskio`, `raid`, `uptime` |
+| `oidcClientId`               | `portail`                             | portal client_id (written **enabled** into the generated `oidc_clients`)                                                                                                                                             |
+| `oidc.secretsDir`            | `/var/lib/portail/oidc`               | OIDC secrets directory (RSA key + `<clientId>_secret` files)                                                                                                                                                         |
+| `oidc.logSecretEvents`       | `true`                                | backend/ExecStartPre INFO logs on OIDC secret files (generate, keep, ACL, prune)                                                                                                                                     |
+| `lang`                       | `en`                                  | default UI language (`fr`/`en`)                                                                                                                                                                                      |
+| `ldap.url`                   | `ldap://127.0.0.1`                    | LDAP server URL (`ldap://` or `ldaps://`)                                                                                                                                                                            |
+| `ldap.baseDn`                | `dc=example,dc=com`                   | LDAP suffix                                                                                                                                                                                                          |
+| `ldap.peopleOu`              | `people`                              | OU holding user entries (`LDAP_PEOPLE_OU`)                                                                                                                                                                           |
+| `ldap.groupsOu`              | `groups`                              | OU holding group entries (`LDAP_GROUPS_OU`)                                                                                                                                                                          |
+| `ldap.caCertificateFile`     | `null`                                | PEM CA bundle validating the `ldaps://` endpoint (`SSL_CERT_FILE`)                                                                                                                                                   |
+| `ldap.adminPasswordFile`     | (required)                            | password of `cn=admin,<baseDn>`                                                                                                                                                                                      |
+| `vhost.enable`               | `true`                                | nginx vhost (frontend as `root` + `/api`, `/jwks.json`, `/.well-known/*`, `/logout` proxy)                                                                                                                           |
+| `vhost.hostName`             | (with vhost)                          | nginx server_name + certificate CN                                                                                                                                                                                   |
+| `vhost.forceSSL`             | `true`                                | HTTPS + 80→443 redirect                                                                                                                                                                                              |
+| `vhost.sslCertificate{,Key}` | (with forceSSL)                       | TLS certificate/key provided by the host (agenix/sops)                                                                                                                                                               |
+| `apps`                       | `[]`                                  | applications listed on the home page                                                                                                                                                                                 |
 
 #### The OIDC clients
 

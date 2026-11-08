@@ -1313,6 +1313,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "portail-metrics"
+version = "0.1.0"
+dependencies = [
+ "portail-core",
+ "portail-units",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "portail-oidc"
 version = "0.1.0"
 dependencies = [
@@ -1348,6 +1359,7 @@ dependencies = [
  "ldap3",
  "portail-core",
  "portail-directory",
+ "portail-metrics",
  "portail-oidc",
  "serde",
  "serde_json",
@@ -1357,6 +1369,14 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "portail-units"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
