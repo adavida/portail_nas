@@ -28,9 +28,18 @@ pub async fn create(new: NewUser) -> Result<User, AppError> {
 }
 
 pub async fn ensure_admin(password: Password) -> Result<(), AppError> {
+    let admin_gid =
+        Gid::try_new(ADMIN_GROUP.to_string()).map_err(|e| AppError::Internal(e.to_string()))?;
+    let has_admin = repo::list_uids()
+        .await?
+        .iter()
+        .any(|g| g.gid == admin_gid && !g.members.is_empty());
+    if has_admin {
+        return Ok(());
+    }
     let uid = Uid::try_new(ADMIN_UID.to_string()).map_err(|e| AppError::Internal(e.to_string()))?;
     if repo::find_user(&uid).await.is_ok() {
-        return Ok(());
+        return ensure_admin_group(&uid).await;
     }
     let new = NewUser {
         uid: uid.clone(),

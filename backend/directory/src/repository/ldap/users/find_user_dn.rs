@@ -18,7 +18,7 @@ pub async fn find_user(uid: &Uid) -> Result<(), AppError> {
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn find_user_dn(ldap: &mut ldap3::Ldap, uid: &Uid) -> Result<String, AppError> {
-    let filter = format!("(uid={})", uid.as_str());
+    let filter = format!("(|(uid={})(cn={}))", uid.as_str(), uid.as_str());
 
     let (rs, _res) = ldap
         .search(&people_search_base(), Scope::Subtree, &filter, vec!["dn"])
@@ -163,6 +163,50 @@ mod tests {
             found.unwrap(),
             dn,
             "search should return the real cn= DN, not a constructed uid= DN"
+        );
+    }
+
+    #[tokio::test]
+    async fn find_user_finds_cn_only_entry_without_uid_attribute() {
+        let Ok(mut ldap) = connect().await else {
+            return;
+        };
+        let uid = gen_uid("fdncon");
+        let dn = format!(
+            "cn={},{}",
+            uid.as_str(),
+            crate::repository::ldap::people_search_base()
+        );
+
+        let mut object_class: HashSet<String> = HashSet::new();
+        for class in ["top", "person", "organizationalPerson", "inetOrgPerson"] {
+            object_class.insert(class.to_string());
+        }
+        let attrs = vec![
+            ("objectClass".to_string(), object_class),
+            (
+                "cn".to_string(),
+                [uid.as_str().to_string()].into_iter().collect(),
+            ),
+            (
+                "sn".to_string(),
+                [format!("cn-{}", uid.as_str())].into_iter().collect(),
+            ),
+        ];
+
+        if ldap.add(&dn, attrs).await.is_err() {
+            let _ = ldap.unbind().await;
+            return;
+        }
+
+        let found = find_user_dn(&mut ldap, &uid).await;
+        let _ = ldap.delete(&dn).await;
+        let _ = ldap.unbind().await;
+
+        assert_eq!(
+            found.unwrap(),
+            dn,
+            "entry selected only by its cn attribute should be found"
         );
     }
 }

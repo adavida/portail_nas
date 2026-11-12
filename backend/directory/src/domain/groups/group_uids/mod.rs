@@ -21,7 +21,7 @@ impl GroupUids {
 
     pub fn uid_from_dn(dn: &str) -> Option<Uid> {
         let (kind, rest) = dn.split_once('=')?;
-        if !kind.eq_ignore_ascii_case("uid") {
+        if !kind.eq_ignore_ascii_case("uid") && !kind.eq_ignore_ascii_case("cn") {
             return None;
         }
         Uid::try_new(rest.split(',').next()?.to_string()).ok()
@@ -45,7 +45,7 @@ mod tests {
             &[
                 format!("uid=alice,ou=people,{BASE}"),
                 format!("uid=bob,ou=people,{BASE}"),
-                format!("cn=devs,ou=groups,{BASE}"),
+                format!("cn=carol,ou=people,{BASE}"),
             ],
         )
         .unwrap();
@@ -56,27 +56,21 @@ mod tests {
             vec![
                 Uid::try_new("alice".into()).unwrap(),
                 Uid::try_new("bob".into()).unwrap(),
+                Uid::try_new("carol".into()).unwrap(),
             ],
-            "uid members should decode, cn entries should be ignored"
+            "uid and cn members should both decode"
         );
     }
 
     #[test]
-    fn uid_from_dn_parses_uid_rdn() {
-        let member = GroupUids::uid_from_dn(&format!("uid=alice,ou=people,{BASE}"));
+    fn uid_from_dn_parses_cn_rdn() {
+        let member = GroupUids::uid_from_dn(&format!("cn=alice,ou=people,{BASE}"));
 
         assert_eq!(
             member,
             Some(Uid::try_new("alice".into()).unwrap()),
-            "uid DN should decode to the uid"
+            "legacy cn DN should decode to the uid"
         );
-    }
-
-    #[test]
-    fn uid_from_dn_rejects_cn_kind() {
-        let member = GroupUids::uid_from_dn(&format!("cn=devs,ou=groups,{BASE}"));
-
-        assert_eq!(member, None, "cn DN should yield no uid");
     }
 
     #[test]

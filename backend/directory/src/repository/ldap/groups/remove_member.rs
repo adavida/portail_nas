@@ -29,6 +29,7 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
         .collect();
     let to_delete: HashSet<String> = stored
         .into_iter()
+        .filter(|dn| !dn.eq_ignore_ascii_case(&group_dn))
         .filter(|dn| GroupUids::uid_from_dn(dn).is_some_and(|m| m == uid))
         .collect();
 
@@ -86,8 +87,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remove_member_leaves_cn_formatted_member_unlisted() {
-        let keep = match seed_user("rmck").await {
+    async fn remove_member_removes_cn_formatted_member() {
+        let keep = match seed_user("rmk").await {
             Some(u) => u,
             None => return,
         };
@@ -126,6 +127,16 @@ mod tests {
             return;
         }
 
+        let groups = list_uids().await.unwrap();
+        let listed = groups
+            .iter()
+            .find(|g| g.gid == gid)
+            .expect("group should be listed");
+        assert!(
+            listed.members.contains(&drop),
+            "cn= member should be listed as a member"
+        );
+
         remove_member(gid.clone(), drop.clone()).await.unwrap();
 
         let groups = list_uids().await.unwrap();
@@ -137,7 +148,7 @@ mod tests {
         assert!(found.members.contains(&keep), "kept member should remain");
         assert!(
             !found.members.iter().any(|m| m == &drop),
-            "cn= members are not uid members and must not be listed"
+            "cn= member should be removed like a uid member"
         );
 
         cleanup(&gid, &[keep, drop]).await;

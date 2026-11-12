@@ -18,7 +18,7 @@ Aucune variable d'env de configuration pour le backend. Le binaire se lance avec
 
 ## Fichiers
 
-- `config.toml` (`.devenv/state/config.toml` = `$PORTAIL_CONFIG_FILE`, **généré** par `scripts/generate-config.sh` depuis les variables d'env `APP_URL`/`BIND_ADDR`/`DB_PATH`/`LDAP_*`/`OIDC_*`, hors dépôt): valeurs dev (LDAP 3890 `dc=dev`, chemins `.devenv/state/...`). Choix du backend annuaire en paramètre (`scripts/generate-config.sh [sqlite|ldap]`, défaut `sqlite`). Généré au démarrage du process `backend`, lancé par `devenv up` via `--config $PORTAIL_CONFIG_FILE`.
+- `config.toml` (`.devenv/state/config.toml` = `$PORTAIL_CONFIG_FILE`, **généré** par `scripts/generate-config.sh` depuis les variables d'env `APP_URL`/`BIND_ADDR`/`DB_PATH`/`LDAP_*`/`OIDC_*`, hors dépôt): valeurs dev (LDAP 3890 `dc=dev`, chemins `.devenv/state/...`). Choix du backend annuaire en paramètre (`scripts/generate-config.sh [sqlite|ldap]`) ; sans paramètre, un fichier déjà présent n'est **pas réécrit** (édit manuel préservé), il n'est créé avec le défaut `sqlite` que s'il est absent. Généré au démarrage du process `backend`, lancé par `devenv up` via `--config $PORTAIL_CONFIG_FILE`.
 - `config.test.toml` (racine, commité): LDAP 3891 `dc=test`, secrets `.devenv/state/secrets-test`. Chargé par les helpers de test via `env!("CARGO_MANIFEST_DIR")/../../config.test.toml` (constante de build, pas d'env runtime).
 
 ## Tests

@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 # Génère le fichier de config du backend depuis les variables d'env.
-# usage: scripts/generate-config.sh [sqlite|ldap]   (défaut: sqlite, ou $DIRECTORY_BACKEND)
+# usage: scripts/generate-config.sh [sqlite|ldap]
+# Sans paramètre, un fichier déjà écrit n'est pas touché (créer sinon).
 set -euo pipefail
+
+STATE="${DEVENV_STATE:-$PWD/.devenv/state}"
+OUT="${PORTAIL_CONFIG_FILE:-$STATE/config.toml}"
+
+if [ $# -eq 0 ] && [ -f "$OUT" ]; then
+  echo "keeping $OUT (no backend argument)"
+  exit 0
+fi
 
 BACKEND="${1:-${DIRECTORY_BACKEND:-sqlite}}"
 case "$BACKEND" in
@@ -12,8 +21,6 @@ case "$BACKEND" in
     ;;
 esac
 
-STATE="${DEVENV_STATE:-$PWD/.devenv/state}"
-OUT="${PORTAIL_CONFIG_FILE:-$STATE/config.toml}"
 mkdir -p "$(dirname "$OUT")"
 CLIENT_ID="${OIDC_CLIENT_ID:-portail-dev}"
 REDIRECT_URI="${OIDC_REDIRECT_URI:-http://localhost:5173/callback}"

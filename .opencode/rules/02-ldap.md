@@ -15,4 +15,4 @@
 - Tables `users`/`groups`/`group_members` en migration `0002` (`backend/db`, règle 15) — mots de passe argon2 hashés dans `directory`, jamais en clair.
 - Membres de groupe = `Uid` uniquement (plus de `cn=` libres, VO `Cn` supprimé).
 - db de test: `db_path` de `config.test.toml`, purgée par `#[ctor]`/`#[dtor]` (`tests/common/db/purge.rs`, règle 10).
-- Bootstrap `admin`: `main.rs` appelle `controllers::users::ensure_admin` au démarrage — crée `admin` (mot de passe `directory.admin_password_file`, défaut `admin`) + groupe `admin` si absent; no-op sinon, sur les deux backends.
+- Bootstrap `admin`: `main.rs` appelle `controllers::users::ensure_admin` au démarrage — no-op si le groupe `admin` a déjà au moins un membre ; sinon crée `admin` (mot de passe `directory.admin_password_file`, défaut `admin`) et l'ajoute au groupe `admin`; sur les deux backends. `delete_user` retire l'utilisateur de tous ses groupes (cascade SQLite et LDAP ; un groupe LDAP vidé est supprimé, `groupOfNames` exigeant ≥ 1 membre).

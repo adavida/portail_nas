@@ -415,3 +415,81 @@ test("hideActions removes the validate and cancel buttons", () => {
   expect(screen.queryByTestId("groups-save-alice")).not.toBeInTheDocument();
   expect(screen.queryByTestId("groups-cancel-alice")).not.toBeInTheDocument();
 });
+
+test("typing filters the group list down to matching entries", async () => {
+  const onSave = vi.fn(async () => true);
+
+  render(GroupsEditor, {
+    props: {
+      uid: "alice",
+      groups: [],
+      allGroups: ["devs", "ops", "opsmaint", "backup"],
+      onSave,
+      onCancel: () => {},
+    },
+  });
+
+  await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
+    target: { value: "ops" },
+  });
+
+  expect(screen.getByTestId("groups-suggest-alice-ops")).toBeInTheDocument();
+  expect(
+    screen.getByTestId("groups-suggest-alice-opsmaint"),
+  ).toBeInTheDocument();
+  expect(screen.queryByTestId("groups-suggest-alice-devs")).toBeNull();
+});
+
+test("suggestion list is anchored to the viewport, not to its row", async () => {
+  render(GroupsEditor, {
+    props: {
+      uid: "alice",
+      groups: [],
+      allGroups: ["ops"],
+      onSave: async () => true,
+      onCancel: () => {},
+    },
+  });
+
+  await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
+    target: { value: "ops" },
+  });
+
+  const list = screen.getByTestId("groups-suggest-list-alice");
+
+  expect(list.style.top).toBe("3px");
+  expect(list.style.left).toBe("0px");
+  expect(list.style.width).toBe("0px");
+});
+
+test("suggestion list flips above the field near the bottom of the viewport", async () => {
+  const rect = {
+    top: 640,
+    bottom: 660,
+    left: 10,
+    width: 200,
+  } as DOMRect;
+  const measured = vi
+    .spyOn(Element.prototype, "getBoundingClientRect")
+    .mockReturnValue(rect);
+
+  render(GroupsEditor, {
+    props: {
+      uid: "alice",
+      groups: [],
+      allGroups: ["ops"],
+      onSave: async () => true,
+      onCancel: () => {},
+    },
+  });
+
+  await fireEvent.input(screen.getByTestId("groups-new-input-alice"), {
+    target: { value: "ops" },
+  });
+
+  const list = screen.getByTestId("groups-suggest-list-alice");
+  measured.mockRestore();
+
+  expect(list.style.bottom).toBe("131px");
+  expect(list.style.top).toBe("");
+});

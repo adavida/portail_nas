@@ -18,7 +18,10 @@ impl User {
         display_name: Option<String>,
         mail: Option<String>,
     ) -> Result<Self, UserError> {
-        let raw_uid = uid.ok_or(UserError::MissingUid)?;
+        let raw_uid = uid
+            .clone()
+            .or_else(|| cn.clone())
+            .ok_or(UserError::MissingUid)?;
         let uid = Uid::try_new(raw_uid).map_err(|_| UserError::InvalidUid)?;
         let raw_name = display_name
             .filter(|s| !s.is_empty())
@@ -85,12 +88,28 @@ mod tests {
 
     #[test]
     fn needs_uid() {
-        let result = User::from_attrs(None, Some("x".into()), None, None).unwrap_err();
+        let result = User::from_attrs(None, None, None, None).unwrap_err();
 
         assert_eq!(
             result,
             UserError::MissingUid,
-            "from_attrs without uid should fail with MissingUid"
+            "from_attrs without uid or cn should fail with MissingUid"
+        );
+    }
+
+    #[test]
+    fn uid_falls_back_to_cn_when_no_uid_attribute() {
+        let u = User::from_attrs(None, Some("carol".into()), None, None).unwrap();
+
+        assert_eq!(
+            u.uid.as_str(),
+            "carol",
+            "cn should be used as uid when the entry has no uid attribute"
+        );
+        assert_eq!(
+            u.name.as_str(),
+            "carol",
+            "name should fall back to the uid when no displayName"
         );
     }
 

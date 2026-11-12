@@ -52,6 +52,36 @@
   let active = $state(0);
   const activeIdx = $derived(Math.min(active, options.length - 1));
   let listEl = $state<HTMLUListElement | null>(null);
+  let fieldEl = $state<HTMLDivElement | null>(null);
+  let anchor = $state({ left: 0, top: 0, bottom: 0, width: 0 });
+
+  const DROPDOWN_GAP_PX = 3;
+  const DROPDOWN_MAX_PX = 192;
+  // shortcut: anchor not re-measured while scrolling or resizing, the list is transient while typing
+  $effect(() => {
+    if (options.length > 0 && fieldEl) {
+      const rect = fieldEl.getBoundingClientRect();
+      anchor = {
+        left: rect.left,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+      };
+    }
+  });
+  const flipsUp = $derived(
+    window.innerHeight - anchor.bottom < DROPDOWN_MAX_PX &&
+      anchor.top >= DROPDOWN_MAX_PX,
+  );
+  const dropdownStyle = $derived(
+    flipsUp
+      ? `left: ${anchor.left}px; width: ${anchor.width}px; bottom: ${
+          window.innerHeight - anchor.top + DROPDOWN_GAP_PX
+        }px;`
+      : `left: ${anchor.left}px; width: ${anchor.width}px; top: ${
+          anchor.bottom + DROPDOWN_GAP_PX
+        }px;`,
+  );
 
   $effect(() => {
     if (activeIdx >= 0) {
@@ -122,7 +152,7 @@
 </script>
 
 <div data-testid={`groups-editor-${uid}`} class="groups-editor">
-  <div class="field">
+  <div class="field" bind:this={fieldEl}>
     {#each visible as gid (gid)}
       <span data-testid={`groups-chip-${uid}-${gid}`} class="chip">
         {gid}
@@ -151,6 +181,7 @@
         bind:this={listEl}
         data-testid={`groups-suggest-list-${uid}`}
         class="suggest"
+        style={dropdownStyle}
       >
         {#each options as opt, i (opt.kind === "create" ? "create" : opt.gid)}
           <li>

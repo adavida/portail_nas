@@ -61,10 +61,7 @@
 }
 
 .suggest {
-  position: absolute;
-  top: calc(100% + #{$s-3});
-  left: 0;
-  right: 0;
+  position: fixed;
   z-index: 10;
   max-height: 12rem;
   overflow-y: auto;
