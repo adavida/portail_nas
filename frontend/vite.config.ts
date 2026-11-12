@@ -3,10 +3,10 @@ import { svelteTesting } from "@testing-library/svelte/vite";
 import { defineConfig } from "vite";
 
 if (!process.env.VITE_OIDC_ISSUER_URL)
-  throw new Error("VITE_OIDC_ISSUER_URL manquant");
-if (!process.env.VITE_APP_URL) throw new Error("VITE_APP_URL manquant");
+  throw new Error("VITE_OIDC_ISSUER_URL missing");
+if (!process.env.VITE_APP_URL) throw new Error("VITE_APP_URL missing");
 if (!process.env.VITE_OIDC_REDIRECT_URI)
-  throw new Error("VITE_OIDC_REDIRECT_URI manquant");
+  throw new Error("VITE_OIDC_REDIRECT_URI missing");
 
 export default defineConfig({
   plugins: [svelte(), ...(process.env.VITEST ? [svelteTesting()] : [])],

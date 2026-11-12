@@ -16,6 +16,7 @@ pub const DEFAULT_PASSWORD_MIN_LENGTH: usize = 8;
 pub const DEFAULT_LOGIN_MAX_ATTEMPTS: u32 = 10;
 pub const DEFAULT_OIDC_ID_BYTES: usize = 16;
 pub const DEFAULT_DB_PATH: &str = "portail.db";
+pub const DEFAULT_ADMIN_PW: &str = "admin";
 pub const SYSTEM_SENSOR_NAMES: [&str; 14] = [
     "memory",
     "cpu",
@@ -57,6 +58,33 @@ pub struct LdapConfig {
     pub tls_ca: String,
 }
 
+impl Default for LdapConfig {
+    fn default() -> Self {
+        Self {
+            url: String::new(),
+            base_dn: String::new(),
+            people_ou: default_people_ou(),
+            groups_ou: default_groups_ou(),
+            admin_pw: DEFAULT_ADMIN_PW.to_string(),
+            tls_ca: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DirectoryBackend {
+    #[default]
+    Ldap,
+    Sqlite,
+}
+
+#[derive(Debug, Clone)]
+pub struct DirectoryConfig {
+    pub backend: DirectoryBackend,
+    pub admin_password: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct OidcConfig {
     pub issuer_url: String,
@@ -85,6 +113,7 @@ pub struct Config {
     pub app_url: String,
     pub bind_addr: String,
     pub db_path: String,
+    pub directory: DirectoryConfig,
     pub ldap: LdapConfig,
     pub oidc: OidcConfig,
     pub security: SecurityConfig,
@@ -98,12 +127,24 @@ struct RawConfig {
     bind_addr: String,
     #[serde(default = "default_db_path")]
     db_path: String,
-    ldap: RawLdap,
+    #[serde(default)]
+    directory: RawDirectory,
+    #[serde(default)]
+    ldap: Option<RawLdap>,
     oidc: RawOidc,
     #[serde(default)]
     security: RawSecurity,
     #[serde(default = "default_system_sensors")]
     system_sensors: Vec<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawDirectory {
+    #[serde(default)]
+    backend: Option<DirectoryBackend>,
+    #[serde(default)]
+    admin_password_file: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -211,10 +252,35 @@ impl Config {
             .parent()
             .and_then(|p| p.to_str())
             .unwrap_or(".");
-        let admin_pw = match parsed.ldap.admin_pw_file {
+        let backend = parsed.directory.backend.unwrap_or_default();
+        let raw_ldap = parsed.ldap;
+        if backend == DirectoryBackend::Ldap && raw_ldap.is_none() {
+            return Err(ConfigError(
+                "directory.backend = \"ldap\" requires an [ldap] section".to_string(),
+            ));
+        }
+        let ldap = match raw_ldap {
+            Some(raw) => {
+                let admin_pw = match raw.admin_pw_file {
+                    Some(file) => read_secret_file(&resolve_path(base_dir, &file))
+                        .map_err(|e| ConfigError(format!("ldap.admin_pw_file: {e}")))?,
+                    None => DEFAULT_ADMIN_PW.to_string(),
+                };
+                LdapConfig {
+                    url: raw.url,
+                    base_dn: raw.base_dn,
+                    people_ou: raw.people_ou,
+                    groups_ou: raw.groups_ou,
+                    admin_pw,
+                    tls_ca: resolve_path(base_dir, &raw.tls_ca),
+                }
+            }
+            None => LdapConfig::default(),
+        };
+        let admin_password = match parsed.directory.admin_password_file {
             Some(file) => read_secret_file(&resolve_path(base_dir, &file))
-                .map_err(|e| ConfigError(format!("ldap.admin_pw_file: {e}")))?,
-            None => "admin".to_string(),
+                .map_err(|e| ConfigError(format!("directory.admin_password_file: {e}")))?,
+            None => DEFAULT_ADMIN_PW.to_string(),
         };
         let id_bytes = parsed.oidc.id_bytes.unwrap_or(DEFAULT_OIDC_ID_BYTES);
         if id_bytes < DEFAULT_OIDC_ID_BYTES {
@@ -264,14 +330,11 @@ impl Config {
             app_url: parsed.app_url,
             bind_addr: parsed.bind_addr,
             db_path: resolve_path(base_dir, &parsed.db_path),
-            ldap: LdapConfig {
-                url: parsed.ldap.url,
-                base_dn: parsed.ldap.base_dn,
-                people_ou: parsed.ldap.people_ou,
-                groups_ou: parsed.ldap.groups_ou,
-                admin_pw,
-                tls_ca: resolve_path(base_dir, &parsed.ldap.tls_ca),
+            directory: DirectoryConfig {
+                backend,
+                admin_password,
             },
+            ldap,
             oidc: OidcConfig {
                 issuer_url: parsed.oidc.issuer_url,
                 client_id: parsed.oidc.client_id,
@@ -323,6 +386,8 @@ impl Config {
             app_url = %self.app_url,
             bind_addr = %self.bind_addr,
             db_path = %self.db_path,
+            directory_backend = ?self.directory.backend,
+            directory_admin_password_configured = %!self.directory.admin_password.is_empty(),
             ldap_url = %self.ldap.url,
             ldap_base_dn = %self.ldap.base_dn,
             ldap_people_ou = %self.ldap.people_ou,
@@ -699,6 +764,110 @@ login_max_attempts = 5
         assert!(
             err.0.contains("invalid config file"),
             "broken toml should be reported: {err}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_defaults_directory_backend_to_ldap() {
+        let path = write_temp_config("backenddefault", &minimal_toml());
+
+        let config = Config::load(&path).unwrap();
+
+        assert_eq!(
+            config.directory.backend,
+            DirectoryBackend::Ldap,
+            "backend should default to ldap for existing deployments"
+        );
+        assert_eq!(
+            config.directory.admin_password, DEFAULT_ADMIN_PW,
+            "default admin bootstrap password expected"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_accepts_sqlite_backend_without_ldap_section() {
+        let path = write_temp_config(
+            "sqlitebackend",
+            &format!(
+                "{}[directory]\nbackend = \"sqlite\"\n",
+                minimal_toml().replace(
+                    "[ldap]\nurl = \"ldap://127.0.0.1:3890\"\nbase_dn = \"dc=dev,dc=example,dc=com\"\n",
+                    "",
+                )
+            ),
+        );
+
+        let config = Config::load(&path).unwrap();
+
+        assert_eq!(
+            config.directory.backend,
+            DirectoryBackend::Sqlite,
+            "sqlite backend should parse"
+        );
+        assert_eq!(
+            config.ldap.url, "",
+            "absent ldap section should stay unused"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_ldap_backend_without_ldap_section() {
+        let path = write_temp_config(
+            "ldapmissing",
+            &minimal_toml().replace(
+                "[ldap]\nurl = \"ldap://127.0.0.1:3890\"\nbase_dn = \"dc=dev,dc=example,dc=com\"\n",
+                "",
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("[ldap] section"),
+            "ldap backend without [ldap] should be rejected: {err}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_reads_directory_admin_password_file() {
+        let pw_file =
+            std::env::temp_dir().join(format!("portail-config-dirpw-{}", std::process::id()));
+        std::fs::write(&pw_file, "s3cret!\n").unwrap();
+        let path = write_temp_config(
+            "diradmin",
+            &format!(
+                "{}\n[directory]\nbackend = \"sqlite\"\nadmin_password_file = \"{}\"\n",
+                minimal_toml(),
+                pw_file.to_str().unwrap()
+            ),
+        );
+
+        let config = Config::load(&path).unwrap();
+
+        assert_eq!(
+            config.directory.admin_password, "s3cret!",
+            "admin password should be read and trimmed from the file"
+        );
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(&pw_file);
+    }
+
+    #[test]
+    fn load_rejects_unknown_directory_backend() {
+        let path = write_temp_config(
+            "badbackend",
+            &format!("{}\n[directory]\nbackend = \"mysql\"\n", minimal_toml()),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("mysql") && err.0.contains("unknown variant"),
+            "unknown backend value should be reported: {err}"
         );
         let _ = std::fs::remove_file(&path);
     }

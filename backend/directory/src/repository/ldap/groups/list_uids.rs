@@ -39,7 +39,6 @@ pub async fn list_uids() -> Result<Vec<GroupUids>, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::groups::group_uids::Members;
     use crate::test_helpers::seed::{cleanup, gen_gid, seed_group, seed_user};
 
     #[tokio::test]
@@ -64,12 +63,9 @@ mod tests {
             .find(|g| g.gid == gid)
             .expect("group should be listed");
 
+        assert!(found.members.contains(&m1), "first member should be listed");
         assert!(
-            found.members.contains(&Members::Uid(m1.clone())),
-            "first member should be listed"
-        );
-        assert!(
-            found.members.contains(&Members::Uid(m2.clone())),
+            found.members.contains(&m2),
             "second member should be listed"
         );
 

@@ -1,15 +1,15 @@
+use crate::common::directory::assert_available::assert_available;
 use axum::http::{Method, StatusCode};
 use serde_json::json;
 
-#[allow(dead_code)]
-mod common;
-use common::{
+use crate::common::{
     http::send::send,
     seed::{nanos::nanos, test_group::TestGroup},
 };
 
 #[tokio::test]
 async fn list_returns_array_with_fields() {
+    assert_available().await;
     let (status, body) = send(Method::GET, "/api/groups", None).await;
 
     assert_eq!(status, StatusCode::OK, "GET /api/groups should be 200");
@@ -31,6 +31,7 @@ async fn list_returns_array_with_fields() {
 
 #[tokio::test]
 async fn create_returns_201_with_name_and_is_listed() {
+    assert_available().await;
     let group = TestGroup::new("apigrp");
     let (status, body) = group.create().await;
 
@@ -70,6 +71,7 @@ async fn create_returns_201_with_name_and_is_listed() {
 
 #[tokio::test]
 async fn delete_removes_group() {
+    assert_available().await;
     let group = TestGroup::new("apigdel");
     let (status, _) = group.create().await;
 
@@ -99,6 +101,7 @@ async fn delete_removes_group() {
 
 #[tokio::test]
 async fn create_invalid_gid_is_rejected() {
+    assert_available().await;
     let (status, _) = send(
         Method::POST,
         "/api/groups",
@@ -116,6 +119,7 @@ async fn create_invalid_gid_is_rejected() {
 
 #[tokio::test]
 async fn create_without_members_is_rejected() {
+    assert_available().await;
     let group = TestGroup::new("apigrp0");
     let (status, _) = group.create_without_members().await;
 
@@ -128,6 +132,7 @@ async fn create_without_members_is_rejected() {
 
 #[tokio::test]
 async fn create_empty_description_is_accepted() {
+    assert_available().await;
     let group = TestGroup::new("apides");
     let (seed_status, _) = send(
         Method::POST,
@@ -181,6 +186,7 @@ async fn create_empty_description_is_accepted() {
 
 #[tokio::test]
 async fn update_changes_name_and_description() {
+    assert_available().await;
     let group = TestGroup::new("apigrupd");
     let (status, _) = group.create().await;
 
@@ -224,6 +230,7 @@ async fn update_changes_name_and_description() {
 
 #[tokio::test]
 async fn delete_unknown_gid_is_404() {
+    assert_available().await;
     let n = nanos();
 
     let (status, body) = send(Method::DELETE, &format!("/api/groups/apinobody{n}"), None).await;
@@ -241,6 +248,7 @@ async fn delete_unknown_gid_is_404() {
 
 #[tokio::test]
 async fn create_duplicate_gid_is_500() {
+    assert_available().await;
     let group = TestGroup::new("apidup");
     let (seed_status, _) = send(
         Method::POST,
@@ -281,6 +289,7 @@ async fn create_duplicate_gid_is_500() {
 
 #[tokio::test]
 async fn delete_protected_gid_is_403() {
+    assert_available().await;
     for gid in ["admin", "user"] {
         let (status, body) = send(Method::DELETE, &format!("/api/groups/{gid}"), None).await;
 
@@ -294,31 +303,23 @@ async fn delete_protected_gid_is_403() {
 }
 
 mod repo {
+    use crate::common::directory::assert_available::assert_available;
     use crate::common::seed::{
         nanos::nanos, new_group_with_member::new_group_with_member, seed_user::seed_user,
     };
-    use portail_core::error::AppError;
     use portail_directory::domain::groups::UpdateGroup;
     use portail_directory::domain::ldap::{Description, Gid, Name};
-    use portail_directory::repository::ldap::groups::{
-        create_group, delete_group, list_groups, update_group,
-    };
+    use portail_directory::repository::{create_group, delete_group, list_groups, update_group};
 
     #[tokio::test]
     async fn repository_create_list_delete_roundtrip() {
+        assert_available().await;
         let member = format!("uniseed{}", nanos());
-        let seeded = seed_user(&member).await;
-        if matches!(seeded, Err(AppError::Ldap(_))) {
-            return;
-        }
-        seeded.unwrap();
+        seed_user(&member).await.unwrap();
 
         let new = new_group_with_member("unigrp", &member);
 
-        let created = match create_group(new.clone()).await {
-            Err(AppError::Ldap(_)) => return,
-            other => other.unwrap(),
-        };
+        let created = create_group(new.clone()).await.unwrap();
 
         assert_eq!(created.gid, new.gid, "created group should echo gid");
         assert_eq!(created.name, new.name, "created group should echo name");
@@ -351,6 +352,7 @@ mod repo {
 
     #[tokio::test]
     async fn repository_delete_unknown_gid_errors() {
+        assert_available().await;
         let gid = Gid::try_new(format!("unidead{}", nanos())).unwrap();
 
         let result = delete_group(gid).await;
@@ -360,17 +362,13 @@ mod repo {
 
     #[tokio::test]
     async fn repository_update_changes_name_and_description() {
+        assert_available().await;
         let member = format!("uniseed2{}", nanos());
-        let seeded = seed_user(&member).await;
-        if matches!(seeded, Err(AppError::Ldap(_))) {
-            return;
-        }
+        seed_user(&member).await.unwrap();
 
         let new = new_group_with_member("unigrp2", &member);
 
-        if create_group(new.clone()).await.is_err() {
-            return;
-        }
+        create_group(new.clone()).await.unwrap();
 
         let renamed = Name::try_new("Repo Renamed".into()).unwrap();
 

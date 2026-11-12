@@ -1,14 +1,14 @@
+use crate::common::directory::assert_available::assert_available;
 use axum::http::{Method, StatusCode};
 use serde_json::json;
 
-#[allow(dead_code)]
-mod common;
-use common::assert::user_groups::user_groups;
-use common::http::send::send;
-use common::seed::{fixture::Fixture, nanos::nanos};
+use crate::common::assert::user_groups::user_groups;
+use crate::common::http::send::send;
+use crate::common::seed::{fixture::Fixture, nanos::nanos};
 
 #[tokio::test]
 async fn add_member_makes_uid_visible_in_group() {
+    assert_available().await;
     let fixture = Fixture::new("apim1");
     let (seed_status, (create_status, _)) = fixture.seed().await;
 
@@ -54,6 +54,7 @@ async fn add_member_makes_uid_visible_in_group() {
 
 #[tokio::test]
 async fn remove_member_hides_uid_from_group() {
+    assert_available().await;
     let fixture = Fixture::new("apim3");
     let (seed_status, (_create_status, _)) = fixture.seed().await;
 
@@ -106,6 +107,7 @@ async fn remove_member_hides_uid_from_group() {
 
 #[tokio::test]
 async fn remove_last_member_deletes_group() {
+    assert_available().await;
     let fixture = Fixture::new("apim5");
     let (seed_status, (create_status, _)) = fixture.seed().await;
 
@@ -146,6 +148,7 @@ async fn remove_last_member_deletes_group() {
 
 #[tokio::test]
 async fn remove_member_from_user_group_is_403() {
+    assert_available().await;
     let n = nanos();
 
     let (status, body) = send(
@@ -165,6 +168,7 @@ async fn remove_member_from_user_group_is_403() {
 
 #[tokio::test]
 async fn add_unknown_uid_is_404() {
+    assert_available().await;
     let fixture = Fixture::new("apim4");
     let n = nanos();
     let ghost = format!("apimghost{n}");
@@ -193,6 +197,7 @@ async fn add_unknown_uid_is_404() {
 
 #[tokio::test]
 async fn remove_member_with_unknown_uid_is_404() {
+    assert_available().await;
     let n = nanos();
 
     let (status, body) = send(

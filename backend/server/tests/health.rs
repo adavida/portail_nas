@@ -1,7 +1,10 @@
-use axum::http::StatusCode;
+#[path = "shared/bootstrap_sqlite.rs"]
+mod bootstrap;
 
+use axum::http::StatusCode;
 #[allow(dead_code)]
 mod common;
+
 use common::http::oneshot::oneshot;
 
 #[tokio::test]

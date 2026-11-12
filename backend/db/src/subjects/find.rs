@@ -13,14 +13,8 @@ pub fn find(conn: &Connection, client_id: &str, username: &str) -> Result<Option
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::connect::init_schema;
     use crate::subjects::insert;
-
-    fn memory_db() -> Connection {
-        let mut conn = Connection::open_in_memory().unwrap();
-        init_schema(&mut conn).unwrap();
-        conn
-    }
+    use crate::test_helpers::memory_db::memory_db;
 
     #[test]
     fn find_returns_none_for_unknown_signature() {

@@ -13,6 +13,7 @@ pub struct ApiError {
 #[derive(Debug)]
 pub enum AppError {
     Ldap(String),
+    Db(String),
     NotFound(String),
     BadRequest(String),
     Internal(String),
@@ -26,6 +27,7 @@ impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Ldap(m) => write!(f, "ldap: {m}"),
+            Self::Db(m) => write!(f, "db: {m}"),
             Self::NotFound(m) => write!(f, "not found: {m}"),
             Self::BadRequest(m) => write!(f, "bad request: {m}"),
             Self::Internal(m) => write!(f, "internal: {m}"),
@@ -62,7 +64,7 @@ impl IntoResponse for AppError {
                 tracing::warn!("403 {}", m);
                 (StatusCode::FORBIDDEN, m, false)
             }
-            Self::Ldap(m) | Self::Internal(m) | Self::MemberError(m) => {
+            Self::Ldap(m) | Self::Db(m) | Self::Internal(m) | Self::MemberError(m) => {
                 tracing::error!("500 {}", m);
                 (StatusCode::INTERNAL_SERVER_ERROR, m, false)
             }

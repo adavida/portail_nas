@@ -31,7 +31,6 @@ pub async fn add_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::groups::group_uids::Members;
     use crate::repository::ldap::list_uids;
     use crate::test_helpers::seed::{cleanup, gen_gid, seed_group, seed_user};
 
@@ -60,7 +59,7 @@ mod tests {
             .expect("group should be listed");
 
         assert!(
-            group.members.contains(&Members::Uid(added.clone())),
+            group.members.contains(&added),
             "group should contain the added uid"
         );
 

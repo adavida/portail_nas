@@ -1,9 +1,8 @@
+use crate::common::directory::assert_available::assert_available;
 use axum::http::{Method, StatusCode};
 use serde_json::json;
 
-#[allow(dead_code)]
-mod common;
-use common::{
+use crate::common::{
     assert::uid_exists::uid_exists,
     http::send::send,
     seed::{nanos::nanos, test_user::TestUser},
@@ -11,6 +10,7 @@ use common::{
 
 #[tokio::test]
 async fn list_returns_sorted_users_with_fields() {
+    assert_available().await;
     let first = TestUser::new("apistephyski");
     let second = TestUser::new("apistepzeta");
 
@@ -51,6 +51,7 @@ async fn list_returns_sorted_users_with_fields() {
 
 #[tokio::test]
 async fn create_returns_201_and_user() {
+    assert_available().await;
     let user = TestUser::new("apicreate");
     let (status, body) = user.create().await;
 
@@ -75,6 +76,7 @@ async fn create_returns_201_and_user() {
 
 #[tokio::test]
 async fn create_invalid_uid_is_rejected() {
+    assert_available().await;
     let (status, _body) = send(
         Method::POST,
         "/api/users",
@@ -90,6 +92,7 @@ async fn create_invalid_uid_is_rejected() {
 
 #[tokio::test]
 async fn update_changes_name_and_email() {
+    assert_available().await;
     let user = TestUser::new("apiupdate");
     let (status, _) = user.create().await;
 
@@ -125,6 +128,7 @@ async fn update_changes_name_and_email() {
 #[cfg(feature = "test-api")]
 #[tokio::test]
 async fn update_password_change_password() {
+    assert_available().await;
     let user = TestUser::new("apipwd");
     let (status, _) = user.create().await;
 
@@ -166,6 +170,7 @@ async fn update_password_change_password() {
 
 #[tokio::test]
 async fn delete_twice_second_fails() {
+    assert_available().await;
     let user = TestUser::new("apidelete");
     let (status, _) = user.create().await;
 
@@ -189,6 +194,7 @@ async fn delete_twice_second_fails() {
 
 #[tokio::test]
 async fn update_unknown_uid_is_404() {
+    assert_available().await;
     let n = nanos();
 
     let (status, body) = send(
@@ -211,6 +217,7 @@ async fn update_unknown_uid_is_404() {
 
 #[tokio::test]
 async fn created_user_lifecycle_visible() {
+    assert_available().await;
     let user = TestUser::new("apilife");
     let (status, _) = user.create().await;
 
@@ -233,6 +240,7 @@ async fn created_user_lifecycle_visible() {
 
 #[tokio::test]
 async fn created_user_joined_user_group() {
+    assert_available().await;
     let user = TestUser::new("apigrpmember");
     let (status, _) = user.create().await;
 

@@ -1,7 +1,7 @@
 use ldap3::{Mod, Scope, SearchEntry};
 
 use crate::{
-    domain::groups::group_uids::Members,
+    domain::groups::GroupUids,
     domain::ldap::{Gid, Uid},
     repository::ldap::{MapLdap, connect, find_group_dn},
 };
@@ -29,7 +29,7 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
         .collect();
     let to_delete: HashSet<String> = stored
         .into_iter()
-        .filter(|dn| Members::from(dn).is_some_and(|m| m.name() == uid.as_str()))
+        .filter(|dn| GroupUids::uid_from_dn(dn).is_some_and(|m| m == uid))
         .collect();
 
     if !to_delete.is_empty() {
@@ -49,7 +49,6 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::groups::group_uids::Members;
     use crate::repository::ldap::{group_dn_from, list_uids, people_search_base, user_dn};
     use crate::test_helpers::seed::{cleanup, gen_gid, seed_group, seed_user};
 
@@ -77,12 +76,9 @@ mod tests {
             .find(|g| g.gid == gid)
             .expect("group should still exist");
 
+        assert!(found.members.contains(&keep), "kept member should remain");
         assert!(
-            found.members.contains(&Members::Uid(keep.clone())),
-            "kept member should remain"
-        );
-        assert!(
-            !found.members.contains(&Members::Uid(drop.clone())),
+            !found.members.contains(&drop),
             "removed member should be gone"
         );
 
@@ -90,7 +86,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remove_member_removes_cn_formatted_member() {
+    async fn remove_member_leaves_cn_formatted_member_unlisted() {
         let keep = match seed_user("rmck").await {
             Some(u) => u,
             None => return,
@@ -138,13 +134,10 @@ mod tests {
             .find(|g| g.gid == gid)
             .expect("group should still exist");
 
+        assert!(found.members.contains(&keep), "kept member should remain");
         assert!(
-            found.members.contains(&Members::Uid(keep.clone())),
-            "kept member should remain"
-        );
-        assert!(
-            !found.members.iter().any(|m| m.name() == drop.as_str()),
-            "cn-form member should be gone even though the entry dn is uid-form"
+            !found.members.iter().any(|m| m == &drop),
+            "cn= members are not uid members and must not be listed"
         );
 
         cleanup(&gid, &[keep, drop]).await;

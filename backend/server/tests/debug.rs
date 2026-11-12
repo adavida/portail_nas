@@ -1,7 +1,10 @@
-use axum::http::{Method, StatusCode};
+#[path = "shared/bootstrap_sqlite.rs"]
+mod bootstrap;
 
+use axum::http::{Method, StatusCode};
 #[allow(dead_code)]
 mod common;
+
 use common::http::{
     req::req, req_with_app::req_with_app, send::send, test_app_as_user::test_app_as_user,
 };

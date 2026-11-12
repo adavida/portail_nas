@@ -1,8 +1,6 @@
 use ldap3::{LdapConnAsync, Scope, SearchEntry};
 use portail_core::config::Config;
 
-use crate::common::config::set_test_config::set_test_config;
-
 async fn purge_ou(ou: &str) {
     let config = Config::global();
     let url = config.ldap.url.clone();
@@ -38,7 +36,7 @@ async fn purge_ou(ou: &str) {
     let _ = ldap.unbind().await;
 }
 
-fn purge_test_ldap() {
+pub(crate) fn purge_test_ldap() {
     std::thread::spawn(|| {
         let Ok(rt) = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -54,15 +52,4 @@ fn purge_test_ldap() {
     })
     .join()
     .ok();
-}
-
-#[ctor::ctor(unsafe)]
-fn purge_test_ldap_at_start() {
-    set_test_config();
-    purge_test_ldap();
-}
-
-#[dtor::dtor(unsafe)]
-fn purge_test_ldap_at_exit() {
-    purge_test_ldap();
 }

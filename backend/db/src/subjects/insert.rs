@@ -17,14 +17,8 @@ pub fn insert(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::connect::init_schema;
     use crate::subjects::find;
-
-    fn memory_db() -> Connection {
-        let mut conn = Connection::open_in_memory().unwrap();
-        init_schema(&mut conn).unwrap();
-        conn
-    }
+    use crate::test_helpers::memory_db::memory_db;
 
     #[test]
     fn insert_then_find_roundtrips_the_subject() {

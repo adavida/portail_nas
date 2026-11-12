@@ -6,8 +6,8 @@ pub use groups::{
     update_group,
 };
 pub use users::{
-    authenticate_user, create_user, delete_user, find_user_dn, find_user_members, list_users,
-    update_user, update_user_password,
+    authenticate_user, create_user, delete_user, find_user, find_user_dn, list_users, update_user,
+    update_user_password,
 };
 
 use crate::domain::ldap::{Gid, Uid};

@@ -1,17 +1,19 @@
 use ldap3::{Scope, SearchEntry};
 
 use crate::{
-    domain::{groups::group_uids::Members, ldap::Uid},
+    domain::ldap::Uid,
     repository::ldap::{MapLdap, connect, people_search_base},
+    repository::user_not_found,
 };
-use portail_core::error::AppError::{self, MemberError};
+use portail_core::error::AppError;
 
 #[tracing::instrument(level = "debug", skip_all)]
-pub async fn find_user_members(uid: &Uid) -> Result<Members, AppError> {
+pub async fn find_user(uid: &Uid) -> Result<(), AppError> {
     let mut ldap = connect().await?;
-    find_user_dn(&mut ldap, uid)
-        .await
-        .and_then(|x| Members::from(x.as_str()).ok_or(MemberError(x)))
+    find_user_dn(&mut ldap, uid).await?;
+    let _ = ldap.unbind().await;
+
+    Ok(())
 }
 
 #[tracing::instrument(level = "debug", skip_all)]
@@ -28,13 +30,12 @@ pub async fn find_user_dn(ldap: &mut ldap3::Ldap, uid: &Uid) -> Result<String, A
     rs.into_iter()
         .next()
         .map(|entry| SearchEntry::construct(entry).dn)
-        .ok_or_else(|| AppError::NotFound(format!("uid={} not found", uid.as_str(),)))
+        .ok_or_else(|| user_not_found(uid))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::ldap::Cn;
     use crate::repository::ldap::{connect, user_dn};
     use crate::test_helpers::seed::{ensure_clean, gen_uid, seed_and_create_user};
     use std::collections::HashSet;
@@ -86,32 +87,29 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn find_user_members_returns_uid_member_for_seeded_user() {
-        let uid = gen_uid("fmemok");
-        if !seed_and_create_user(&uid, "Member OK", "", "pw").await {
+    async fn find_user_ok_for_seeded_user() {
+        let uid = gen_uid("fuok");
+        if !seed_and_create_user(&uid, "User OK", "", "pw").await {
             return;
         }
 
-        let member = find_user_members(&uid).await;
+        let found = find_user(&uid).await;
 
-        assert_eq!(
-            member.unwrap(),
-            Members::Uid(uid.clone()),
-            "dn uid=... should decode to Members::Uid of the seeded uid"
-        );
+        assert!(found.is_ok(), "existing uid should be found");
 
         ensure_clean(&uid).await;
     }
 
     #[tokio::test]
-    async fn find_user_members_not_found_for_missing_uid() {
-        let uid = gen_uid("fmemko");
+    async fn find_user_not_found_for_missing_uid() {
+        let uid = gen_uid("fuko");
 
-        let result = find_user_members(&uid).await;
+        let result = find_user(&uid).await;
 
         let err = match result {
+            Err(AppError::Ldap(_)) => return,
             Err(err) => err,
-            Ok(member) => panic!("missing uid should return NotFound, got member={member:?}"),
+            Ok(()) => panic!("missing uid should return NotFound"),
         };
 
         assert!(
@@ -121,55 +119,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn find_user_members_returns_cn_member_for_cn_rdn_user() {
-        let Ok(mut ldap) = connect().await else {
-            return;
-        };
-        let uid = gen_uid("fmemcn");
-        let dn = format!(
-            "cn={},{}",
-            uid.as_str(),
-            crate::repository::ldap::people_search_base()
-        );
-
-        let mut object_class: HashSet<String> = HashSet::new();
-        for class in ["top", "person", "organizationalPerson", "inetOrgPerson"] {
-            object_class.insert(class.to_string());
-        }
-        let attrs = vec![
-            ("objectClass".to_string(), object_class),
-            (
-                "cn".to_string(),
-                [uid.as_str().to_string()].into_iter().collect(),
-            ),
-            (
-                "sn".to_string(),
-                [format!("cn-{}", uid.as_str())].into_iter().collect(),
-            ),
-            (
-                "uid".to_string(),
-                [uid.as_str().to_string()].into_iter().collect(),
-            ),
-        ];
-
-        if ldap.add(&dn, attrs).await.is_err() {
-            let _ = ldap.unbind().await;
-            return;
-        }
-
-        let member = find_user_members(&uid).await;
-        let _ = ldap.delete(&dn).await;
-        let _ = ldap.unbind().await;
-
-        assert_eq!(
-            member.unwrap(),
-            Members::Cn(Cn::try_new(uid.as_str().to_string()).unwrap()),
-            "dn cn=... should decode to Members::Cn of the entry cn"
-        );
-    }
-
-    #[tokio::test]
-    async fn find_user_dn_finds_entry_with_cn_rdn() {
+    async fn find_user_finds_entry_with_cn_rdn() {
         let Ok(mut ldap) = connect().await else {
             return;
         };

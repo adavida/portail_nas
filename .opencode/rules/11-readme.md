@@ -8,7 +8,7 @@ Le README est court et strict: français d'abord, anglais ensuite (`**Français*
 
 1. **Une ligne** — le but, non technique: gérer les utilisateurs du NAS NixOS et afficher une page regroupant ses applications. Jamais plus d'une phrase d'intro, pas de stack dans cette ligne.
 2. **Déploiement NixOS (flake)** — snippet `flake.nix`/config hôte **exhaustif** utilisant `nixosModules.default` (`services.portail`: toutes les options du module, défauts explicites), tableau des options, note secrets générés (OIDC) en 1-2 phrases, checks `nix build` + `nix flake check`. Pas de provisioning OpenLDAP complet ni de génération de secrets: la source de vérité reste `nixos/portail.nix` et `devenv.nix`.
-3. **Développement** — un seul bloc de commandes: `devenv up`/`devenv down` + ports, scripts devenv (`openfrontend`, `resetUsers`), `just test`, `treefmt` (sans préfixe `devenv shell --`, l'environnement dev est déjà actif).
+3. **Développement** — un seul bloc de commandes: `devenv up`/`devenv down` + ports, scripts devenv (`openfrontend`, `resetAdminLdap`, `resetAdminSqlite`), `just test`, `treefmt` (sans préfixe `devenv shell --`, l'environnement dev est déjà actif).
 
 ## Règles
 

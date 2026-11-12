@@ -18,15 +18,17 @@ backend/server/tests/common/<type>/<helper>.rs # 1 helper
 ```
 
 - Types unit: `seed/` (gen_uid, gen_gid, new_user, ensure_clean, seed_and_create_user, seed_user, seed_group, cleanup), `assert/` (assert_auth_ok/fail/err), `app/` (test_app, inject_admin), `config/` (set_test_config). Un helper `#[cfg(test)]` n'est pas exportable entre crates ⇒ duplication assumée par crate d'appartenance (set_test_config: directory+oidc+server, test_helpers/seed+assert: directory).
-- Types intégration: `seed/` (test_user, test_group, fixture, seed_user, new_group_with_member, nanos), `assert/` (uid_exists, user_groups), `http/` (send, oneshot, req, req_with_app, test_app, test_app_as_user, inject_admin, inject_user), `config/` (set_test_config), `ldap/` (purge, ensure_clean).
+- Types intégration: `seed/` (test_user, test_group, fixture, seed_user, new_group_with_member, nanos), `assert/` (uid_exists, user_groups), `http/` (send, oneshot, req, req_with_app, test_app, test_app_as_user, inject_admin, inject_user), `config/` (set_test_config_sqlite, set_test_config_ldap), `db/` (purge), `ldap/` (purge), `directory/` (assert_available — panic si le backend actif est injoignable).
+- Suites factorisées par backend: le corps des `#[tokio::test]` d'une ressource vit UNE seule fois dans `tests/shared/<ressource>.rs`, compilé dans deux binaires `tests/<ressource>_{sqlite,ldap}.rs` (glue: `#[allow(dead_code)] mod common;`, `#[path = "shared/bootstrap_<x>.rs"] mod bootstrap;`, `#[path = "shared/<ressource>.rs"] mod suite;`). Le bootstrap (ctor: set config + purges) est factorisé dans `tests/shared/bootstrap_{sqlite,ldap}.rs`. Chaque test du shared commence par `assert_available().await` — backend injoignable ⇒ le test ÉCHOUE (pas de skip silencieux); la suite complète nécessite `devenv up` (slapd test 3891).
 - Frontend: `frontend/src/test/<helper>.ts`, 1 helper par fichier (`setup.ts` reste l'entrée setupFiles).
 
 ## Interdits
 
 - `pub(crate) mod test_utils` inline dans un `mod.rs` de module applicatif (ex: `repository/ldap/users/mod.rs`) → helper dans `src/test_helpers/`.
 - Helper (fn ou struct de test) défini dans un fichier `backend/server/tests/<ressource>.rs` hors `#[cfg(test)] mod tests` du unit → le déplacer dans `tests/common/<helper>.rs`. Dans `tests/*.rs`, ne restent que les `#[tokio::test]`.
+- Dupliquer un test pour les deux backends → le corps vit dans `tests/shared/`, compilé par les deux binaires.
 - Plusieurs helpers dans un même fichier → un fichier par helper.
-- `#![allow(dead_code)]` par fichier helper → interdit; chaque binaire de test compile tout `common`, le lint est donc structurel: un seul `#[allow(dead_code)]` sur `mod common;` en tête de chaque `tests/<ressource>.rs` le couvre tout le sous-arbre.
+- `#![allow(dead_code)]` par fichier helper → interdit; chaque binaire de test compile tout `common`, le lint est donc structurel: un seul `#[allow(dead_code)]` sur `mod common;` en tête de chaque `tests/<ressource>[_backend].rs` le couvre tout le sous-arbre.
 
 ## Vérification
 

@@ -1,18 +1,18 @@
 use portail_core::error::AppError;
 use portail_directory::domain::ldap::{Email, Name, Password, Uid};
 use portail_directory::domain::users::NewUser;
-use portail_directory::repository::ldap::users::create_user;
-
-use crate::common::ldap::ensure_clean::ensure_clean;
+use portail_directory::repository::{create_user, delete_user};
 
 pub async fn seed_user(uid_str: &str) -> Result<(), AppError> {
-    ensure_clean(uid_str).await;
+    let uid = Uid::try_new(uid_str.to_string()).map_err(|e| AppError::Internal(e.to_string()))?;
+    let _ = delete_user(&uid).await;
 
     let new = NewUser {
-        uid: Uid::try_new(uid_str.to_string()).unwrap(),
-        name: Name::try_new("Seed Member".into()).unwrap(),
-        email: Email::try_new("".into()).unwrap(),
-        password: Password::try_new("secret123".into()).unwrap(),
+        uid,
+        name: Name::try_new("Seed Member".into()).map_err(|e| AppError::Internal(e.to_string()))?,
+        email: Email::try_new("".into()).map_err(|e| AppError::Internal(e.to_string()))?,
+        password: Password::try_new("secret123".into())
+            .map_err(|e| AppError::Internal(e.to_string()))?,
     };
 
     create_user(new).await.map(|_| ())

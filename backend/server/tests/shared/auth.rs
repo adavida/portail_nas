@@ -1,12 +1,12 @@
+use crate::common::directory::assert_available::assert_available;
 use axum::http::{Method, StatusCode};
 use serde_json::json;
 
-#[allow(dead_code)]
-mod common;
-use common::http::{req::req, req_with_app::req_with_app, send::send};
+use crate::common::http::{req::req, req_with_app::req_with_app, send::send};
 
 #[tokio::test]
 async fn protected_endpoints_return_401_without_token() {
+    assert_available().await;
     let protected = vec![
         (Method::GET, "/api/users", None),
         (
@@ -60,6 +60,7 @@ async fn protected_endpoints_return_401_without_token() {
 
 #[tokio::test]
 async fn public_endpoints_not_401_without_token() {
+    assert_available().await;
     let status = req(Method::GET, "/api/health", None).await;
     assert_ne!(
         status,
@@ -95,6 +96,7 @@ async fn public_endpoints_not_401_without_token() {
 #[cfg(feature = "test-api")]
 #[tokio::test]
 async fn authenticate_endpoint_is_protected() {
+    assert_available().await;
     let status = req(
         Method::POST,
         "/api/users/someuid/authenticate",
@@ -111,6 +113,7 @@ async fn authenticate_endpoint_is_protected() {
 #[cfg(feature = "test-api")]
 #[tokio::test]
 async fn oidc_test_endpoint_is_protected() {
+    assert_available().await;
     let status = req(
         Method::POST,
         "/api/auth/oidc-test",
@@ -126,7 +129,8 @@ async fn oidc_test_endpoint_is_protected() {
 
 #[tokio::test]
 async fn admin_can_access_protected_endpoints() {
-    let admin_app = common::http::test_app::test_app();
+    assert_available().await;
+    let admin_app = crate::common::http::test_app::test_app();
     let protected = vec![
         (Method::GET, "/api/users"),
         (Method::GET, "/api/groups"),
@@ -153,7 +157,8 @@ async fn admin_can_access_protected_endpoints() {
 
 #[tokio::test]
 async fn user_gets_403_on_admin_endpoints() {
-    let user_app = common::http::test_app_as_user::test_app_as_user();
+    assert_available().await;
+    let user_app = crate::common::http::test_app_as_user::test_app_as_user();
     let admin_endpoints = vec![
         (Method::GET, "/api/users", None),
         (Method::GET, "/api/groups", None),
@@ -182,7 +187,8 @@ async fn user_gets_403_on_admin_endpoints() {
 
 #[tokio::test]
 async fn user_can_access_me_without_admin() {
-    let user_app = common::http::test_app_as_user::test_app_as_user();
+    assert_available().await;
+    let user_app = crate::common::http::test_app_as_user::test_app_as_user();
 
     let status = req_with_app(user_app, Method::GET, "/api/auth/me", None).await;
 
@@ -195,6 +201,7 @@ async fn user_can_access_me_without_admin() {
 
 #[tokio::test]
 async fn me_reports_is_admin_and_groups_for_admin() {
+    assert_available().await;
     let (status, body) = send(Method::GET, "/api/auth/me", None).await;
 
     assert_eq!(status, StatusCode::OK, "admin /me should be 200");

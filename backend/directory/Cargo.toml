@@ -6,6 +6,8 @@ license = "GPL-2.0-or-later"
 
 [dependencies]
 portail-core = { path = "../core" }
+portail-db = { path = "../db" }
+argon2 = "0.6.0"
 axum = "0.8.9"
 ldap3 = { version = "0.12", default-features = false, features = ["tls-native"] }
 native-tls = "0.2"

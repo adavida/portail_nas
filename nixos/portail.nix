@@ -97,6 +97,12 @@ let
     app_url = cfg.appUrl;
     bind_addr = cfg.bindAddress;
     db_path = cfg.dbPath;
+    directory = {
+      backend = cfg.directory.backend;
+    }
+    // lib.optionalAttrs (cfg.directory.adminPasswordFile != null) {
+      admin_password_file = toString cfg.directory.adminPasswordFile;
+    };
     system_sensors = cfg.systemSensors;
     ldap = {
       url = cfg.ldap.url;
@@ -161,6 +167,35 @@ in
         first start: the parent must be writable by the `portail` service
         user (`StateDirectory = "portail"` covers the default).
       '';
+    };
+
+    directory = {
+      backend = lib.mkOption {
+        type = lib.types.enum [
+          "ldap"
+          "sqlite"
+        ];
+        default = "ldap";
+        description = ''
+          User/group directory backend (generated `config.toml` section
+          `directory`, key `backend`). `ldap` reads and writes the LDAP server
+          below; `sqlite` stores users, groups and argon2-hashed passwords in
+          the database at `dbPath` and no longer needs OpenLDAP. The `admin`
+          account is created on first start when absent, with the password
+          from `directory.adminPasswordFile` (default `admin`).
+        '';
+      };
+
+      adminPasswordFile = lib.mkOption {
+        type = with lib.types; nullOr path;
+        default = null;
+        description = ''
+          File containing the bootstrap password of the `admin` portal user
+          (generated `config.toml` key `directory.admin_password_file`, read
+          once at startup, only applied when `admin` does not exist yet).
+          Secrets: agenix/sops-nix. Null = default `admin`.
+        '';
+      };
     };
 
     systemSensors = lib.mkOption {

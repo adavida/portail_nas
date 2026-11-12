@@ -1,10 +1,9 @@
+use crate::common::directory::assert_available::assert_available;
 use axum::http::{Method, StatusCode};
 use base64::Engine as _;
 use serde_json::json;
 
-#[allow(dead_code)]
-mod common;
-use common::{
+use crate::common::{
     http::send_raw::send_raw,
     oidc::{
         auth_url::auth_url, challenge::VERIFIER, header_pairs::header_pairs,
@@ -16,6 +15,7 @@ use common::{
 
 #[tokio::test]
 async fn discovery_advertises_endpoints() {
+    assert_available().await;
     let (status, _, body, _) =
         send_raw(Method::GET, "/.well-known/openid-configuration", &[], None).await;
 
@@ -37,6 +37,7 @@ async fn discovery_advertises_endpoints() {
 
 #[tokio::test]
 async fn full_authorization_code_flow_issues_verified_tokens() {
+    assert_available().await;
     let user = TestUser::new("apiofidc");
     let (status, _) = user.create().await;
     if status == StatusCode::INTERNAL_SERVER_ERROR {
@@ -267,6 +268,7 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
 
 #[tokio::test]
 async fn token_rejects_wrong_pkce_verifier() {
+    assert_available().await;
     if !provider_available().await {
         return;
     }
@@ -360,6 +362,7 @@ async fn token_rejects_wrong_pkce_verifier() {
 
 #[tokio::test]
 async fn login_rejects_wrong_password() {
+    assert_available().await;
     if !provider_available().await {
         return;
     }
@@ -415,6 +418,7 @@ async fn login_rejects_wrong_password() {
 
 #[tokio::test]
 async fn login_same_req_still_works_after_wrong_password() {
+    assert_available().await;
     if !provider_available().await {
         return;
     }
@@ -492,6 +496,7 @@ async fn login_same_req_still_works_after_wrong_password() {
 
 #[tokio::test]
 async fn login_rejects_unknown_req() {
+    assert_available().await;
     let (status, _, body, _) = send_raw(
         Method::POST,
         "/api/oidc/login",
@@ -519,6 +524,7 @@ async fn login_rejects_unknown_req() {
 
 #[tokio::test]
 async fn login_caps_attempts_per_req() {
+    assert_available().await;
     let url = auth_url(
         portail_core::config::Config::global()
             .oidc
@@ -577,6 +583,7 @@ async fn login_caps_attempts_per_req() {
 
 #[tokio::test]
 async fn authorize_requires_registered_redirect_uri() {
+    assert_available().await;
     let url = auth_url(
         portail_core::config::Config::global()
             .oidc
@@ -597,6 +604,7 @@ async fn authorize_requires_registered_redirect_uri() {
 #[cfg(feature = "test-api")]
 #[tokio::test]
 async fn oidc_connection_test_reports_ok_for_configured_client() {
+    assert_available().await;
     let (status, _, body, _) = send_raw(
         Method::POST,
         "/api/auth/oidc-test",
@@ -626,6 +634,7 @@ async fn oidc_connection_test_reports_ok_for_configured_client() {
 #[cfg(feature = "test-api")]
 #[tokio::test]
 async fn oidc_connection_test_reports_unknown_client() {
+    assert_available().await;
     let (status, _, body, _) = send_raw(
         Method::POST,
         "/api/auth/oidc-test",

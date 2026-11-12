@@ -1,4 +1,3 @@
-pub mod cn;
 pub mod description;
 pub mod email;
 pub mod gid;
@@ -7,7 +6,6 @@ pub mod name;
 pub mod password;
 pub mod uid;
 
-pub use cn::{Cn, CnError};
 pub use description::Description;
 pub use email::{Email, EmailError};
 pub use gid::{Gid, GidError};

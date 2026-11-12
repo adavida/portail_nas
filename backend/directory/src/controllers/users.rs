@@ -1,16 +1,18 @@
 use crate::{
     domain::groups::NewGroup,
-    domain::ldap::{Description, Gid, Members, Name, Password, Uid},
+    domain::ldap::{Description, Email, Gid, Members, Name, Password, Uid},
     domain::users::{NewUser, UpdateUser, User},
-    repository::ldap as ldap_repo,
+    repository as repo,
 };
 use portail_core::error::AppError;
 
 const DEFAULT_GROUP: &str = "user";
+const ADMIN_UID: &str = "admin";
+const ADMIN_GROUP: &str = "admin";
 
 pub async fn list() -> Result<Vec<User>, AppError> {
-    let mut users = ldap_repo::list_users().await?;
-    let uids = ldap_repo::list_uids().await?;
+    let mut users = repo::list_users().await?;
+    let uids = repo::list_uids().await?;
 
     users
         .iter_mut()
@@ -20,17 +22,33 @@ pub async fn list() -> Result<Vec<User>, AppError> {
 }
 
 pub async fn create(new: NewUser) -> Result<User, AppError> {
-    let user = ldap_repo::create_user(new).await?;
+    let user = repo::create_user(new).await?;
     let _ = ensure_user_group(&user.uid).await;
     Ok(user)
+}
+
+pub async fn ensure_admin(password: Password) -> Result<(), AppError> {
+    let uid = Uid::try_new(ADMIN_UID.to_string()).map_err(|e| AppError::Internal(e.to_string()))?;
+    if repo::find_user(&uid).await.is_ok() {
+        return Ok(());
+    }
+    let new = NewUser {
+        uid: uid.clone(),
+        name: Name::try_new(ADMIN_UID.to_string())
+            .map_err(|e| AppError::Internal(e.to_string()))?,
+        email: Email::try_new(String::new()).map_err(|e| AppError::Internal(e.to_string()))?,
+        password,
+    };
+    create(new).await?;
+    ensure_admin_group(&uid).await
 }
 
 async fn ensure_user_group(uid: &Uid) -> Result<(), AppError> {
     let gid =
         Gid::try_new(DEFAULT_GROUP.to_string()).map_err(|e| AppError::Internal(e.to_string()))?;
-    let exists = ldap_repo::list_groups().await?.iter().any(|g| g.gid == gid);
+    let exists = repo::list_groups().await?.iter().any(|g| g.gid == gid);
     if exists {
-        return ldap_repo::add_member(gid, uid.clone()).await;
+        return repo::add_member(gid, uid.clone()).await;
     }
     let new = NewGroup {
         gid: gid.clone(),
@@ -39,34 +57,53 @@ async fn ensure_user_group(uid: &Uid) -> Result<(), AppError> {
         members: Members::try_new(vec![uid.clone()])
             .map_err(|e| AppError::Internal(e.to_string()))?,
     };
-    if ldap_repo::create_group(new).await.is_ok() {
+    if repo::create_group(new).await.is_ok() {
         return Ok(());
     }
-    ldap_repo::add_member(gid, uid.clone()).await
+    repo::add_member(gid, uid.clone()).await
+}
+
+async fn ensure_admin_group(uid: &Uid) -> Result<(), AppError> {
+    let gid =
+        Gid::try_new(ADMIN_GROUP.to_string()).map_err(|e| AppError::Internal(e.to_string()))?;
+    let existing = repo::list_uids().await?.into_iter().find(|g| g.gid == gid);
+    match existing {
+        Some(group) if group.members.contains(uid) => Ok(()),
+        Some(group) => repo::add_member(group.gid, uid.clone()).await,
+        None => {
+            let new = NewGroup {
+                gid,
+                name: Name::try_new(ADMIN_GROUP.to_string())
+                    .map_err(|e| AppError::Internal(e.to_string()))?,
+                description: Description::try_new(String::new()),
+                members: Members::try_new(vec![uid.clone()])
+                    .map_err(|e| AppError::Internal(e.to_string()))?,
+            };
+            repo::create_group(new).await.map(|_| ())
+        }
+    }
 }
 
 pub async fn update_password(uid: Uid, password: Password) -> Result<(), AppError> {
-    ldap_repo::update_user_password(&uid, password).await
+    repo::update_user_password(&uid, password).await
 }
 
 pub async fn delete(uid: Uid) -> Result<(), AppError> {
-    ldap_repo::delete_user(&uid).await
+    repo::delete_user(&uid).await
 }
 
 pub async fn update(uid: Uid, data: UpdateUser) -> Result<(), AppError> {
-    ldap_repo::update_user(&uid, data).await
+    repo::update_user(&uid, data).await
 }
 
 pub async fn authenticate(uid: Uid, password: Password) -> Result<bool, AppError> {
-    ldap_repo::authenticate_user(&uid, password).await
+    repo::authenticate_user(&uid, password).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::groups::group_uids::Members;
-    use crate::repository::ldap::list_uids;
-    use crate::test_helpers::seed::{cleanup, gen_uid, new_user};
+    use crate::test_helpers::seed::{gen_uid, new_user};
 
     #[tokio::test]
     async fn concurrent_creates_both_join_the_default_group_despite_the_race() {
@@ -82,18 +119,18 @@ mod tests {
             return;
         }
 
-        let groups = list_uids().await.unwrap();
+        let groups = repo::list_uids().await.unwrap();
         let user_group = groups
             .iter()
             .find(|g| g.gid == gid)
             .expect("the default group must exist after two creates");
         assert!(
-            user_group.members.contains(&Members::Uid(uid_a.clone()))
-                && user_group.members.contains(&Members::Uid(uid_b.clone())),
+            user_group.members.contains(&uid_a) && user_group.members.contains(&uid_b),
             "both concurrent users must belong to '{DEFAULT_GROUP}', got {:?}",
             user_group.members
         );
 
-        cleanup(&gid, &[uid_a, uid_b]).await;
+        let _ = repo::delete_user(&uid_a).await;
+        let _ = repo::delete_user(&uid_b).await;
     }
 }

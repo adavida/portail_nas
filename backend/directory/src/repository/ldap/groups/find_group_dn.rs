@@ -2,6 +2,7 @@ use ldap3::{Scope, SearchEntry};
 
 use crate::{
     domain::ldap::Gid,
+    repository::group_not_found,
     repository::ldap::{MapLdap, groups_search_base},
 };
 use portail_core::error::AppError;
@@ -20,7 +21,7 @@ pub async fn find_group_dn(ldap: &mut ldap3::Ldap, gid: &Gid) -> Result<String, 
     rs.into_iter()
         .next()
         .map(|entry| SearchEntry::construct(entry).dn)
-        .ok_or_else(|| AppError::NotFound(format!("gid={} not found", gid.as_str())))
+        .ok_or_else(|| group_not_found(gid))
 }
 
 #[cfg(test)]

@@ -12,6 +12,8 @@ mod tests {
     use crate::test_helpers::app::test_app;
     use axum::{body::Body, extract::Request, http::StatusCode};
     use http_body_util::BodyExt;
+    use portail_directory::domain::ldap::{Email, Name, Password};
+    use portail_directory::domain::users::NewUser;
     use tower::ServiceExt;
 
     #[tokio::test]
@@ -93,32 +95,22 @@ mod tests {
 
     #[tokio::test]
     async fn users_lists_seeded_user() {
-        let url = portail_core::config::Config::global().ldap.url.as_str();
-        let base = portail_core::config::Config::global().ldap.base_dn.as_str();
-
-        if let Ok((conn, mut ldap)) = ldap3::LdapConnAsync::new(url).await {
-            ldap3::drive!(conn);
-            let bind_dn = format!("cn=admin,{base}");
-            let _ = ldap.simple_bind(&bind_dn, "admin").await;
-
-            for (uid, cn, mail) in [
-                ("apitest2", "Api Test2", "apitest2@example.com"),
-                ("apitest1", "Api Test1", "apitest1@example.com"),
-            ] {
-                let dn = format!("uid={uid},ou=people,{base}");
-                let attrs = vec![
-                    (
-                        "objectClass".to_string(),
-                        ["inetOrgPerson".to_string()].into_iter().collect(),
-                    ),
-                    ("uid".to_string(), [uid.to_string()].into_iter().collect()),
-                    ("cn".to_string(), [cn.to_string()].into_iter().collect()),
-                    ("sn".to_string(), [cn.to_string()].into_iter().collect()),
-                    ("mail".to_string(), [mail.to_string()].into_iter().collect()),
-                ];
-                let _ = ldap.add(&dn, attrs).await;
-            }
-            let _ = ldap.unbind().await;
+        for uid in ["apitest1", "apitest2"] {
+            let _ = portail_directory::repository::delete_user(&uid_string(uid)).await;
+        }
+        for (uid, name, email) in [
+            ("apitest1", "Api Test1", "apitest1@example.com"),
+            ("apitest2", "Api Test2", "apitest2@example.com"),
+        ] {
+            let new = NewUser {
+                uid: uid_string(uid),
+                name: Name::try_new(name.into()).unwrap(),
+                email: Email::try_new(email.into()).unwrap(),
+                password: Password::try_new("secret123".into()).unwrap(),
+            };
+            portail_directory::repository::create_user(new)
+                .await
+                .unwrap();
         }
 
         let app = test_app();
@@ -128,10 +120,6 @@ mod tests {
             .unwrap();
 
         let resp = app.oneshot(req).await.unwrap();
-
-        if resp.status() == StatusCode::INTERNAL_SERVER_ERROR {
-            return;
-        }
 
         assert_eq!(resp.status(), StatusCode::OK);
 
@@ -144,27 +132,28 @@ mod tests {
             .filter_map(|o| o.get("uid").and_then(|x| x.as_str()))
             .collect();
 
-        if uids.contains(&"apitest1") {
-            assert!(uids.contains(&"apitest2"));
+        let p1 = uids
+            .iter()
+            .position(|&x| x == "apitest1")
+            .expect("apitest1 should be listed");
+        let p2 = uids
+            .iter()
+            .position(|&x| x == "apitest2")
+            .expect("apitest2 should be listed");
 
-            let p1 = uids.iter().position(|&x| x == "apitest1").unwrap();
-            let p2 = uids.iter().position(|&x| x == "apitest2").unwrap();
+        assert!(p1 < p2, "uid sort asc expected");
 
-            assert!(p1 < p2, "uid sort asc expected");
+        let apitest1 = arr.iter().find(|o| o["uid"] == "apitest1").unwrap();
 
-            let apitest1 = arr.iter().find(|o| o["uid"] == "apitest1").unwrap();
+        assert_eq!(apitest1["name"], "Api Test1");
+        assert_eq!(apitest1["email"], "apitest1@example.com");
 
-            assert_eq!(apitest1["name"], "Api Test1");
-            assert_eq!(apitest1["email"], "apitest1@example.com");
-
-            if let Ok((conn, mut l2)) = ldap3::LdapConnAsync::new(url).await {
-                ldap3::drive!(conn);
-                let _ = l2.simple_bind(&format!("cn=admin,{base}"), "admin").await;
-                for uid in ["apitest1", "apitest2"] {
-                    let _ = l2.delete(&format!("uid={uid},ou=people,{base}")).await;
-                }
-                let _ = l2.unbind().await;
-            }
+        for uid in ["apitest1", "apitest2"] {
+            let _ = portail_directory::repository::delete_user(&uid_string(uid)).await;
         }
+    }
+
+    fn uid_string(uid: &str) -> portail_directory::domain::ldap::Uid {
+        portail_directory::domain::ldap::Uid::try_new(uid.into()).unwrap()
     }
 }

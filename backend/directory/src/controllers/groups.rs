@@ -1,7 +1,7 @@
 use crate::{
     domain::groups::{Group, NewGroup, UpdateGroup},
     domain::ldap::{Gid, Uid},
-    repository::ldap as ldap_repo,
+    repository as repo,
 };
 use portail_core::error::AppError;
 
@@ -13,11 +13,11 @@ fn is_protected(gid: &Gid) -> bool {
 }
 
 pub async fn list() -> Result<Vec<Group>, AppError> {
-    ldap_repo::list_groups().await
+    repo::list_groups().await
 }
 
 pub async fn create(new: NewGroup) -> Result<Group, AppError> {
-    ldap_repo::create_group(new).await
+    repo::create_group(new).await
 }
 
 pub async fn delete(gid: Gid) -> Result<(), AppError> {
@@ -27,15 +27,15 @@ pub async fn delete(gid: Gid) -> Result<(), AppError> {
             gid.as_str()
         )));
     }
-    ldap_repo::delete_group(gid).await
+    repo::delete_group(gid).await
 }
 
 pub async fn update(gid: Gid, data: UpdateGroup) -> Result<(), AppError> {
-    ldap_repo::update_group(gid, data).await
+    repo::update_group(gid, data).await
 }
 
 pub async fn add_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
-    ldap_repo::add_member(gid, uid).await
+    repo::add_member(gid, uid).await
 }
 
 pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
@@ -44,13 +44,10 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
             "group user is mandatory: members cannot be removed".to_string(),
         ));
     }
-    let maybe_group = ldap_repo::list_uids()
-        .await?
-        .into_iter()
-        .find(|g| g.gid == gid);
-    ldap_repo::find_user_members(&uid).await?;
+    let maybe_group = repo::list_uids().await?.into_iter().find(|g| g.gid == gid);
+    repo::find_user(&uid).await?;
     if let Some(group) = maybe_group {
-        let is_last = group.members.iter().all(|m| m.name() == uid.as_str());
+        let is_last = group.members.iter().all(|m| m == &uid);
         if is_last && is_protected(&gid) {
             return Err(AppError::Forbidden(format!(
                 "group {} must keep at least one member",
@@ -58,9 +55,9 @@ pub async fn remove_member(gid: Gid, uid: Uid) -> Result<(), AppError> {
             )));
         }
         if is_last {
-            ldap_repo::delete_group(gid).await
+            repo::delete_group(gid).await
         } else {
-            ldap_repo::remove_member(gid, uid).await
+            repo::remove_member(gid, uid).await
         }
     } else {
         Ok(())

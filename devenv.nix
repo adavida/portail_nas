@@ -148,9 +148,9 @@ in
     echo "portail LDAP — rust $(rustc --version) | node $(node --version)"
     echo "LDAP dev:  $LDAP_URL/$LDAP_BASE_DN (CA LDAPS: $LDAP_TLS_CA)"
     echo "LDAP test: $LDAP_TEST_URL/$LDAP_TEST_BASE_DN"
-    echo "OpenLDAP users: admin|user, group admin — resetUsers to reseed)"
+    echo "Directory users: admin|user, group admin — resetAdminLdap / resetAdminSqlite to reseed)"
     echo "OIDC provider: $OIDC_ISSUER_URL (self-hosted, client=$OIDC_CLIENT_ID, secrets: $OIDC_SECRETS_DIR)"
-    echo "Config backend: $PORTAIL_CONFIG_FILE (--config), tests: ./config.test.toml"
+    echo "Config backend: scripts/generate-config.sh -> $PORTAIL_CONFIG_FILE (--config), tests: ./config.test.toml"
   '';
 
   enterTest = ''
@@ -185,31 +185,13 @@ in
 
   processes = {
     backend.exec = ''
-      cat > "$PORTAIL_CONFIG_FILE" <<EOF
-      app_url = "$APP_URL"
-      bind_addr = "$BIND_ADDR"
-      db_path = "db/portail.db"
-      system_sensors = ["memory","cpu","network","disk"]
-
-      [ldap]
-      url = "$LDAP_URL"
-      base_dn = "$LDAP_BASE_DN"
-      tls_ca = "$LDAP_TLS_CA"
-
-      [oidc]
-      issuer_url = "$OIDC_ISSUER_URL"
-      client_id = "$OIDC_CLIENT_ID"
-      redirect_uri = "$OIDC_REDIRECT_URI"
-      secrets_dir = "$OIDC_SECRETS_DIR"
-      clients = [{ id = "$OIDC_CLIENT_ID", secret_file = "$OIDC_CLIENT_ID_secret", enabled = true, redirect_uris = ["$OIDC_REDIRECT_URI"], scopes = ["openid","profile","email","groups"] }, { id = "oauth-debugger", enabled = false, redirect_uris = ["http://127.0.0.1:3030/callback"], scopes = ["openid","profile","email","groups"] }]
-      EOF
-      cargo watch -w backend -x "run -p portail-server -- --config $PORTAIL_CONFIG_FILE"
+      scripts/generate-config.sh
+      cargo watch -w backend -w "$PORTAIL_CONFIG_FILE" -x "run -p portail-server -- --config $PORTAIL_CONFIG_FILE"
     '';
     "backend-test".exec = "cargo watch -w backend -x 'test --features test-api --quiet'";
     frontend.exec = "npm --prefix frontend run dev";
     "frontend-test".exec = "npm --prefix frontend run test:watch";
     oauthdebugger.exec = ''
-      until [ -f "$PORTAIL_CONFIG_FILE" ]; do sleep 0.5; done
       exec uvx --from "oauth2-debugger[verify]" oauth2-debugger --port 3030 --issuer "$OIDC_ISSUER_URL" --client-id oauth-debugger --scope "openid profile email groups" --no-browser
     '';
     openldap.exec = mkSlapd {
@@ -231,7 +213,7 @@ in
 
   scripts = {
     openfrontend.exec = "xdg-open $APP_URL/ 2>/dev/null || echo \"Ouvrez manuellement $APP_URL/\"";
-    resetUsers.exec = ''
+    resetAdminLdap.exec = ''
       BIND="-x -H ldap://127.0.0.1:3890 -D cn=admin,$LDAP_BASE_DN -w admin"
       DNS="$(ldapsearch $BIND -s one -b "ou=people,$LDAP_BASE_DN" "(objectClass=inetOrgPerson)" dn | awk '/^dn: /{print $2}')
       $(ldapsearch $BIND -s one -b "ou=groups,$LDAP_BASE_DN" "(objectClass=groupOfNames)" dn | awk '/^dn: /{print $2}')"
@@ -241,7 +223,23 @@ in
       ldapadd $BIND <<LDIF
       ${devUsers}
       LDIF
-      echo "users reset: admin (group admin) / user"
+      echo "ldap users reset: admin (group admin) / user"
+    '';
+    resetAdminSqlite.exec = ''
+      # shortcut: hash argon2id precomputed for "admin" (repo Argon2::default), regenerate if the hashing params change
+      db="''${DEVENV_STATE}/db/portail.db"
+      admin_hash='$argon2id$v=19$m=19456,t=2,p=1$zb8fanKIem/qH47HXrNgVw$LoBR+5xGiDBotmhoNQqru0o0yXPz2LemXPINzhItubk'
+      if [ ! -f "$db" ]; then
+        echo "no sqlite db at $db — start the backend once (devenv up) to create the schema"
+        exit 1
+      fi
+      sqlite3 "$db" <<SQL
+      INSERT INTO users (uid, name, password_hash) VALUES ('admin', 'admin', '$admin_hash')
+        ON CONFLICT(uid) DO UPDATE SET password_hash = excluded.password_hash;
+      INSERT OR IGNORE INTO groups (gid, name) VALUES ('admin', 'admin');
+      INSERT OR IGNORE INTO group_members (gid, uid) VALUES ('admin', 'admin');
+      SQL
+      echo "sqlite admin reset: admin (group admin, password admin) — db kept"
     '';
   };
 
