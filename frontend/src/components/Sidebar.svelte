@@ -3,7 +3,7 @@
   import { logout } from "../auth/oidc";
   import { t } from "../i18n";
 
-  type Tab = "home" | "users" | "groups" | "system" | "debug";
+  type Tab = "home" | "profile" | "directory" | "monitoring";
 
   let { tab = $bindable<Tab>("home"), admin = false } = $props();
   let menuOpen = $state(false);
@@ -11,10 +11,9 @@
   const items: { id: Tab; labelKey: string; testId: string; adminOnly: boolean }[] =
     [
       { id: "home", labelKey: "nav.home", testId: "tab-home", adminOnly: false },
-      { id: "users", labelKey: "nav.users", testId: "tab-users", adminOnly: true },
-      { id: "groups", labelKey: "nav.groups", testId: "tab-groups", adminOnly: true },
-      { id: "system", labelKey: "nav.system", testId: "tab-system", adminOnly: true },
-      { id: "debug", labelKey: "nav.debug", testId: "tab-debug", adminOnly: true },
+      { id: "profile", labelKey: "nav.profile", testId: "tab-profile", adminOnly: false },
+      { id: "directory", labelKey: "nav.directory", testId: "tab-directory", adminOnly: true },
+      { id: "monitoring", labelKey: "nav.monitoring", testId: "tab-monitoring", adminOnly: true },
     ];
 
   function select(next: Tab) {

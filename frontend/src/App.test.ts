@@ -38,32 +38,33 @@ test("renders home by default for admin", async () => {
     expect(screen.getByTestId("apps-empty")).toBeInTheDocument();
   });
 
-  expect(screen.getByTestId("tab-users")).toBeInTheDocument();
+  expect(screen.getByTestId("tab-directory")).toBeInTheDocument();
   expect(screen.queryByTestId("users-table")).not.toBeInTheDocument();
 });
 
-test("switches to users tab", async () => {
+test("switches to users within directory tab", async () => {
   render(App);
 
   await waitFor(() => {
     expect(screen.getByTestId("apps-empty")).toBeInTheDocument();
   });
 
-  await fireEvent.click(screen.getByTestId("tab-users"));
+  await fireEvent.click(screen.getByTestId("tab-directory"));
 
   const table = await screen.findByTestId("users-table");
 
   expect(table).toBeInTheDocument();
 });
 
-test("switches to groups tab", async () => {
+test("switches to groups tab within directory", async () => {
   render(App);
 
   await waitFor(() => {
     expect(screen.getByTestId("apps-empty")).toBeInTheDocument();
   });
 
-  await fireEvent.click(screen.getByTestId("tab-groups"));
+  await fireEvent.click(screen.getByTestId("tab-directory"));
+  await fireEvent.click(screen.getByTestId("directory-tab-groups"));
 
   const table = await screen.findByTestId("groups-table");
 
@@ -117,6 +118,6 @@ test("non-admin sees home only", async () => {
     expect(screen.getByTestId("apps-empty")).toBeInTheDocument();
   });
 
-  expect(screen.queryByTestId("tab-users")).not.toBeInTheDocument();
-  expect(screen.queryByTestId("tab-groups")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("tab-directory")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("tab-monitoring")).not.toBeInTheDocument();
 });

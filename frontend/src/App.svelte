@@ -1,11 +1,10 @@
 <script lang="ts">
   import Callback from "./pages/Callback.svelte";
-  import Debug from "./pages/Debug.svelte";
-  import Groups from "./pages/Groups.svelte";
+  import Directory from "./pages/Directory.svelte";
   import Home from "./pages/Home.svelte";
   import Login from "./pages/Login.svelte";
-  import System from "./pages/System.svelte";
-  import Users from "./pages/Users.svelte";
+  import Monitoring from "./pages/Monitoring.svelte";
+  import Profile from "./pages/Profile.svelte";
   import Toaster from "./components/Toaster.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import { whoami } from "./api/auth";
@@ -16,7 +15,7 @@
   const isCallback = window.location.pathname === "/callback";
   const isLogin = window.location.pathname === "/login";
 
-  let tab = $state<"home" | "users" | "groups" | "system" | "debug">("home");
+  let tab = $state<"home" | "profile" | "directory" | "monitoring">("home");
   let checked = $state(false);
   let admin = $state(false);
   let groups = $state<string[]>([]);
@@ -76,14 +75,12 @@
     <main class="content">
       {#if tab === "home"}
         <Home {groups} />
-      {:else if tab === "users"}
-        <Users />
-      {:else if tab === "groups"}
-        <Groups />
-      {:else if tab === "system"}
-        <System />
+      {:else if tab === "profile"}
+        <Profile />
+      {:else if tab === "directory"}
+        <Directory />
       {:else}
-        <Debug />
+        <Monitoring />
       {/if}
     </main>
     <Toaster />

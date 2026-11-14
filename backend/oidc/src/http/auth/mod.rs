@@ -1,38 +1,23 @@
 use axum::{
-    Extension, Json, Router,
-    routing::{get, post},
+    Router,
+    routing::{get, post, put},
 };
 
-use crate::auth::Claims;
-use crate::auth::middleware::AuthUser;
 use portail_core::config::Config;
 
 pub mod callback;
 pub mod config;
+mod current_uid;
 pub mod debug;
 pub mod debug_claims;
+mod me;
 pub mod oidc_test;
+mod update_me;
+mod update_me_password;
 
-#[derive(serde::Serialize)]
-pub struct Me {
-    sub: String,
-    preferred_username: Option<String>,
-    email: Option<String>,
-    groups: Vec<String>,
-    is_admin: bool,
-}
-
-impl Me {
-    fn from_claims(claims: &Claims) -> Self {
-        Self {
-            sub: claims.sub.clone(),
-            preferred_username: claims.preferred_username.clone(),
-            email: claims.email.clone(),
-            groups: claims.groups.clone(),
-            is_admin: claims.is_admin(),
-        }
-    }
-}
+use me::me;
+use update_me::update_me;
+use update_me_password::update_me_password;
 
 pub fn auth_router(config: Config) -> Router<Config> {
     Router::new()
@@ -42,7 +27,9 @@ pub fn auth_router(config: Config) -> Router<Config> {
 }
 
 pub fn user_auth_router() -> Router<Config> {
-    Router::new().route("/me", get(me))
+    Router::new()
+        .route("/me", get(me).put(update_me))
+        .route("/me/password", put(update_me_password))
 }
 
 pub fn protected_auth_router() -> Router<Config> {
@@ -54,8 +41,4 @@ pub fn protected_auth_router() -> Router<Config> {
     let r = r.route("/oidc-test", post(oidc_test::oidc_test));
 
     r
-}
-
-pub async fn me(Extension(AuthUser(claims)): Extension<AuthUser>) -> Json<Me> {
-    Json(Me::from_claims(&claims))
 }

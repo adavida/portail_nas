@@ -1,0 +1,39 @@
+@use "../styles/tokens" as *;
+
+.tabs {
+  display: flex;
+  gap: $s-4;
+  border-bottom: $border;
+
+  button {
+    font: inherit;
+    font-size: $fs-md;
+    background: transparent;
+    border: none;
+    border-bottom: $s-2 solid transparent;
+    border-radius: $r-sm $r-sm 0 0;
+    padding: $s-8 $s-12;
+    margin-bottom: -$bw;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition:
+      color $dur,
+      background $dur;
+
+    &:hover {
+      color: var(--c-text);
+      background: var(--c-bg);
+    }
+
+    &.active {
+      color: var(--c-accent);
+      font-weight: $fw-semibold;
+      border-bottom-color: var(--c-accent);
+    }
+
+    &:focus-visible {
+      outline: $outline-w solid var(--c-accent);
+      outline-offset: -$outline-w;
+    }
+  }
+}

@@ -69,13 +69,15 @@ async fn public_endpoints_not_401_without_token() {
     );
     assert_eq!(status, StatusCode::OK);
 
-    let status = req(Method::GET, "/api/auth/config", None).await;
-    assert_ne!(
-        status,
-        StatusCode::UNAUTHORIZED,
-        "GET /api/auth/config should not be 401"
-    );
+    let (status, body) = send(Method::GET, "/api/auth/config", None).await;
     assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["password_min_length"],
+        portail_core::config::Config::global()
+            .security
+            .password_min_length,
+        "GET /api/auth/config should expose the password policy"
+    );
 
     let status = req(
         Method::POST,

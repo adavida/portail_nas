@@ -5,12 +5,12 @@ import Sidebar from "./Sidebar.svelte";
 test("admin sees all tabs, user only home", () => {
   const { unmount } = render(Sidebar, { props: { admin: true } });
 
-  expect(screen.getByTestId("tab-debug")).toBeInTheDocument();
+  expect(screen.getByTestId("tab-monitoring")).toBeInTheDocument();
 
   unmount();
   render(Sidebar, { props: { admin: false } });
 
-  expect(screen.queryByTestId("tab-users")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("tab-directory")).not.toBeInTheDocument();
   expect(screen.getByTestId("tab-home")).toBeInTheDocument();
 });
 

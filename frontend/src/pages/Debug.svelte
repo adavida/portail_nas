@@ -29,7 +29,7 @@
 </script>
 
 <section>
-  <h2>{$t("nav.debug")}</h2>
+  <h2>{$t("nav.diagnostics")}</h2>
   {#if error}
     <p data-testid="debug-error">{$t("common.error", { error: error ?? "" })}</p>
   {:else if info === null || apps === null}

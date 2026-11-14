@@ -3,6 +3,7 @@ import { authHeader } from "../auth/oidc";
 export type Me = {
   sub: string;
   preferred_username: string | null;
+  name: string | null;
   email: string | null;
   groups: string[];
   is_admin: boolean;
@@ -11,6 +12,7 @@ export type Me = {
 const anonymous: Me = {
   sub: "",
   preferred_username: null,
+  name: null,
   email: null,
   groups: [],
   is_admin: false,

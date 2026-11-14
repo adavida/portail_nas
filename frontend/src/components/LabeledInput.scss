@@ -1,0 +1,19 @@
+@use "../styles/tokens" as *;
+
+.labeled-input {
+  display: grid;
+  grid-template-columns: $form-label-w 1fr;
+  align-items: center;
+  gap: $s-8;
+  color: var(--c-muted);
+  font-size: $fs-sm;
+
+  .input {
+    max-width: none;
+  }
+
+  @media (max-width: $bp-narrow) {
+    grid-template-columns: 1fr;
+    gap: $s-4;
+  }
+}

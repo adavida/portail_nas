@@ -1,0 +1,92 @@
+@use "../styles/tokens" as *;
+
+.profile-card {
+  display: flex;
+  flex-direction: column;
+  gap: $s-12;
+  max-width: 30rem;
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+
+    &:hover {
+      background: var(--c-accent);
+    }
+  }
+}
+
+.profile-id {
+  display: flex;
+  align-items: center;
+  gap: $s-12;
+}
+
+.profile-avatar {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+  font-size: $fs-h2;
+  font-weight: $fw-bold;
+}
+
+.profile-uid {
+  font-weight: $fw-semibold;
+  font-size: $fs-lg;
+}
+
+.profile-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $s-4;
+  margin-top: $s-4;
+}
+
+.profile-tag {
+  padding: $s-1 $s-6;
+  border-radius: $r-sm;
+  background: var(--c-accent-soft);
+  color: var(--c-accent-strong);
+  font-family: ui-monospace, monospace;
+  font-size: $fs-xs;
+}
+
+.profile-fields {
+  display: flex;
+  flex-direction: column;
+  gap: $s-12;
+}
+
+.profile-conditions {
+  display: flex;
+  flex-direction: column;
+  gap: $s-2;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--c-muted);
+  font-size: $fs-xs;
+
+  li::before {
+    content: "• ";
+  }
+
+  li.ok {
+    color: var(--c-ok-text);
+
+    &::before {
+      content: "✓ ";
+    }
+  }
+}
+
+@media (min-width: $bp-narrow + 1px) {
+  .profile-save {
+    padding-left: calc($form-label-w + $s-8);
+  }
+}
