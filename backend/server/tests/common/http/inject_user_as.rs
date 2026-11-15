@@ -24,6 +24,7 @@ pub async fn inject_user_as(mut req: Request, next: Next) -> Result<Response, St
         groups: vec![],
         email: Some(format!("{uid}@example.com")),
         preferred_username: Some(uid),
+        name: None,
         nonce: None,
         azp: None,
         custom_claims: Default::default(),

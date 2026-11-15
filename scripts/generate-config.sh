@@ -48,6 +48,17 @@ clients = [
   { id = "$CLIENT_ID", secret_file = "", enabled = true, redirect_uris = ["$REDIRECT_URI"], scopes = ["openid", "profile", "email", "groups"] },
   { id = "oauth-debugger", enabled = false, redirect_uris = ["http://127.0.0.1:3030/callback"], scopes = ["openid", "profile", "email", "groups"] },
 ]
+
+[[attrs.labels]]
+name = "city"
+type = "text"
+max_chars = 50
+names = { fr = "Ville", en = "City" }
+
+[[attrs.labels]]
+name = "telephone"
+type = "telephone"
+names = { fr = "Téléphone", en = "Telephone" }
 TOML
 
 echo "wrote $OUT (directory backend: $BACKEND)"

@@ -76,6 +76,7 @@ mod tests {
             custom_claims: vec![],
             required_group: required_group.into(),
             forbidden_group: forbidden_group.into(),
+            expose_attrs: vec![],
         }
     }
 
@@ -114,6 +115,39 @@ mod tests {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(untagged)]
+pub enum ExposeAttr {
+    Plain(String),
+    Named {
+        label: String,
+        #[serde(default)]
+        claim: String,
+    },
+}
+
+impl ExposeAttr {
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Plain(label) => label,
+            Self::Named { label, .. } => label,
+        }
+    }
+
+    pub fn claim(&self) -> &str {
+        match self {
+            Self::Plain(label) => label,
+            Self::Named { label, claim } => {
+                if claim.is_empty() {
+                    label
+                } else {
+                    claim
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ClientEntry {
     pub id: String,
@@ -130,6 +164,8 @@ pub struct ClientEntry {
     pub required_group: String,
     #[serde(default)]
     pub forbidden_group: String,
+    #[serde(default)]
+    pub expose_attrs: Vec<ExposeAttr>,
 }
 
 impl ClientEntry {

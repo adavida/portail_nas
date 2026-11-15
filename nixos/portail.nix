@@ -34,6 +34,7 @@ let
       redirectUris = a.oidc.redirectUris;
       scopes = a.oidc.scopes;
       customClaims = a.oidc.customClaims;
+      exposeAttrs = a.oidc.exposeAttrs;
       requiredGroup = a.oidc.requiredGroup;
       forbiddenGroup = a.oidc.forbiddenGroup;
       user = a.oidc.user;
@@ -81,6 +82,7 @@ let
       scopes = c.scopes;
       required_group = c.requiredGroup;
       forbidden_group = c.forbiddenGroup;
+      expose_attrs = c.exposeAttrs;
       custom_claims = map (r: {
         name = r.name;
         value = r.value;
@@ -97,6 +99,7 @@ let
     app_url = cfg.appUrl;
     bind_addr = cfg.bindAddress;
     db_path = cfg.dbPath;
+    default_phone_country = cfg.defaultPhoneCountry;
     directory = {
       backend = cfg.directory.backend;
     }
@@ -128,6 +131,17 @@ let
       password_min_length = cfg.security.passwordMinLength;
       login_max_attempts = cfg.security.loginMaxAttempts;
     };
+    attrs.labels = lib.mapAttrsToList (
+      n: l:
+      {
+        name = n;
+        type = l.type;
+      }
+      // lib.optionalAttrs (l.maxChars != null) { max_chars = l.maxChars; }
+      // lib.optionalAttrs (l.min != null) { inherit (l) min; }
+      // lib.optionalAttrs (l.max != null) { inherit (l) max; }
+      // lib.optionalAttrs (l.names != { }) { inherit (l) names; }
+    ) cfg.attrs.labels;
   };
 in
 {
@@ -167,6 +181,101 @@ in
         first start: the parent must be writable by the `portail` service
         user (`StateDirectory = "portail"` covers the default).
       '';
+    };
+
+    defaultPhoneCountry = lib.mkOption {
+      type = lib.types.str;
+      default = "FR";
+      description = ''
+        ISO 3166-1 alpha-2 country code preselected by the phone-number
+        fields of the profile page (generated `config.toml` key
+        `default_phone_country`, exposed to the frontend as
+        `default_phone_country` of `GET /api/auth/config`). Unknown codes
+        fall back to `FR` client-side.
+      '';
+    };
+
+    attrs = {
+      labels = lib.mkOption {
+        type = lib.types.attrsOf (
+          lib.types.submodule (
+            { name, ... }: {
+              options = {
+                name = lib.mkOption {
+                  type = lib.types.str;
+                  default = name;
+                  internal = true;
+                  description = "Attribute label — the attr key (generated `config.toml` `attrs.labels[].name`).";
+                };
+                type = lib.mkOption {
+                  type = lib.types.enum [
+                    "text"
+                    "number"
+                    "email"
+                    "telephone"
+                  ];
+                  description = "Field type validated by the backend when the user saves it.";
+                };
+                maxChars = lib.mkOption {
+                  type = with lib.types; nullOr int;
+                  default = null;
+                  description = "text only — maximum character count. Null = portal default (500).";
+                };
+                min = lib.mkOption {
+                  type = with lib.types; nullOr int;
+                  default = null;
+                  description = "number only — minimum value (inclusive).";
+                };
+                max = lib.mkOption {
+                  type = with lib.types; nullOr int;
+                  default = null;
+                  description = "number only — maximum value (inclusive).";
+                };
+                names = lib.mkOption {
+                  type = with lib.types; attrsOf str;
+                  default = { };
+                  description = "display name of the field per language code, e.g. `{ fr = \"Ville\"; en = \"City\"; }` — falls back to the label itself when the UI language is absent";
+                };
+              };
+            }
+          )
+        );
+        default = { };
+        description = ''
+          Custom user attributes catalog (generated `config.toml` section `attrs`).
+          Keys are the label names; each user may fill the values on the profile
+          page. Label names must be valid LDAP attribute names (a-z, digits, `-`,
+          2-32 chars, not a standard attribute like `mail`/`uid`). In LDAP each
+          catalogued label is stored as a real attribute (e.g. `city: Strasbourg`) —
+          the OpenLDAP server schema must declare a matching `attributetype` and
+          allow it in the auxiliary `portailUser` class (see `docker/portail.schema`
+          for the pattern); values kept for labels outside the catalog stay packed
+          in the multi-valued `portailAttr` (`label=value`). In SQLite everything
+          lives in the `user_attrs` table. Empty (default) disables the feature.
+        '';
+        example = {
+          telephone = {
+            type = "telephone";
+            names = {
+              fr = "Téléphone";
+              en = "Telephone";
+            };
+          };
+          biography = {
+            type = "text";
+            maxChars = 300;
+            names = {
+              fr = "Biographie";
+              en = "Biography";
+            };
+          };
+          age = {
+            type = "number";
+            min = 0;
+            max = 150;
+          };
+        };
+      };
     };
 
     directory = {
@@ -437,6 +546,28 @@ in
                     type = lib.types.str;
                     default = "";
                     description = "LDAP group whose membership is required to see this app on the home page and to complete its OIDC token exchange (403 otherwise). Empty (default) = no requirement.";
+                  };
+                  exposeAttrs = lib.mkOption {
+                    type =
+                      with lib.types;
+                      listOf (oneOf [
+                        str
+                        (submodule {
+                          options = {
+                            label = lib.mkOption {
+                              type = lib.types.str;
+                              description = "Catalogued attr label whose stored value is exposed.";
+                            };
+                            claim = lib.mkOption {
+                              type = lib.types.str;
+                              default = "";
+                              description = "Claim name in this client's tokens/userinfo; empty = the label itself. Must not shadow a reserved OIDC claim.";
+                            };
+                          };
+                        })
+                      ]);
+                    default = [ ];
+                    description = "Custom attribute labels (from `attrs.labels`) sent as claims in this client's tokens and `/userinfo`. A plain string sends that label under its own name; `{ label = \"city\"; claim = \"ville\"; }` sends city's value under the claim name `ville`. `\"*\"` bundles every value into a single `attrs` JSON claim. Empty (default) = send nothing; unknown labels or reserved claim names fail backend startup.";
                   };
                   forbiddenGroup = lib.mkOption {
                     type = lib.types.str;

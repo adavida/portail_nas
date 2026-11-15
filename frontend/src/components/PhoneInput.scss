@@ -1,0 +1,122 @@
+@use "../styles/tokens" as *;
+
+.phone-input {
+  display: grid;
+  grid-template-columns: $form-label-w 1fr;
+  align-items: center;
+  gap: $s-8;
+  color: var(--c-muted);
+  font-size: $fs-sm;
+
+  @media (max-width: $bp-narrow) {
+    grid-template-columns: 1fr;
+    gap: $s-4;
+  }
+}
+
+.phone-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: $s-6;
+  border: $border;
+  border-radius: $r-sm;
+  background: var(--c-surface);
+  width: $pct;
+
+  &:focus-within {
+    border-color: var(--c-accent);
+    box-shadow: $ring;
+  }
+
+  .phone-trigger {
+    flex: none;
+    border: none;
+    background: none;
+    padding: $s-6 0 6px $s-10;
+    font: inherit;
+    font-size: $fs-body;
+    color: var(--c-text);
+    cursor: pointer;
+  }
+
+  .phone-dial {
+    flex: none;
+    font-size: $fs-body;
+    color: var(--c-text);
+  }
+
+  .phone-number {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: none;
+    padding: $s-6 $s-10 $s-6 0;
+    font: inherit;
+    font-size: $fs-body;
+    color: var(--c-text);
+    width: $pct;
+
+    &:focus {
+      outline: none;
+    }
+  }
+}
+
+.phone-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: $z-modal - 1;
+}
+
+.phone-list {
+  position: absolute;
+  top: calc(100% + #{$s-4});
+  left: 0;
+  z-index: $z-modal;
+  display: flex;
+  flex-direction: column;
+  width: 16rem;
+  max-height: 15rem;
+  border: $border;
+  border-radius: $r-sm;
+  background: var(--c-surface);
+  box-shadow: $ring;
+  overflow: hidden;
+
+  .phone-search {
+    flex: none;
+    margin: $s-6;
+    padding: $s-6;
+    border: $border;
+    border-radius: $r-sm;
+    background: var(--c-bg);
+    color: var(--c-text);
+    font: inherit;
+    font-size: $fs-body;
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-y: auto;
+  }
+
+  li button {
+    display: block;
+    width: $pct;
+    padding: $s-6 $s-10;
+    border: none;
+    background: none;
+    text-align: left;
+    font: inherit;
+    font-size: $fs-body;
+    color: var(--c-text);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--c-bg);
+    }
+  }
+}

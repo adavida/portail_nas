@@ -33,6 +33,8 @@ pub fn test_client(client_id: ClientId) -> Result<OidcTestReport, AppError> {
     };
 
     let flow = store::AuthFlow {
+        name: None,
+        attrs: Vec::new(),
         client_id: client.id.as_str().to_string(),
         redirect_uri: client.redirect_uris[0].as_str().to_string(),
         state: None,

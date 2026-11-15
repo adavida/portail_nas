@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Génère les secrets de la stack docker-compose dans docker/secrets/ + docker/.env.
 # Idempotent : un fichier existant n'est jamais écrasé (supprimer le fichier pour régénérer).
-# Les secrets OIDC (clé de signature, clients.json) sont générés par le backend
-# lui-même dans le volume `oidc-secrets` au premier start — rien ici.
+# Les secrets OIDC (clé de signature) sont générés par le backend lui-même
+# dans le volume `oidc-secrets` au premier start — rien ici.
 # Usage : bash docker/gen-secrets.sh
 set -euo pipefail
 

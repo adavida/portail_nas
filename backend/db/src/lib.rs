@@ -1,3 +1,4 @@
+pub mod attrs;
 pub mod connect;
 pub mod groups;
 pub(crate) mod path;

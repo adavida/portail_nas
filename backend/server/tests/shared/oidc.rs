@@ -221,6 +221,10 @@ async fn full_authorization_code_flow_issues_verified_tokens() {
         body["preferred_username"], user.uid,
         "preferred_username keeps the readable uid"
     );
+    assert_eq!(
+        body["name"], user.name,
+        "the profile scope signs the display name into userinfo, got {body}"
+    );
     assert!(
         body["groups"].as_array().unwrap().contains(&json!("user")),
         "seeded user should belong to group 'user', got {:?}",

@@ -15,6 +15,8 @@ pub struct AuthFlow {
     pub sub: String,
     pub groups: Vec<String>,
     pub email: Option<String>,
+    pub name: Option<String>,
+    pub attrs: Vec<(String, String)>,
 }
 
 #[derive(Default)]
@@ -141,6 +143,8 @@ mod tests {
 
     fn flow(sub: &str) -> AuthFlow {
         AuthFlow {
+            name: None,
+            attrs: Vec::new(),
             client_id: "app1".into(),
             redirect_uri: "http://localhost:5173/callback".into(),
             state: Some("st".into()),

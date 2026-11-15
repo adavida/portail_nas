@@ -1,0 +1,37 @@
+app_url = "https://portail.localhost"
+bind_addr = "0.0.0.0:3000"
+db_path = "/data/portail.db"
+system_sensors = ["memory", "cpu", "network", "disk"]
+
+[directory]
+backend = "sqlite"
+
+[ldap]
+url = "ldap://openldap:389"
+base_dn = "dc=dev,dc=example,dc=com"
+admin_pw_file = "/secrets/ldap-admin-pw"
+
+[oidc]
+issuer_url = "https://portail.localhost"
+client_id = "portail-dev"
+redirect_uri = "https://portail.localhost/callback"
+secrets_dir = "/oidc-secrets"
+secret_logs = false
+clients = [
+  { id = "portail-dev", enabled = true, redirect_uris = ["https://portail.localhost/callback"], scopes = ["openid", "profile", "email", "groups"] },
+]
+
+[security]
+password_min_length = 8
+login_max_attempts = 10
+
+[[attrs.labels]]
+name = "city"
+type = "text"
+max_chars = 50
+names = { fr = "Ville", en = "City" }
+
+[[attrs.labels]]
+name = "telephone"
+type = "telephone"
+names = { fr = "Téléphone", en = "Telephone" }

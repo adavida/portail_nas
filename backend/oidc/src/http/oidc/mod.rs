@@ -6,7 +6,8 @@ use axum::{
     routing::{get, post},
 };
 
-use portail_core::config::Config;
+use portail_core::config::EXPOSE_ALL_ATTRS;
+use portail_core::config::{Config, ExposeAttr};
 use portail_core::error::AppError;
 
 pub mod authorize;
@@ -122,11 +123,63 @@ pub(crate) async fn enrich_flow(flow: &mut crate::auth::store::AuthFlow) -> Resu
         return Ok(());
     };
     flow.groups = user.groups.iter().map(|g| g.as_str().to_string()).collect();
+    flow.name = Some(user.name.as_str().to_string());
     if !user.email.as_str().is_empty() {
         flow.email = Some(user.email.as_str().to_string());
     }
+    flow.attrs = attrs_snapshot(user.uid.as_str()).await;
     Ok(())
 }
+
+pub(crate) async fn attrs_snapshot(uid: &str) -> Vec<(String, String)> {
+    let any_client_exposes = portail_core::config::Config::global()
+        .oidc
+        .clients
+        .iter()
+        .any(|client| !client.expose_attrs.is_empty());
+    if !any_client_exposes {
+        return Vec::new();
+    }
+    let Ok(parsed) = portail_directory::domain::ldap::Uid::try_new(uid.to_string()) else {
+        return Vec::new();
+    };
+    portail_directory::controllers::users::list_attrs(&parsed)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|attr| (attr.label, attr.value))
+        .collect()
+}
+
+pub(crate) fn attrs_claims(
+    expose: &[ExposeAttr],
+    attrs: &[(String, String)],
+) -> Vec<(String, String)> {
+    if expose.iter().any(|e| e.label() == EXPOSE_ALL_ATTRS) {
+        if attrs.is_empty() {
+            return Vec::new();
+        }
+        let map: std::collections::BTreeMap<&str, &str> = attrs
+            .iter()
+            .map(|(label, value)| (label.as_str(), value.as_str()))
+            .collect();
+        return vec![(
+            EXPOSE_ALL_CLAIM.to_string(),
+            serde_json::to_string(&map).unwrap_or_default(),
+        )];
+    }
+    expose
+        .iter()
+        .filter_map(|entry| {
+            attrs
+                .iter()
+                .find(|(stored, _)| stored == entry.label())
+                .map(|(_, value)| (entry.claim().to_string(), value.clone()))
+        })
+        .collect()
+}
+
+pub(crate) const EXPOSE_ALL_CLAIM: &str = "attrs";
 
 #[cfg(test)]
 mod tests {
@@ -173,6 +226,90 @@ mod tests {
             sid.as_deref(),
             Some("abc123"),
             "session sid should be parsed"
+        );
+    }
+
+    #[test]
+    fn attrs_claims_selects_only_exposed_labels() {
+        let attrs = vec![
+            ("city".to_string(), "Nice".to_string()),
+            ("age".to_string(), "30".to_string()),
+        ];
+
+        let claims = attrs_claims(&[ExposeAttr::Plain("city".to_string())], &attrs);
+
+        assert_eq!(
+            claims,
+            vec![("city".to_string(), "Nice".to_string())],
+            "only the exposed, present label should become a claim"
+        );
+    }
+
+    #[test]
+    fn attrs_claims_star_bundles_everything_in_one_json_claim() {
+        let attrs = vec![
+            ("city".to_string(), "Nice".to_string()),
+            ("age".to_string(), "30".to_string()),
+        ];
+
+        let claims = attrs_claims(&[ExposeAttr::Plain(EXPOSE_ALL_ATTRS.to_string())], &attrs);
+
+        assert_eq!(claims.len(), 1, "star must produce exactly one claim");
+        assert_eq!(claims[0].0, EXPOSE_ALL_CLAIM, "claim is named 'attrs'");
+        assert_eq!(
+            serde_json::from_str::<std::collections::BTreeMap<String, String>>(&claims[0].1)
+                .unwrap(),
+            [
+                ("age".to_string(), "30".to_string()),
+                ("city".to_string(), "Nice".to_string())
+            ]
+            .into_iter()
+            .collect::<std::collections::BTreeMap<_, _>>(),
+            "the attrs claim must be a JSON object of every stored pair"
+        );
+    }
+
+    #[test]
+    fn attrs_claims_renames_the_claim_for_a_label() {
+        let attrs = vec![("city".to_string(), "Nice".to_string())];
+        let expose = vec![ExposeAttr::Named {
+            label: "city".to_string(),
+            claim: "ville".to_string(),
+        }];
+
+        let claims = attrs_claims(&expose, &attrs);
+
+        assert_eq!(
+            claims,
+            vec![("ville".to_string(), "Nice".to_string())],
+            "the value of city must be emitted under the renamed claim 'ville'"
+        );
+    }
+
+    #[test]
+    fn attrs_claims_named_without_claim_falls_back_to_label() {
+        let attrs = vec![("age".to_string(), "30".to_string())];
+        let expose = vec![ExposeAttr::Named {
+            label: "age".to_string(),
+            claim: String::new(),
+        }];
+
+        let claims = attrs_claims(&expose, &attrs);
+
+        assert_eq!(
+            claims,
+            vec![("age".to_string(), "30".to_string())],
+            "an empty claim name means the label itself"
+        );
+    }
+
+    #[test]
+    fn attrs_claims_star_emits_nothing_when_empty() {
+        let claims = attrs_claims(&[ExposeAttr::Plain(EXPOSE_ALL_ATTRS.to_string())], &[]);
+
+        assert!(
+            claims.is_empty(),
+            "no stored attrs means no bundle claim to add"
         );
     }
 

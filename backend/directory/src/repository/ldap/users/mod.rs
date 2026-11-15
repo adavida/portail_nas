@@ -2,7 +2,9 @@ mod authenticate_user;
 mod create_user;
 mod delete_user;
 mod find_user_dn;
+mod list_user_attrs;
 mod list_users;
+mod set_user_attrs;
 mod update_user;
 mod update_user_password;
 
@@ -11,7 +13,12 @@ pub use create_user::create_user;
 pub use delete_user::delete_user;
 pub use find_user_dn::find_user;
 pub use find_user_dn::find_user_dn;
+pub use list_user_attrs::list_user_attrs;
+pub(crate) use list_user_attrs::{
+    ATTR_ELEMENT, ATTR_OBJECT_CLASS, catalog_labels, read_attr_entry,
+};
 pub use list_users::list_users;
+pub use set_user_attrs::set_user_attrs;
 pub use update_user::update_user;
 pub use update_user_password::update_user_password;
 

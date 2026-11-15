@@ -78,6 +78,11 @@ async fn public_endpoints_not_401_without_token() {
             .password_min_length,
         "GET /api/auth/config should expose the password policy"
     );
+    assert_eq!(
+        body["default_phone_country"],
+        portail_core::config::Config::global().default_phone_country,
+        "GET /api/auth/config should expose the default phone country"
+    );
 
     let status = req(
         Method::POST,

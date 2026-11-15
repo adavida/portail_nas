@@ -88,6 +88,7 @@ mod tests {
             custom_claims: Default::default(),
             required_group: String::new(),
             forbidden_group: String::new(),
+            expose_attrs: vec![],
         }
     }
 
@@ -167,6 +168,7 @@ mod tests {
             custom_claims: Default::default(),
             required_group: String::new(),
             forbidden_group: String::new(),
+            expose_attrs: vec![],
         }])
         .unwrap_err();
 

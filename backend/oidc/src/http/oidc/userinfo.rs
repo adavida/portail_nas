@@ -1,6 +1,8 @@
 use axum::{Json, extract::State, http::HeaderMap};
 use serde::Serialize;
+use std::collections::BTreeMap;
 
+use super::{attrs_claims, attrs_snapshot};
 use crate::auth::tokens;
 use portail_core::config::Config;
 use portail_core::error::AppError;
@@ -9,8 +11,11 @@ use portail_core::error::AppError;
 pub struct Userinfo {
     pub(crate) sub: String,
     pub(crate) preferred_username: Option<String>,
+    pub(crate) name: Option<String>,
     pub(crate) email: Option<String>,
     pub(crate) groups: Vec<String>,
+    #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) attrs: BTreeMap<String, String>,
 }
 
 pub async fn userinfo(
@@ -26,11 +31,26 @@ pub async fn userinfo(
         return Err(AppError::Unauthorized("missing Bearer token".into()));
     }
     let claims = tokens::verify_any_aud(&config, token)?;
+    let expose = config
+        .oidc
+        .clients
+        .iter()
+        .find(|client| client.id == claims.aud)
+        .map(|client| client.expose_attrs.clone())
+        .unwrap_or_default();
+    let attrs = match claims.preferred_username.as_deref() {
+        Some(uid) if !expose.is_empty() => attrs_claims(&expose, &attrs_snapshot(uid).await)
+            .into_iter()
+            .collect(),
+        _ => BTreeMap::new(),
+    };
     Ok(Json(Userinfo {
         sub: claims.sub,
         preferred_username: claims.preferred_username,
+        name: claims.name,
         email: claims.email,
         groups: claims.groups,
+        attrs,
     }))
 }
 

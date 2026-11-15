@@ -1,10 +1,12 @@
 use serde::Deserialize;
 use std::time::Duration;
 
+pub mod attrs;
 pub mod client;
 pub mod errors;
 mod global;
-pub use client::{ClientEntry, CustomClaim};
+pub use attrs::{AttrKind, AttrSpec};
+pub use client::{ClientEntry, CustomClaim, ExposeAttr};
 pub use errors::ConfigError;
 
 pub const DEFAULT_KEY_BITS: usize = 2048;
@@ -17,6 +19,7 @@ pub const DEFAULT_LOGIN_MAX_ATTEMPTS: u32 = 10;
 pub const DEFAULT_OIDC_ID_BYTES: usize = 16;
 pub const DEFAULT_DB_PATH: &str = "portail.db";
 pub const DEFAULT_ADMIN_PW: &str = "admin";
+pub const DEFAULT_PHONE_COUNTRY: &str = "FR";
 pub const SYSTEM_SENSOR_NAMES: [&str; 14] = [
     "memory",
     "cpu",
@@ -34,7 +37,8 @@ pub const SYSTEM_SENSOR_NAMES: [&str; 14] = [
     "uptime",
 ];
 pub const DEFAULT_SYSTEM_SENSORS: [&str; 4] = ["memory", "cpu", "network", "disk"];
-pub const RESERVED_CLAIM_NAMES: [&str; 11] = [
+pub const EXPOSE_ALL_ATTRS: &str = "*";
+pub const RESERVED_CLAIM_NAMES: [&str; 12] = [
     "iss",
     "sub",
     "aud",
@@ -44,6 +48,7 @@ pub const RESERVED_CLAIM_NAMES: [&str; 11] = [
     "nonce",
     "azp",
     "email",
+    "name",
     "groups",
     "preferred_username",
 ];
@@ -118,6 +123,15 @@ pub struct Config {
     pub oidc: OidcConfig,
     pub security: SecurityConfig,
     pub system_sensors: Vec<String>,
+    pub attrs: Vec<AttrSpec>,
+    pub default_phone_country: String,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawAttrs {
+    #[serde(default)]
+    labels: Vec<AttrSpec>,
 }
 
 #[derive(Deserialize)]
@@ -136,6 +150,10 @@ struct RawConfig {
     security: RawSecurity,
     #[serde(default = "default_system_sensors")]
     system_sensors: Vec<String>,
+    #[serde(default = "default_phone_country")]
+    default_phone_country: String,
+    #[serde(default)]
+    attrs: RawAttrs,
 }
 
 #[derive(Deserialize, Default)]
@@ -221,6 +239,10 @@ fn default_system_sensors() -> Vec<String> {
         .collect()
 }
 
+fn default_phone_country() -> String {
+    DEFAULT_PHONE_COUNTRY.to_string()
+}
+
 fn read_secret_file(path: &str) -> Result<String, String> {
     std::fs::read_to_string(path)
         .map(|s| s.trim().to_string())
@@ -297,6 +319,42 @@ impl Config {
                 "system_sensors contains unknown sensor '{unknown}' (known: {})",
                 SYSTEM_SENSOR_NAMES.join(", ")
             )));
+        }
+        attrs::validate_labels(&parsed.attrs.labels).map_err(ConfigError)?;
+        let known_labels: Vec<&str> = parsed
+            .attrs
+            .labels
+            .iter()
+            .map(|label| label.name.as_str())
+            .collect();
+        for entry in &parsed.oidc.clients {
+            for expose in &entry.expose_attrs {
+                let label = expose.label();
+                if label != EXPOSE_ALL_ATTRS && !known_labels.contains(&label) {
+                    return Err(ConfigError(format!(
+                        "client {}: exposes unknown attr label '{label}' (known: {})",
+                        entry.id,
+                        if known_labels.is_empty() {
+                            "none".to_string()
+                        } else {
+                            known_labels.join(", ")
+                        }
+                    )));
+                }
+                let claim = expose.claim();
+                if claim.is_empty() {
+                    return Err(ConfigError(format!(
+                        "client {}: exposed claim name must not be empty",
+                        entry.id
+                    )));
+                }
+                if RESERVED_CLAIM_NAMES.contains(&claim) {
+                    return Err(ConfigError(format!(
+                        "client {}: exposed claim name '{claim}' shadows a reserved OIDC claim",
+                        entry.id,
+                    )));
+                }
+            }
         }
         for entry in &parsed.oidc.clients {
             for rule in &entry.custom_claims {
@@ -378,7 +436,13 @@ impl Config {
                     .unwrap_or(DEFAULT_LOGIN_MAX_ATTEMPTS),
             },
             system_sensors: parsed.system_sensors,
+            attrs: parsed.attrs.labels,
+            default_phone_country: parsed.default_phone_country,
         })
+    }
+
+    pub fn attr_spec(&self, label: &str) -> Option<&AttrSpec> {
+        self.attrs.iter().find(|spec| spec.name == label)
     }
 
     pub fn log_summary(&self) {
@@ -409,6 +473,8 @@ impl Config {
             login_max_attempts = %self.security.login_max_attempts,
             oidc_id_bytes = %self.oidc.id_bytes,
             system_sensors = %self.system_sensors.join(","),
+            attrs_labels = %self.attrs.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(","),
+            default_phone_country = %self.default_phone_country,
             "backend config loaded"
         );
     }
@@ -452,11 +518,31 @@ clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enabled = t
     }
 
     #[test]
+    fn load_reads_default_phone_country() {
+        let path = write_temp_config(
+            "phonecountry",
+            &format!("default_phone_country = \"BE\"\n{}", minimal_toml()),
+        );
+
+        let config = Config::load(&path).unwrap();
+
+        assert_eq!(
+            config.default_phone_country, "BE",
+            "explicit phone country expected"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
     fn load_applies_defaults_for_optional_fields() {
         let path = write_temp_config("defaults", &minimal_toml());
 
         let config = Config::load(&path).unwrap();
 
+        assert!(
+            config.attrs.is_empty(),
+            "no attrs section should mean an empty catalog"
+        );
         assert_eq!(config.ldap.people_ou, "people", "default OU expected");
         assert_eq!(config.ldap.groups_ou, "groups", "default OU expected");
         assert_eq!(
@@ -464,6 +550,10 @@ clients = [{ id = "portail-dev", secret_file = "portail-dev_secret", enabled = t
             "default admin password expected"
         );
         assert_eq!(config.ldap.tls_ca, "", "default empty TLS CA expected");
+        assert_eq!(
+            config.default_phone_country, "FR",
+            "default phone country expected"
+        );
         assert_eq!(
             config.db_path,
             format!("{}/portail.db", std::env::temp_dir().display()),
@@ -764,6 +854,193 @@ login_max_attempts = 5
         assert!(
             err.0.contains("invalid config file"),
             "broken toml should be reported: {err}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_reads_attr_labels_and_expose_attrs() {
+        let path = write_temp_config(
+            "attrlabels",
+            &format!(
+                "{}[[attrs.labels]]\nname = \"telephone\"\ntype = \"telephone\"\nnames = {{ fr = \"T\u{e9}l\u{e9}phone\", en = \"Telephone\" }}\n\n[[attrs.labels]]\nname = \"age\"\ntype = \"number\"\nmin = 0\nmax = 150\n",
+                minimal_toml().replace(
+                    r#"scopes = ["openid"] }]"#,
+                    r#"scopes = ["openid"], expose_attrs = ["telephone", { label = "age", claim = "nombre" }] }]"#,
+                ),
+            ),
+        );
+
+        let config = Config::load(&path).unwrap();
+
+        assert_eq!(config.attrs.len(), 2, "two attr labels expected");
+        assert_eq!(config.attrs[0].name, "telephone", "first label expected");
+        assert_eq!(config.attrs[0].kind, AttrKind::Telephone, "kind expected");
+        assert_eq!(
+            config.attrs[0].names.get("fr").map(String::as_str),
+            Some("Téléphone"),
+            "localized name fr expected"
+        );
+        assert!(
+            config.attr_spec("age").unwrap().names.is_empty(),
+            "a label without names section has an empty map"
+        );
+        assert_eq!(
+            config.attr_spec("age").map(|s| s.max),
+            Some(Some(150)),
+            "number bounds expected"
+        );
+        assert_eq!(
+            config.oidc.clients[0].expose_attrs,
+            vec![
+                ExposeAttr::Plain("telephone".to_string()),
+                ExposeAttr::Named {
+                    label: "age".to_string(),
+                    claim: "nombre".to_string(),
+                },
+            ],
+            "client expose_attrs expected in both plain and renamed form"
+        );
+        assert_eq!(
+            config.oidc.clients[0].expose_attrs[1].claim(),
+            "nombre",
+            "the renamed entry emits claim 'nombre' for label 'age'"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_duplicate_attr_label_names() {
+        let path = write_temp_config(
+            "attdup",
+            &format!(
+                "{}[[attrs.labels]]\nname = \"x1\"\ntype = \"text\"\n\n[[attrs.labels]]\nname = \"x1\"\ntype = \"email\"\n",
+                minimal_toml()
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("duplicate name 'x1'"),
+            "duplicated label names should be rejected: {err}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_inconsistent_attr_options() {
+        let path = write_temp_config(
+            "attrbad",
+            &format!(
+                "{}[[attrs.labels]]\nname = \"age\"\ntype = \"number\"\nmin = 10\nmax = 5\n",
+                minimal_toml()
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("min (10) must not exceed max (5)"),
+            "min above max should be rejected: {err}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_unknown_exposed_attr_label() {
+        let path = write_temp_config(
+            "attrexpose",
+            &minimal_toml().replace(
+                r#"scopes = ["openid"] }]"#,
+                r#"scopes = ["openid"], expose_attrs = ["ghost"] }]"#,
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("unknown attr label 'ghost'"),
+            "exposing an uncatalogued label should be rejected: {err}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_renamed_claim_shadowing_reserved_name() {
+        let path = write_temp_config(
+            "atrename",
+            &format!(
+                "{}[[attrs.labels]]\nname = \"telephone\"\ntype = \"telephone\"\n",
+                minimal_toml().replace(
+                    r#"scopes = ["openid"] }]"#,
+                    r#"scopes = ["openid"], expose_attrs = [{ label = "telephone", claim = "sub" }] }]"#,
+                ),
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("reserved OIDC claim"),
+            "a renamed claim cannot shadow a reserved claim: {err}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_attr_label_shadowing_reserved_claim() {
+        let path = write_temp_config(
+            "attrreserved",
+            &format!(
+                "{}[[attrs.labels]]\nname = \"sub\"\ntype = \"text\"\n",
+                minimal_toml()
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("reserved OIDC claim name"),
+            "a label named after a reserved claim should be rejected: {err}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_attr_label_with_ldap_invalid_name() {
+        let path = write_temp_config(
+            "attrldapname",
+            &format!(
+                "{}[[attrs.labels]]\nname = \"mon.label\"\ntype = \"text\"\n",
+                minimal_toml()
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("LDAP attribute names"),
+            "dots and underscores must be rejected for catalogued labels: {err}"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_attr_label_shadowing_standard_ldap_attribute() {
+        let path = write_temp_config(
+            "attrldapres",
+            &format!(
+                "{}[[attrs.labels]]\nname = \"mail\"\ntype = \"text\"\n",
+                minimal_toml()
+            ),
+        );
+
+        let err = Config::load(&path).unwrap_err();
+
+        assert!(
+            err.0.contains("standard LDAP attribute"),
+            "a label named after a standard attribute must be refused: {err}"
         );
         let _ = std::fs::remove_file(&path);
     }

@@ -104,6 +104,9 @@ pub fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppErro
                 custom_claims.insert(rule.name.clone(), rule.value.clone());
             }
         }
+        for (name, value) in crate::http::oidc::attrs_claims(&entry.expose_attrs, &flow.attrs) {
+            custom_claims.insert(name, value);
+        }
     }
     let groups = if flow.scopes.iter().any(|s| s == "groups") {
         flow.groups.clone()
@@ -123,6 +126,10 @@ pub fn claims(config: &Config, flow: &store::AuthFlow) -> Result<Claims, AppErro
             .clone()
             .filter(|e| !e.is_empty() && flow.scopes.iter().any(|s| s == "email")),
         preferred_username: Some(flow.sub.clone()),
+        name: flow
+            .name
+            .clone()
+            .filter(|_| flow.scopes.iter().any(|s| s == "profile")),
         nonce: flow.nonce.clone(),
         azp: None,
         custom_claims,
@@ -237,12 +244,15 @@ mod tests {
             ],
             required_group: String::new(),
             forbidden_group: String::new(),
+            expose_attrs: vec![],
         }];
         config
     }
 
     fn public_flow(challenge: Option<&str>) -> store::AuthFlow {
         store::AuthFlow {
+            name: None,
+            attrs: Vec::new(),
             client_id: PUBLIC_ID.into(),
             redirect_uri: PUBLIC_REDIRECT.into(),
             state: None,
@@ -253,6 +263,33 @@ mod tests {
             groups: vec!["birds".into()],
             email: None,
         }
+    }
+
+    #[test]
+    fn name_claim_follows_profile_scope() {
+        let config = env_with_public_client("nameclaim");
+
+        let mut with_profile = public_flow(None);
+        with_profile.name = Some("Test Person".into());
+        with_profile.scopes = vec!["openid".into(), "profile".into()];
+
+        let issued = claims(&config, &with_profile).expect("claims should build");
+
+        assert_eq!(
+            issued.name.as_deref(),
+            Some("Test Person"),
+            "the profile scope must sign the display name into the token"
+        );
+
+        let mut without_profile = public_flow(None);
+        without_profile.name = Some("Test Person".into());
+
+        let issued_no_scope = claims(&config, &without_profile).expect("claims should build");
+
+        assert_eq!(
+            issued_no_scope.name, None,
+            "without the profile scope the name claim must be absent"
+        );
     }
 
     #[test]
@@ -582,6 +619,7 @@ mod tests {
             custom_claims: Default::default(),
             required_group: String::new(),
             forbidden_group: String::new(),
+            expose_attrs: vec![],
         }];
         std::fs::create_dir_all(&config.oidc.secrets_dir).unwrap();
         config.db_path = format!("{}/portail.db", config.oidc.secrets_dir);
@@ -597,6 +635,8 @@ mod tests {
     fn exchange_confidential_client_reads_secret_from_file() {
         let config = env_with_secret_client("ok", true);
         let flow = store::AuthFlow {
+            name: None,
+            attrs: Vec::new(),
             client_id: "confid".into(),
             redirect_uri: PUBLIC_REDIRECT.into(),
             state: None,
@@ -634,6 +674,8 @@ mod tests {
         let mut config = env_with_secret_client("gate", true);
         config.oidc.clients[0].required_group = "vpn".into();
         let code = store::save_code(store::AuthFlow {
+            attrs: Vec::new(),
+            name: None,
             client_id: "confid".into(),
             redirect_uri: PUBLIC_REDIRECT.into(),
             state: None,
@@ -660,6 +702,8 @@ mod tests {
         let mut config = env_with_secret_client("gate-ok", true);
         config.oidc.clients[0].required_group = "vpn".into();
         let code = store::save_code(store::AuthFlow {
+            attrs: Vec::new(),
+            name: None,
             client_id: "confid".into(),
             redirect_uri: PUBLIC_REDIRECT.into(),
             state: None,

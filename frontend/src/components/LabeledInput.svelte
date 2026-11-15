@@ -5,8 +5,11 @@
     label: string;
     value: string;
     testId: string;
-    type?: "text" | "email" | "password";
+    type?: "text" | "email" | "password" | "number" | "tel";
     placeholder?: string;
+    maxLength?: number | null;
+    min?: number | null;
+    max?: number | null;
   };
 
   let {
@@ -15,6 +18,9 @@
     testId,
     type = "text",
     placeholder = "",
+    maxLength = null,
+    min = null,
+    max = null,
   }: Props = $props();
 </script>
 
@@ -24,6 +30,9 @@
     class="input"
     {type}
     {placeholder}
+    maxlength={maxLength ?? undefined}
+    min={min ?? undefined}
+    max={max ?? undefined}
     data-testid={testId}
     bind:value
   />

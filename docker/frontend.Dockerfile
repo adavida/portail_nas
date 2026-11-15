@@ -1,5 +1,5 @@
 # Image prod du portail-frontend : build vite (URLs compilées via ARG) -> nginx TLS.
-# Build hors compose : docker build -f docker/frontend.Dockerfile -t portail-frontend:$(git rev-parse --abbrev-ref HEAD | tr / -) frontend
+# Build hors compose : docker build -f docker/frontend.Dockerfile -t portail-frontend:dev frontend
 
 FROM docker.io/library/node:22-alpine AS build
 

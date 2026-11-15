@@ -281,6 +281,7 @@ mod tests {
             custom_claims: Default::default(),
             required_group: String::new(),
             forbidden_group: String::new(),
+            expose_attrs: vec![],
         }
     }
 
@@ -369,6 +370,7 @@ mod tests {
             custom_claims: Default::default(),
             required_group: String::new(),
             forbidden_group: String::new(),
+            expose_attrs: vec![],
         }];
 
         let err = clients(&config).unwrap_err();

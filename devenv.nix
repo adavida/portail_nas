@@ -81,10 +81,48 @@ let
           -subj "/CN=127.0.0.1" \
           -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
       fi
+      cat > "$DEVENV_STATE/${dir}/portail.schema" <<'SCHEMA'
+      attributetype ( 1.3.6.1.4.1.99999.1.1
+          NAME 'portailAttr'
+          DESC 'Portal custom attribute outside the catalog, encoded label=value'
+          EQUALITY caseIgnoreMatch
+          SUBSTR caseIgnoreSubstringsMatch
+          SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{512} )
+      attributetype ( 1.3.6.1.4.1.99999.1.2
+          NAME 'city'
+          DESC 'Portal catalogued attribute city'
+          EQUALITY caseIgnoreMatch
+          SUBSTR caseIgnoreSubstringsMatch
+          SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{512} )
+      attributetype ( 1.3.6.1.4.1.99999.1.3
+          NAME 'age'
+          DESC 'Portal catalogued attribute age'
+          EQUALITY caseIgnoreMatch
+          SUBSTR caseIgnoreSubstringsMatch
+          SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{512} )
+      attributetype ( 1.3.6.1.4.1.99999.1.4
+          NAME 'contact'
+          DESC 'Portal catalogued attribute contact'
+          EQUALITY caseIgnoreMatch
+          SUBSTR caseIgnoreSubstringsMatch
+          SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{512} )
+      attributetype ( 1.3.6.1.4.1.99999.1.5
+          NAME 'telephone'
+          DESC 'Portal catalogued attribute telephone'
+          EQUALITY caseIgnoreMatch
+          SUBSTR caseIgnoreSubstringsMatch
+          SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{512} )
+      objectclass ( 1.3.6.1.4.1.99999.2.1
+          NAME 'portailUser'
+          DESC 'Auxiliary class carrying portal custom attributes'
+          SUP top AUXILIARY
+          MAY ( portailAttr $ city $ age $ contact $ telephone ) )
+      SCHEMA
       cat > "$DEVENV_STATE/${dir}/slapd.conf" <<EOF
       include ${pkgs.openldap}/etc/schema/core.schema
       include ${pkgs.openldap}/etc/schema/cosine.schema
       include ${pkgs.openldap}/etc/schema/inetorgperson.schema
+      include $DEVENV_STATE/${dir}/portail.schema
       modulepath ${pkgs.openldap}/lib/modules
       moduleload back_mdb.la
       pidfile $DEVENV_STATE/${dir}/run/slapd.pid

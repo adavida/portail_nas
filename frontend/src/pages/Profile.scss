@@ -56,6 +56,15 @@
   font-size: $fs-xs;
 }
 
+.profile-subtitle {
+  margin: $s-4 0 0;
+  color: var(--c-muted);
+  font-size: $fs-xs;
+  font-weight: $fw-semibold;
+  text-transform: uppercase;
+  letter-spacing: $ls-caps;
+}
+
 .profile-fields {
   display: flex;
   flex-direction: column;

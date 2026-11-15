@@ -24,7 +24,7 @@ clients = [
     ], scopes = [
         "openid",
         "profile",
-        "email",
+        "contact",
         "groups",
     ], custom_claims = [
         { name = "env", value = "test" },
@@ -46,3 +46,26 @@ clients = [
 [security]
 password_min_length = 2
 login_max_attempts = 3
+
+[[attrs.labels]]
+name = "city"
+type = "text"
+max_chars = 50
+names = { fr = "Ville", en = "City" }
+
+[[attrs.labels]]
+name = "age"
+type = "number"
+min = 0
+max = 150
+names = { fr = "Âge", en = "Age" }
+
+[[attrs.labels]]
+name = "contact"
+type = "email"
+names = { fr = "Courriel", en = "Email" }
+
+[[attrs.labels]]
+name = "telephone"
+type = "telephone"
+names = { fr = "Téléphone", en = "Telephone" }

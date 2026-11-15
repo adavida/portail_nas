@@ -1,52 +1,59 @@
-# Stack prod (images locales, ni build ni download au `up`).
+# Stack locale — tout se passe via compose : `up` construit les images absentes
+# (sections `build:`), télécharge openldap s'il manque, et ne touche jamais aux
+# volumes de données au rebuild.
 # Prérequis (une fois, hors compose) :
-#   bash docker/gen-secrets.sh
-#   bash docker/build-images.sh                      # tag = branche git (sanitisée)
+#   bash docker/gen-secrets.sh                       # mdp admin LDAP + cert TLS
 # Lancer (depuis la racine du repo) :
-#   GIT_TAG=$(git rev-parse --abbrev-ref HEAD | tr '/_' '--') docker compose -f docker/compose.yml up -d
+#   docker compose -f docker/compose.yml up -d                 # mode sqlite
+#   docker compose -f docker/compose.yml --profile ldap up -d  # mode ldap
+#   docker compose -f docker/compose.yml up -d --build         # forcer le rebuild (le `up`
+#                                                              # simple ne reconstruit que si l'image manque)
 # Entrée unique : le conteneur frontend fait edge TLS par SNI sur 443 —
 #   https://portail.localhost (SPA + /api + fournisseur OIDC du backend).
-# Le portail est son propre fournisseur OIDC : la clé de signature et
-# clients.json sont générés dans le volume `oidc-secrets` au premier start.
+# Deux modes d'annuaire, choisis par [directory] backend dans ./config.toml :
+#   sqlite -> docker compose up -d                          (pas de conteneur LDAP)
+#   ldap   -> docker compose --profile ldap up -d           (openldap + seed + schéma portailAttr)
+# Données sauvegardées (volumes nommés, survivent aux `down` et aux rebuilds) :
+#   ldap-data / ldap-config  -> annuaire OpenLDAP (users, groups, portailAttr)
+#   backend-data             -> SQLite /data/portail.db (subs OIDC + attrs si backend sqlite)
+#   oidc-secrets             -> clé de signature + secrets générés au premier start
+# Config applicative : ./config.toml monté en lecture seule (--config), jamais de
+# variable d'env de config ; ./secrets (mot de passe LDAP, cert TLS) monté en ro.
 # ldap/backend ne publient aucun port (réseau interne compose uniquement).
 
 services:
   openldap:
     image: docker.io/osixia/openldap:1.5.0
-    pull_policy: never
+    profiles: ["ldap"]
     environment:
-      LDAP_PORT: "3890"
       LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin}
       LDAP_DOMAIN: dev.example.com
       LDAP_ORGANISATION: dev example
+      LDAP_SEED_INTERNAL_SCHEMA_PATH: /container/slapd/schema
+      LDAP_SEED_INTERNAL_LDIF_PATH: /container/slapd/ldif
     volumes:
+      - ./portail.schema:/container/slapd/schema/portail.schema:ro
       - ./seed.ldif:/container/slapd/ldif/00-seed.ldif:ro
       - ldap-data:/var/lib/ldap
       - ldap-config:/etc/ldap/slapd.d
 
   backend:
-    image: portail-backend:${GIT_TAG:-dev}
-    pull_policy: never
-    environment:
-      APP_URL: https://portail.localhost
-      BIND_ADDR: 0.0.0.0:3000
-      LDAP_BASE_DN: dc=dev,dc=example,dc=com
-      LDAP_URL: ldap://openldap:3890
-      LDAP_ADMIN_PW: /secrets/ldap-admin-pw
-      OIDC_CLIENT_ID: portail-dev
-      OIDC_ISSUER_URL: https://portail.localhost
-      OIDC_REDIRECT_URI: https://portail.localhost/callback
-      OIDC_SECRETS_DIR: /oidc-secrets
+    image: portail-backend:dev
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
     volumes:
+      - ./config.toml:/etc/portail/config.toml:ro
       - ./secrets:/secrets:ro
+      - backend-data:/data
       - oidc-secrets:/oidc-secrets
-    depends_on:
-      - openldap
-    restart: on-failure
+    restart: on-failure # en mode ldap, retente jusqu'à ce qu'openldap soit prêt (pas de depends_on : il forcerait le profil ldap)
 
   frontend:
-    image: portail-frontend:${GIT_TAG:-dev}
-    pull_policy: never
+    image: portail-frontend:dev
+    build:
+      context: ../frontend
+      dockerfile: ../docker/frontend.Dockerfile
     ports:
       - "443:443" # edge TLS SNI : portail.localhost -> SPA + /api + OIDC
     volumes:
@@ -54,8 +61,10 @@ services:
       - ./secrets/portal.key:/etc/nginx/tls/portal.key:ro
     depends_on:
       - backend
+    restart: on-failure # nginx résout "backend" au boot : laisse passer la course DNS compose
 
 volumes:
   ldap-data:
   ldap-config:
+  backend-data:
   oidc-secrets:

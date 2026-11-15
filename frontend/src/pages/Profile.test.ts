@@ -36,6 +36,219 @@ test("pre-fills name and email from /api/auth/me", async () => {
   expect(name).toHaveValue("Alice");
   expect(email).toHaveValue("a@ex.com");
   expect(screen.getByTestId("profile-save")).toBeDisabled();
+  expect(screen.queryByTestId("profile-attrs")).not.toBeInTheDocument();
+});
+
+test("attr fields show the localized name of the ui language", async () => {
+  globalThis.fetch = mockFetchByUrl({
+    "/api/auth/me": {
+      ...me,
+      attrs: [
+        {
+          label: "city",
+          value: "",
+          type: "text",
+          max_chars: null,
+          min: null,
+          max: null,
+          names: { fr: "Ville", en: "City" },
+        },
+      ],
+    },
+    "/api/auth/config": config,
+  });
+
+  renderWithToaster(Profile, {});
+
+  const field = await screen.findByTestId("profile-attr-city");
+
+  expect(field.closest("label")).toHaveTextContent("City");
+});
+
+test("typing a custom attr enables the confirm button", async () => {
+  globalThis.fetch = mockFetchByUrl({
+    "/api/auth/me": {
+      ...me,
+      attrs: [
+        {
+          label: "telephone",
+          value: "",
+          type: "telephone",
+          max_chars: null,
+          min: null,
+          max: null,
+        },
+      ],
+    },
+    "/api/auth/config": config,
+  });
+
+  renderWithToaster(Profile, {});
+
+  const phone = await screen.findByTestId("profile-attr-telephone");
+  const save = screen.getByTestId("profile-save");
+  expect(save).toBeDisabled();
+
+  await fireEvent.input(phone, { target: { value: "+33 6 12 34 56 78" } });
+
+  expect(save).not.toBeDisabled();
+});
+
+test("phone attrs are sent without spaces (E.164)", async () => {
+  const fetchMock = mockFetchByUrl({
+    "/api/auth/me": {
+      ...me,
+      attrs: [
+        {
+          label: "telephone",
+          value: "",
+          type: "telephone",
+          max_chars: null,
+          min: null,
+          max: null,
+        },
+      ],
+    },
+    "PUT /api/auth/me": { profile_saved: true, attrs_saved: true },
+    "/api/auth/config": config,
+  });
+  globalThis.fetch = fetchMock;
+
+  renderWithToaster(Profile, {});
+
+  const phone = await screen.findByTestId("profile-attr-telephone");
+  expect(phone).toHaveAttribute("type", "tel");
+
+  await fireEvent.input(phone, { target: { value: "0612345678" } });
+  expect(screen.getByTestId("profile-attr-telephone-dial")).toHaveTextContent(
+    "+33",
+  );
+  expect(phone).toHaveValue("6 12 34 56 78");
+
+  await fireEvent.click(screen.getByTestId("profile-save"));
+
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/me",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({
+          name: "Alice",
+          email: "a@ex.com",
+          attrs: [{ label: "telephone", value: "+33612345678" }],
+        }),
+      }),
+    );
+  });
+  expect(
+    fetchMock.mock.calls.filter(
+      ([url, init]) => url === "/api/auth/me/attrs" && init?.method === "PUT",
+    ),
+  ).toHaveLength(0);
+});
+
+test("a failing profile half does not block saving attrs", async () => {
+  const fetchMock = mockFetchByUrl({
+    "/api/auth/me": {
+      ...me,
+      attrs: [
+        {
+          label: "city",
+          value: "Paris",
+          type: "text",
+          max_chars: null,
+          min: null,
+          max: null,
+        },
+      ],
+    },
+    "PUT /api/auth/me": {
+      profile_saved: false,
+      attrs_saved: true,
+      error: "name is empty",
+    },
+    "/api/auth/config": config,
+  });
+  globalThis.fetch = fetchMock;
+
+  renderWithToaster(Profile, {});
+
+  const city = await screen.findByTestId("profile-attr-city");
+  await fireEvent.input(city, { target: { value: "" } });
+  await fireEvent.click(screen.getByTestId("profile-save"));
+
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/me",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({
+          name: "Alice",
+          email: "a@ex.com",
+          attrs: [{ label: "city", value: "" }],
+        }),
+      }),
+    );
+  });
+});
+
+test("custom attrs render prefilled and are saved with the form", async () => {
+  const fetchMock = mockFetchByUrl({
+    "/api/auth/me": {
+      ...me,
+      attrs: [
+        {
+          label: "city",
+          value: "Paris",
+          type: "text",
+          max_chars: 50,
+          min: null,
+          max: null,
+        },
+        {
+          label: "age",
+          value: "30",
+          type: "number",
+          max_chars: null,
+          min: 0,
+          max: 150,
+        },
+      ],
+    },
+    "PUT /api/auth/me": { profile_saved: true, attrs_saved: true },
+    "/api/auth/config": config,
+  });
+  globalThis.fetch = fetchMock;
+
+  renderWithToaster(Profile, {});
+
+  const city = await screen.findByTestId("profile-attr-city");
+  const age = screen.getByTestId("profile-attr-age");
+
+  expect(city).toHaveValue("Paris");
+  expect(age).toHaveAttribute("type", "number");
+  expect(screen.getByTestId("profile-save")).toBeDisabled();
+
+  await fireEvent.input(city, { target: { value: "Lyon" } });
+  await fireEvent.click(screen.getByTestId("profile-save"));
+
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/me",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({
+          name: "Alice",
+          email: "a@ex.com",
+          attrs: [
+            { label: "city", value: "Lyon" },
+            { label: "age", value: "30" },
+          ],
+        }),
+      }),
+    );
+  });
+  expect(screen.getByTestId("profile-save")).toBeDisabled();
 });
 
 test("tabs switch between informations and password", async () => {
@@ -82,7 +295,11 @@ test("save sends PUT /api/auth/me with current values", async () => {
       "/api/auth/me",
       expect.objectContaining({
         method: "PUT",
-        body: JSON.stringify({ name: "Alice Dupont", email: "a@ex.com" }),
+        body: JSON.stringify({
+          name: "Alice Dupont",
+          email: "a@ex.com",
+          attrs: [],
+        }),
       }),
     );
   });

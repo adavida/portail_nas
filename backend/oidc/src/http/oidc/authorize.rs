@@ -74,6 +74,8 @@ pub async fn authorize(
         return Ok(failure("invalid_request"));
     }
     let mut flow = store::AuthFlow {
+        name: None,
+        attrs: Vec::new(),
         client_id,
         redirect_uri: redirect_uri.clone(),
         state: q.state.clone(),

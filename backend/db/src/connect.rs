@@ -15,6 +15,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "0002_directory_users_groups",
         include_str!("../migrations/0002_directory_users_groups.sql"),
     ),
+    (
+        "0003_user_attrs",
+        include_str!("../migrations/0003_user_attrs.sql"),
+    ),
 ];
 
 pub fn connect(config: &Config) -> Result<Connection, String> {
@@ -41,6 +45,8 @@ pub fn connect(config: &Config) -> Result<Connection, String> {
     conn.pragma_update(None, "foreign_keys", true)
         .map_err(|e| format!("cannot enable foreign keys on {}: {e}", path.display()))?;
     init_schema(&mut conn).map_err(|e| format!("cannot init schema in {}: {e}", path.display()))?;
+    let names: Vec<String> = config.attrs.iter().map(|spec| spec.name.clone()).collect();
+    crate::attrs::ensure_labels(&mut conn, &names)?;
     Ok(conn)
 }
 
@@ -71,6 +77,7 @@ pub(crate) fn init_schema(conn: &mut Connection) -> Result<(), rusqlite::Error> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use portail_core::config::{AttrKind, AttrSpec};
     use std::os::unix::fs::PermissionsExt;
 
     fn test_config(tag: &str) -> Config {
@@ -129,6 +136,30 @@ mod tests {
             MIGRATIONS.len(),
             "rerunning init_schema must not re-apply migrations"
         );
+    }
+
+    #[test]
+    fn connect_syncs_attr_labels_from_config() {
+        let mut config = test_config("attrsync");
+        config.attrs = vec![AttrSpec {
+            name: "city".into(),
+            kind: AttrKind::Text,
+            max_chars: None,
+            min: None,
+            max: None,
+            names: Default::default(),
+        }];
+
+        let conn = connect(&config).unwrap();
+        let count: i64 = conn
+            .query_row("SELECT count(*) FROM attr_labels", [], |row| row.get(0))
+            .unwrap();
+
+        assert_eq!(
+            count, 1,
+            "configured attr labels must exist in the labels table after connect"
+        );
+        let _ = std::fs::remove_dir_all(portal_db_path(&config).parent().unwrap());
     }
 
     #[test]

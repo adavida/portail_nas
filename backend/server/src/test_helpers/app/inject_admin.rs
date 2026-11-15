@@ -13,6 +13,7 @@ pub(crate) async fn inject_admin(mut req: Request, next: Next) -> Result<Respons
         groups: vec!["admin".into()],
         email: Some("admin@example.com".into()),
         preferred_username: Some("admin".into()),
+        name: None,
         nonce: None,
         azp: None,
         custom_claims: Default::default(),

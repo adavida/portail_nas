@@ -1,7 +1,7 @@
 use crate::{
     domain::groups::NewGroup,
     domain::ldap::{Description, Email, Gid, Members, Name, Password, Uid},
-    domain::users::{NewUser, UpdateUser, User},
+    domain::users::{NewUser, UpdateUser, User, UserAttr},
     repository as repo,
 };
 use portail_core::error::AppError;
@@ -103,6 +103,21 @@ pub async fn delete(uid: Uid) -> Result<(), AppError> {
 
 pub async fn update(uid: Uid, data: UpdateUser) -> Result<(), AppError> {
     repo::update_user(&uid, data).await
+}
+
+pub async fn list_attrs(uid: &Uid) -> Result<Vec<UserAttr>, AppError> {
+    repo::list_user_attrs(uid).await
+}
+
+pub async fn update_attrs(uid: &Uid, attrs: Vec<UserAttr>) -> Result<(), AppError> {
+    let mut validated = Vec::with_capacity(attrs.len());
+    for entry in attrs {
+        validated.push(
+            UserAttr::try_new(entry.label, entry.value)
+                .map_err(|e| AppError::BadRequest(e.to_string()))?,
+        );
+    }
+    repo::set_user_attrs(uid, validated).await
 }
 
 pub async fn authenticate(uid: Uid, password: Password) -> Result<bool, AppError> {

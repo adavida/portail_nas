@@ -18,6 +18,7 @@ pub async fn inject_user(mut req: Request, next: Next) -> Result<Response, Statu
         groups: vec![],
         email: Some("user@example.com".into()),
         preferred_username: Some("user".into()),
+        name: None,
         nonce: None,
         azp: None,
         custom_claims: Default::default(),

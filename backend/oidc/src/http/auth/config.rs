@@ -9,6 +9,7 @@ pub struct AuthConfig {
     client_id: String,
     redirect_uri: String,
     password_min_length: usize,
+    default_phone_country: String,
 }
 
 pub async fn config(State(config): State<Config>) -> Json<AuthConfig> {
@@ -17,5 +18,6 @@ pub async fn config(State(config): State<Config>) -> Json<AuthConfig> {
         client_id: config.oidc.client_id.clone(),
         redirect_uri: config.oidc.redirect_uri.clone(),
         password_min_length: config.security.password_min_length,
+        default_phone_country: config.default_phone_country.clone(),
     })
 }

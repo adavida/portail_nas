@@ -28,6 +28,8 @@ pub async fn debug_claims(
         )));
     };
     let mut flow = store::AuthFlow {
+        name: None,
+        attrs: Vec::new(),
         client_id: client.id.as_str().to_string(),
         redirect_uri: String::new(),
         state: None,

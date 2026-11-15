@@ -16,7 +16,7 @@ async fn update_me_changes_profile_and_me_reflects_it() {
         return;
     }
 
-    let (status, _) = send_as(
+    let (status, body) = send_as(
         &user.uid,
         Method::PUT,
         "/api/auth/me",
@@ -24,10 +24,14 @@ async fn update_me_changes_profile_and_me_reflects_it() {
     )
     .await;
 
+    assert_eq!(status, StatusCode::OK, "PUT /api/auth/me should 200");
     assert_eq!(
-        status,
-        StatusCode::NO_CONTENT,
-        "PUT /api/auth/me should 204"
+        body["profile_saved"], true,
+        "a valid profile half should report saved"
+    );
+    assert_eq!(
+        body["attrs_saved"], true,
+        "untouched attrs should report saved"
     );
 
     let (status, body) = send_as(&user.uid, Method::GET, "/api/auth/me", None).await;
@@ -54,7 +58,7 @@ async fn update_me_rejects_invalid_email() {
         return;
     }
 
-    let (status, _) = send_as(
+    let (status, body) = send_as(
         &user.uid,
         Method::PUT,
         "/api/auth/me",
@@ -64,8 +68,109 @@ async fn update_me_rejects_invalid_email() {
 
     assert_eq!(
         status,
-        StatusCode::UNPROCESSABLE_ENTITY,
-        "invalid email should be rejected by the Email VO"
+        StatusCode::OK,
+        "the merge request itself should succeed"
+    );
+    assert_eq!(
+        body["profile_saved"], false,
+        "an invalid email should be rejected by the Email VO"
+    );
+    assert!(
+        body["error"].is_string(),
+        "the failure reason should be reported, got {body}"
+    );
+
+    user.delete().await;
+}
+
+#[tokio::test]
+async fn update_me_saves_profile_and_attrs_in_one_request() {
+    assert_available().await;
+    let user = TestUser::new("apimeall");
+    let (status, _) = user.create().await;
+    if status == StatusCode::INTERNAL_SERVER_ERROR {
+        return;
+    }
+
+    let (status, body) = send_as(
+        &user.uid,
+        Method::PUT,
+        "/api/auth/me",
+        Some(json!({
+            "name": "Full Save",
+            "email": "full@example.com",
+            "attrs": [{"label": "city", "value": "Nice"}]
+        })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK, "PUT /api/auth/me should 200");
+    assert_eq!(
+        body["profile_saved"], true,
+        "valid profile half should save, got {body}"
+    );
+    assert_eq!(
+        body["attrs_saved"], true,
+        "valid attrs half should save, got {body}"
+    );
+
+    let (_, me) = send_as(&user.uid, Method::GET, "/api/auth/me", None).await;
+    let city = me["attrs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["label"] == "city")
+        .cloned();
+
+    assert_eq!(
+        city.unwrap()["value"],
+        "Nice",
+        "the attr saved through /me should come back"
+    );
+
+    user.delete().await;
+}
+
+#[tokio::test]
+async fn update_me_saves_attrs_even_when_name_is_empty() {
+    assert_available().await;
+    let user = TestUser::new("apimepart");
+    let (status, _) = user.create().await;
+    if status == StatusCode::INTERNAL_SERVER_ERROR {
+        return;
+    }
+
+    let (status, body) = send_as(
+        &user.uid,
+        Method::PUT,
+        "/api/auth/me",
+        Some(json!({
+            "name": "",
+            "email": "part@example.com",
+            "attrs": [{"label": "age", "value": "30"}]
+        })),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK, "partial save should 200");
+    assert_eq!(body["profile_saved"], false, "empty name is refused");
+    assert_eq!(
+        body["attrs_saved"], true,
+        "a failing name must not block saving attrs, got {body}"
+    );
+
+    let (_, me) = send_as(&user.uid, Method::GET, "/api/auth/me", None).await;
+    let age = me["attrs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["label"] == "age")
+        .cloned();
+
+    assert_eq!(
+        age.unwrap()["value"],
+        "30",
+        "attrs must be stored despite the profile failure"
     );
 
     user.delete().await;

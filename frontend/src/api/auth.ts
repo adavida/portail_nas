@@ -1,5 +1,15 @@
 import { authHeader } from "../auth/oidc";
 
+export type AttrEntry = {
+  label: string;
+  value: string;
+  type: "text" | "number" | "email" | "telephone";
+  max_chars: number | null;
+  min: number | null;
+  max: number | null;
+  names?: Record<string, string>;
+};
+
 export type Me = {
   sub: string;
   preferred_username: string | null;
@@ -7,6 +17,7 @@ export type Me = {
   email: string | null;
   groups: string[];
   is_admin: boolean;
+  attrs?: AttrEntry[];
 };
 
 const anonymous: Me = {
